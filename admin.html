@@ -15,28 +15,21 @@
 </head>
 <body>
 
-<!-- ══════════ NOT CONFIGURED ══════════ -->
-<div class="gate" id="setupGate" style="display:none;">
-  <div class="gate-card">
-    <div class="gate-logo">°CRYO <span>Admin</span></div>
-    <p class="gate-sub">Supabase холболт тохируулагдаагүй байна.</p>
-    <div class="notice warn">
-      <b>2 алхам үлдлээ:</b><br><br>
-      1. Supabase Dashboard → SQL Editor дээр <code>supabase/schema.sql</code>-ийг ажиллуулна.<br><br>
-      2. Project Settings → API Keys → <code>anon / public</code> түлхүүрийг хуулж
-      <code>supabase-config.js</code> доторх <code>anonKey</code> талбарт тавина.
-    </div>
-    <p class="gate-sub" style="margin:0">Дараа нь энэ хуудсыг дахин ачаална уу.</p>
-  </div>
-</div>
-
 <!-- ══════════ LOGIN ══════════ -->
-<div class="gate" id="authGate" style="display:none;">
+<div class="gate" id="authGate">
   <div class="gate-card">
-    <div class="gate-logo">°CRYO <span>Admin</span></div>
+    <a href="index.html" class="gate-logo">°CRYO <span>Admin</span></a>
     <p class="gate-sub">Удирдлагын самбарт нэвтрэх</p>
 
-    <div class="gate-tabs">
+    <!-- shown only while Supabase is not connected yet -->
+    <div class="notice warn" id="cfgWarn" style="display:none;">
+      <b>Supabase холбогдоогүй байна — нэвтрэх боломжгүй.</b><br><br>
+      1. Supabase → SQL Editor дээр <code>supabase/schema.sql</code>-ийг ажиллуулна.<br>
+      2. Project Settings → API Keys → <code>anon / public</code> түлхүүрийг хуулна.<br>
+      3. <code>supabase-config.js</code> доторх <code>anonKey</code> талбарт тавьж commit хийнэ.
+    </div>
+
+    <div class="gate-tabs" id="gateTabs">
       <button type="button" class="on" data-mode="signin">Нэвтрэх</button>
       <button type="button" data-mode="signup">Бүртгүүлэх</button>
     </div>
@@ -86,6 +79,7 @@
     <a href="index.html" class="side-logo">°CRYO <span>Admin</span></a>
 
     <button class="nav-item on" data-view="overview"><span class="ic">◈</span> Хяналтын самбар</button>
+    <button class="nav-item" data-view="reports"><span class="ic">▦</span> Тайлан</button>
     <button class="nav-item" data-view="bookings"><span class="ic">▤</span> Захиалга</button>
     <button class="nav-item" data-view="messages"><span class="ic">✉</span> Хүсэлт</button>
     <button class="nav-item" data-view="services"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
@@ -140,6 +134,79 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Үйлчилгээ / багц</th><th>Захиалга</th><th>Дүн</th></tr></thead>
           <tbody id="topBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── REPORTS ── -->
+    <section class="view" data-panel="reports">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Тайлан</div>
+          <div class="page-sub" id="repRange">—</div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn-sm ghost" id="repCsv">↓ CSV татах</button>
+          <button class="btn-sm ghost" id="repPrint">⎙ Хэвлэх</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="filters" id="repFilters">
+          <button class="chip-btn on" data-range="month">Энэ сар</button>
+          <button class="chip-btn" data-range="prev">Өнгөрсөн сар</button>
+          <button class="chip-btn" data-range="q">Сүүлийн 3 сар</button>
+          <button class="chip-btn" data-range="year">Энэ жил</button>
+          <button class="chip-btn" data-range="all">Бүх хугацаа</button>
+          <span style="flex:1"></span>
+          <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+            <label style="margin:0">Эхлэх</label>
+            <input class="ctl sm" type="date" id="repFrom" style="width:auto"/>
+          </div>
+          <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+            <label style="margin:0">Дуусах</label>
+            <input class="ctl sm" type="date" id="repTo" style="width:auto"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Нийт орлого</div>
+          <div class="kpi-val" id="rRevenue"><small>₮</small>0</div>
+          <div class="kpi-note" id="rRevenueNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Захиалгын тоо</div>
+          <div class="kpi-val" id="rCount">0</div>
+          <div class="kpi-note" id="rCountNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Дундаж дүн</div>
+          <div class="kpi-val" id="rAvg"><small>₮</small>0</div>
+          <div class="kpi-note">Нэг захиалгад</div></div>
+        <div class="kpi"><div class="kpi-label">Биелэлт</div>
+          <div class="kpi-val" id="rRate">0<small style="margin:0 0 0 2px">%</small></div>
+          <div class="kpi-note" id="rRateNote">—</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Өдрийн орлого</div>
+          <div class="page-sub" id="repTrendNote">—</div>
+        </div>
+        <svg class="chart" id="repChart" viewBox="0 0 720 210" preserveAspectRatio="none" role="img"
+             aria-label="Өдрийн орлогын график"></svg>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Үйлчилгээ, багцын задаргаа</div></div>
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Үйлчилгээ / багц</th><th>Тоо</th><th>Орлого</th><th>Эзлэх хувь</th></tr></thead>
+          <tbody id="repSvcBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Төлөвийн задаргаа</div></div>
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Төлөв</th><th>Тоо</th><th>Дүн</th><th>Эзлэх хувь</th></tr></thead>
+          <tbody id="repStatusBody"></tbody>
         </table></div>
       </div>
     </section>

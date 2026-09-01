@@ -83,7 +83,7 @@ body{background:var(--void);min-height:100vh}
 
 /* ── chart ── */
 .chart{width:100%;height:210px;display:block;overflow:visible}
-.chart .bar{fill:url(#barGrad);transition:opacity .2s}
+.chart .bar{transition:opacity .2s}
 .chart .bar:hover{opacity:.75}
 .chart text{font-family:var(--ff-body);font-size:10px;fill:var(--text-muted)}
 .chart .grid{stroke:rgba(150,205,255,.10);stroke-width:1}
@@ -161,4 +161,23 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
 @media(max-width:560px){
   .kpis{grid-template-columns:1fr}
   .page-title{font-size:22px}
+}
+
+
+/* ══════════ PRINT (report view) ══════════ */
+@media print{
+  body{background:#fff}
+  .side,.gate,.page-head .btn-sm,.filters,#refreshBtn{display:none !important}
+  .shell{display:block}
+  .main{padding:0}
+  .view{display:none !important}
+  .view.on{display:block !important}
+  .panel,.kpi{background:#fff !important;border:1px solid #ccc !important;box-shadow:none !important;
+    break-inside:avoid;page-break-inside:avoid}
+  .page-title,.panel-title,.kpi-val,.t-strong,.rate-amt{color:#000 !important;
+    -webkit-text-fill-color:#000 !important;background:none !important}
+  .kpi-label,.kpi-note,.page-sub,table.tbl td{color:#333 !important}
+  table.tbl th{background:#eee !important;color:#000 !important}
+  .chart .bar{fill:#1a7fc4 !important}
+  .chart text{fill:#333 !important}
 }

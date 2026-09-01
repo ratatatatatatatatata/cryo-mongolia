@@ -52,8 +52,18 @@ function fmtDate(v) {
    BOOT
    ══════════════════════════════════════════════════════════════ */
 (async function boot() {
+  wireNav();
+  wireBookingFilters();
+  wireReports();
+
+  /* the login screen always renders; it just explains itself when the
+     project has no anon key yet, instead of vanishing behind a setup page */
   if (!CFG.url || !CFG.anonKey) {
-    show($("setupGate"));
+    show($("authGate"));
+    show($("cfgWarn"));
+    $("authBtn").disabled = true;
+    $("authBtn").textContent = "Supabase холбогдоогүй";
+    $("gateTabs").style.display = "none";
     return;
   }
   sb = createClient(CFG.url, CFG.anonKey);
@@ -62,8 +72,6 @@ function fmtDate(v) {
   $("signOut").addEventListener("click", () => sb.auth.signOut());
   $("denyOut").addEventListener("click", () => sb.auth.signOut());
   $("refreshBtn").addEventListener("click", loadAll);
-  wireNav();
-  wireBookingFilters();
 
   sb.auth.onAuthStateChange(() => route());
   await route();
@@ -224,6 +232,7 @@ async function loadAll() {
   }
 
   renderOverview();
+  renderReports();
   renderBookings();
   renderMessages();
   renderServices();
@@ -260,28 +269,19 @@ function renderOverview() {
   renderTop();
 }
 
-function drawChart() {
-  const svg = $("revChart");
+function drawBars(svg, buckets) {
   svg.innerHTML = "";
   const NS = "http://www.w3.org/2000/svg";
-
-  // last 12 months, zero-filled
-  const now = new Date();
-  const buckets = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const row = cache.months.find((m) => String(m.month).slice(0, 7) === key);
-    buckets.push({ label: d.getMonth() + 1 + "-р", value: row ? Number(row.revenue) : 0 });
-  }
-
   const W = 720, H = 210, padL = 8, padB = 26, padT = 12;
   const max = Math.max(1, ...buckets.map((b) => b.value));
-  const bw = (W - padL * 2) / buckets.length;
+  const bw = (W - padL * 2) / Math.max(1, buckets.length);
 
+  /* a unique gradient per chart: a shared id resolves to the copy inside
+     the hidden view, which Chrome then refuses to paint with */
+  const gid = "barGrad-" + (svg.id || "x");
   const defs = document.createElementNS(NS, "defs");
   defs.innerHTML =
-    '<linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">' +
+    '<linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0%" stop-color="#b3e2ff"/><stop offset="100%" stop-color="#1a7fc4"/></linearGradient>';
   svg.appendChild(defs);
 
@@ -294,28 +294,45 @@ function drawChart() {
     svg.appendChild(line);
   }
 
+  const every = buckets.length > 24 ? Math.ceil(buckets.length / 12) : 1;
   buckets.forEach((b, i) => {
     const h = Math.max(2, ((H - padT - padB) * b.value) / max);
     const x = padL + i * bw + bw * 0.22;
     const y = H - padB - h;
     const r = document.createElementNS(NS, "rect");
     r.setAttribute("x", x); r.setAttribute("y", y);
-    r.setAttribute("width", bw * 0.56); r.setAttribute("height", h);
+    r.setAttribute("width", Math.max(1.5, bw * 0.56)); r.setAttribute("height", h);
     r.setAttribute("rx", Math.min(5, bw * 0.28));
     r.setAttribute("class", "bar");
+    r.setAttribute("fill", "url(#" + gid + ")");
     const title = document.createElementNS(NS, "title");
-    title.textContent = `${b.label} · ${money(b.value)}`;
+    title.textContent = b.label + " · " + money(b.value);
     r.appendChild(title);
     svg.appendChild(r);
 
-    const t = document.createElementNS(NS, "text");
-    t.setAttribute("x", padL + i * bw + bw / 2);
-    t.setAttribute("y", H - 8);
-    t.setAttribute("text-anchor", "middle");
-    t.textContent = b.label;
-    svg.appendChild(t);
+    if (i % every === 0) {
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", padL + i * bw + bw / 2);
+      t.setAttribute("y", H - 8);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = b.label;
+      svg.appendChild(t);
+    }
   });
+}
 
+function drawChart() {
+  const svg = $("revChart");
+  const now = new Date();
+  const buckets = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const row = cache.months.find((m) => String(m.month).slice(0, 7) === key);
+    buckets.push({ label: d.getMonth() + 1 + "-р", value: row ? Number(row.revenue) : 0 });
+  }
+
+  drawBars(svg, buckets);
   const total = buckets.reduce((s, b) => s + b.value, 0);
   $("chartNote").textContent = `12 сарын нийт: ${money(total)}`;
 }
@@ -685,3 +702,233 @@ function renderUsers() {
     body.appendChild(tr);
   });
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   REPORTS
+   ══════════════════════════════════════════════════════════════ */
+
+let repRange = "month";
+
+function rangeBounds(kind) {
+  const now = new Date();
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (kind === "month") {
+    return [new Date(now.getFullYear(), now.getMonth(), 1), startOfDay(now)];
+  }
+  if (kind === "prev") {
+    return [
+      new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      new Date(now.getFullYear(), now.getMonth(), 0),
+    ];
+  }
+  if (kind === "q") {
+    return [new Date(now.getFullYear(), now.getMonth() - 2, 1), startOfDay(now)];
+  }
+  if (kind === "year") {
+    return [new Date(now.getFullYear(), 0, 1), startOfDay(now)];
+  }
+  if (kind === "custom") {
+    const f = $("repFrom").value, t = $("repTo").value;
+    return [f ? new Date(f) : new Date(2000, 0, 1), t ? new Date(t) : new Date()];
+  }
+  return [new Date(2000, 0, 1), startOfDay(now)]; // all
+}
+
+function wireReports() {
+  const filters = $("repFilters");
+  if (!filters) return;
+
+  filters.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip-btn");
+    if (!b) return;
+    filters.querySelectorAll(".chip-btn").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    repRange = b.dataset.range;
+    renderReports();
+  });
+
+  ["repFrom", "repTo"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("change", () => {
+      filters.querySelectorAll(".chip-btn").forEach((x) => x.classList.remove("on"));
+      repRange = "custom";
+      renderReports();
+    });
+  });
+
+  const csv = $("repCsv");
+  if (csv) csv.addEventListener("click", exportCsv);
+  const pr = $("repPrint");
+  if (pr) pr.addEventListener("click", () => window.print());
+}
+
+function reportRows() {
+  const [from, to] = rangeBounds(repRange);
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
+  return {
+    from,
+    to: end,
+    rows: cache.bookings.filter((b) => {
+      const d = new Date(b.created_at);
+      return d >= from && d <= end;
+    }),
+  };
+}
+
+function renderReports() {
+  if (!$("repRange")) return;
+  const { from, to, rows } = reportRows();
+
+  $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
+
+  const paid = rows.filter((b) => b.status === "confirmed" || b.status === "done");
+  const revenue = paid.reduce((s, b) => s + (b.amount || 0), 0);
+  const done = rows.filter((b) => b.status === "done").length;
+  const rate = rows.length ? Math.round((done / rows.length) * 100) : 0;
+
+  $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
+  $("rRevenueNote").textContent = paid.length + " баталгаажсан захиалга";
+  $("rCount").textContent = rows.length.toLocaleString("en-US");
+  $("rCountNote").textContent =
+    "Хүлээгдэж буй " + rows.filter((b) => b.status === "pending").length;
+  $("rAvg").innerHTML =
+    '<small>₮</small>' +
+    (paid.length ? Math.round(revenue / paid.length) : 0).toLocaleString("en-US");
+  $("rRate").innerHTML = rate + '<small style="margin:0 0 0 2px">%</small>';
+  $("rRateNote").textContent = done + " / " + rows.length + " биелсэн";
+
+  /* daily (or monthly for long ranges) trend */
+  const spanDays = Math.round((to - from) / 86400000);
+  const byMonth = spanDays > 92;
+  const buckets = [];
+  if (byMonth) {
+    const cur = new Date(from.getFullYear(), from.getMonth(), 1);
+    while (cur <= to) {
+      const key = cur.getFullYear() + "-" + String(cur.getMonth() + 1).padStart(2, "0");
+      const v = paid
+        .filter((b) => String(b.created_at).slice(0, 7) === key)
+        .reduce((s, b) => s + (b.amount || 0), 0);
+      buckets.push({ label: cur.getMonth() + 1 + "-р", value: v });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  } else {
+    const cur = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    while (cur <= to) {
+      const key =
+        cur.getFullYear() +
+        "-" + String(cur.getMonth() + 1).padStart(2, "0") +
+        "-" + String(cur.getDate()).padStart(2, "0");
+      const v = paid
+        .filter((b) => String(b.created_at).slice(0, 10) === key)
+        .reduce((s, b) => s + (b.amount || 0), 0);
+      buckets.push({ label: String(cur.getDate()), value: v });
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+  drawBars($("repChart"), buckets);
+  $("repTrendNote").textContent =
+    (byMonth ? "Сараар" : "Өдрөөр") + " · нийт " + money(revenue);
+
+  /* service / package breakdown */
+  const agg = {};
+  rows.forEach((b) => {
+    const key = b.package || b.service || "Тодорхойгүй";
+    agg[key] = agg[key] || { n: 0, sum: 0 };
+    agg[key].n++;
+    if (b.status === "confirmed" || b.status === "done") agg[key].sum += b.amount || 0;
+  });
+  const svcBody = $("repSvcBody");
+  svcBody.innerHTML = "";
+  const entries = Object.entries(agg).sort((a, b) => b[1].sum - a[1].sum);
+  if (!entries.length) {
+    svcBody.innerHTML =
+      '<tr><td colspan="4"><div class="empty">Энэ хугацаанд захиалга алга.</div></td></tr>';
+  } else {
+    entries.forEach(([name, v]) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(cell(name, "t-strong"));
+      tr.appendChild(cell(v.n, "t-mono"));
+      tr.appendChild(cell(money(v.sum), "t-mono"));
+      tr.appendChild(shareCell(revenue ? (v.sum / revenue) * 100 : 0));
+      svcBody.appendChild(tr);
+    });
+  }
+
+  /* status breakdown */
+  const stBody = $("repStatusBody");
+  stBody.innerHTML = "";
+  Object.keys(STATUS_MN).forEach((k) => {
+    const list = rows.filter((b) => b.status === k);
+    const sum = list.reduce((s, b) => s + (b.amount || 0), 0);
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "pill st-" + k;
+    pill.textContent = STATUS_MN[k];
+    td.appendChild(pill);
+    tr.appendChild(td);
+    tr.appendChild(cell(list.length, "t-mono"));
+    tr.appendChild(cell(money(sum), "t-mono"));
+    tr.appendChild(shareCell(rows.length ? (list.length / rows.length) * 100 : 0));
+    stBody.appendChild(tr);
+  });
+}
+
+function shareCell(pct) {
+  const td = document.createElement("td");
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:flex;align-items:center;gap:10px;min-width:150px";
+  const bar = document.createElement("div");
+  bar.style.cssText =
+    "flex:1;height:6px;border-radius:99px;background:rgba(150,205,255,.12);overflow:hidden";
+  const fill = document.createElement("div");
+  fill.style.cssText =
+    "height:100%;border-radius:99px;background:linear-gradient(90deg,#b3e2ff,#1a7fc4);width:" +
+    Math.max(0, Math.min(100, pct)).toFixed(1) + "%";
+  bar.appendChild(fill);
+  const lab = document.createElement("span");
+  lab.className = "t-mono";
+  lab.style.cssText = "font-size:12px;min-width:44px;text-align:right";
+  lab.textContent = pct.toFixed(1) + "%";
+  wrap.append(bar, lab);
+  td.appendChild(wrap);
+  return td;
+}
+
+function exportCsv() {
+  const { from, to, rows } = reportRows();
+  const head = [
+    "Дугаар", "Үйлчлүүлэгч", "Утас", "Үйлчилгээ", "Багц",
+    "Огноо", "Цаг", "Дүн", "Урьдчилгаа", "Банк", "Төлөв", "Үүссэн",
+  ];
+  const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const lines = [head.map(q).join(",")];
+  rows.forEach((b) => {
+    lines.push(
+      [
+        b.ref, b.customer_name, b.phone, b.service, b.package,
+        b.booked_date, b.booked_time, b.amount, b.deposit, b.bank,
+        STATUS_MN[b.status] || b.status, b.created_at,
+      ].map(q).join(","),
+    );
+  });
+
+  // BOM so Excel opens the Cyrillic correctly
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download =
+    "cryo-tailan-" + fmtDate(from).replace(/\./g, "") + "-" + fmtDate(to).replace(/\./g, "") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 500);
+}
+
+
