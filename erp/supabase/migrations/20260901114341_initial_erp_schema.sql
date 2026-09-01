@@ -699,7 +699,16 @@ create table public.customers (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   search_document tsvector generated always as (
-    to_tsvector('simple', coalesce(full_name, '') || ' ' || coalesce(phone_normalized, '') || ' ' || coalesce(email, ''))
+    to_tsvector(
+      'simple',
+      coalesce(full_name, '') || ' ' ||
+      case
+        when left(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 3) = '976'
+          and length(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g')) = 11
+        then right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 8)
+        else regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g')
+      end || ' ' || coalesce(email, '')
+    )
   ) stored,
   check (char_length(btrim(full_name)) between 2 and 160),
   check (phone is null or char_length(phone) <= 40),
