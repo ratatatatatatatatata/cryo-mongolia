@@ -495,6 +495,8 @@ section+section,.stats+section{border-top:1px solid var(--border)}
 .stage{
   position:relative;height:520px;perspective:1600px;perspective-origin:50% 46%;
   display:flex;align-items:center;justify-content:center;
+  /* the coverflow throws items well past the viewport on narrow screens */
+  overflow:hidden;
 }
 .stage::before{ /* floor light pool */
   content:'';position:absolute;bottom:56px;left:50%;transform:translateX(-50%);
