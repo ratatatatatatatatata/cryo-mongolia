@@ -1,0 +1,164 @@
+/* ══════════════════════════════════════════════════════════════
+   °CRYO Mongolia — admin dashboard
+   Uses the Deep Freeze tokens from shared.css
+   ══════════════════════════════════════════════════════════════ */
+
+body{background:var(--void);min-height:100vh}
+
+/* ── setup / login gate ── */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(80% 60% at 50% 0%,rgba(26,127,196,.18),transparent 62%),var(--void)}
+.gate-card{width:100%;max-width:420px;padding:44px 40px;border-radius:var(--r-2xl);
+  background:linear-gradient(165deg,rgba(20,38,62,.8),rgba(8,16,28,.94));
+  border:1px solid var(--border-mid);box-shadow:var(--lift-3), var(--hairline)}
+.gate-logo{font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);margin-bottom:6px}
+.gate-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-sub{font-size:12.5px;color:var(--text-muted);margin-bottom:28px}
+.gate-card .field{margin-bottom:16px}
+.gate-tabs{display:flex;gap:6px;margin-bottom:22px}
+.gate-tabs button{flex:1;padding:9px;border-radius:99px;border:1px solid var(--border);
+  background:var(--glass);color:var(--text-secondary);font-family:var(--ff-body);
+  font-size:12.5px;font-weight:700;cursor:pointer;transition:all var(--ease)}
+.gate-tabs button.on{color:#03131f;border-color:transparent;
+  background:linear-gradient(135deg,var(--ice-100),var(--ice-400))}
+
+/* ── shell ── */
+.shell{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+.side{position:sticky;top:0;height:100vh;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
+  background:linear-gradient(180deg,rgba(10,18,32,.95),rgba(3,6,12,.98));
+  border-right:1px solid var(--border)}
+.side-logo{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);
+  padding:0 12px 22px;text-decoration:none;display:block}
+.side-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.side a.nav-item,.side button.nav-item{
+  display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:12px;
+  font-family:var(--ff-body);font-size:13.5px;font-weight:600;color:var(--text-secondary);
+  background:none;border:1px solid transparent;cursor:pointer;text-align:left;
+  text-decoration:none;transition:all var(--ease);width:100%}
+.nav-item:hover{color:var(--ice-100);background:var(--glass)}
+.nav-item.on{color:var(--ice-50);background:rgba(88,198,255,.12);border-color:rgba(88,198,255,.26)}
+.nav-item .ic{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.side-foot{margin-top:auto;padding-top:18px;border-top:1px solid var(--border)}
+.side-user{padding:0 12px 12px}
+.side-user .u-mail{font-size:12px;color:var(--ice-100);font-weight:700;word-break:break-all}
+.side-role{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:99px;
+  font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.role-owner{background:linear-gradient(135deg,var(--ice-100),var(--ice-400));color:#03131f}
+.role-admin{background:rgba(88,198,255,.16);color:var(--ice-200);border:1px solid rgba(88,198,255,.32)}
+.role-staff{background:var(--glass);color:var(--text-muted);border:1px solid var(--border)}
+
+.main{padding:34px 40px 60px;min-width:0}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;margin-bottom:28px}
+.page-title{font-size:27px;font-weight:800;letter-spacing:-.04em;color:var(--ice-50)}
+.page-sub{font-size:13px;color:var(--text-muted);margin-top:5px}
+.view{display:none}
+.view.on{display:block;animation:vin .4s cubic-bezier(.22,1,.36,1)}
+@keyframes vin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ── KPI tiles ── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.kpi{position:relative;padding:24px;border-radius:var(--r-xl);overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.014));
+  border:1px solid var(--border);box-shadow:var(--hairline)}
+.kpi::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(70% 60% at 50% 0%,rgba(88,198,255,.13),transparent 70%)}
+.kpi-label{position:relative;font-size:9.5px;font-weight:800;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:12px}
+.kpi-val{position:relative;font-size:30px;font-weight:800;line-height:1;letter-spacing:-.05em;
+  background:linear-gradient(150deg,var(--ice-50),var(--ice-400));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi-val small{font-size:.5em;color:var(--ice-500);-webkit-text-fill-color:var(--ice-500);margin-right:4px}
+.kpi-note{position:relative;font-size:11.5px;color:var(--text-muted);margin-top:9px}
+
+/* ── panels ── */
+.panel{padding:26px 28px;border-radius:var(--r-xl);margin-bottom:22px;
+  background:linear-gradient(165deg,rgba(20,38,62,.5),rgba(8,16,28,.8));
+  border:1px solid var(--border);box-shadow:var(--hairline)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;margin-bottom:20px}
+.panel-title{font-size:15px;font-weight:800;letter-spacing:-.02em;color:var(--ice-100)}
+
+/* ── chart ── */
+.chart{width:100%;height:210px;display:block;overflow:visible}
+.chart .bar{fill:url(#barGrad);transition:opacity .2s}
+.chart .bar:hover{opacity:.75}
+.chart text{font-family:var(--ff-body);font-size:10px;fill:var(--text-muted)}
+.chart .grid{stroke:rgba(150,205,255,.10);stroke-width:1}
+
+/* ── tables ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--r-lg);border:1px solid var(--border)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+table.tbl th{background:rgba(88,198,255,.09);padding:12px 16px;text-align:left;font-size:9.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ice-300);font-weight:800;white-space:nowrap}
+table.tbl td{padding:13px 16px;border-bottom:1px solid var(--border);color:var(--text-secondary);
+  vertical-align:middle}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
+.t-strong{color:var(--ice-100);font-weight:700}
+.t-mono{font-variant-numeric:tabular-nums}
+.empty{padding:44px 20px;text-align:center;color:var(--text-muted);font-size:13.5px}
+
+/* ── status pills ── */
+.pill{display:inline-block;padding:4px 12px;border-radius:99px;font-size:9.5px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.st-pending  {background:rgba(255,180,80,.14);color:#ffcf95;border:1px solid rgba(255,180,80,.3)}
+.st-confirmed{background:rgba(88,198,255,.14);color:var(--ice-200);border:1px solid rgba(88,198,255,.32)}
+.st-done     {background:rgba(80,220,160,.14);color:#8ceec2;border:1px solid rgba(80,220,160,.3)}
+.st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
+
+/* ── controls ── */
+.field{display:flex;flex-direction:column;gap:7px}
+.field label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+input.ctl,select.ctl,textarea.ctl{
+  background:rgba(3,6,12,.6);border:1px solid var(--border);color:var(--text-primary);
+  font-family:var(--ff-body);font-size:13.5px;padding:11px 13px;border-radius:var(--r-md);
+  outline:none;transition:border-color var(--ease),box-shadow var(--ease);width:100%}
+input.ctl:focus,select.ctl:focus,textarea.ctl:focus{
+  border-color:rgba(88,198,255,.5);box-shadow:0 0 0 4px rgba(88,198,255,.09)}
+select.ctl option{background:#0a1220}
+input.ctl.sm,select.ctl.sm{padding:7px 10px;font-size:12.5px;border-radius:9px}
+input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip-btn{padding:8px 16px;border-radius:99px;border:1px solid var(--border);background:var(--glass);
+  color:var(--text-secondary);font-family:var(--ff-body);font-size:12px;font-weight:700;cursor:pointer;
+  transition:all var(--ease)}
+.chip-btn:hover{color:var(--ice-200);border-color:var(--border-mid)}
+.chip-btn.on{color:#03131f;border-color:transparent;
+  background:linear-gradient(135deg,var(--ice-100),var(--ice-400))}
+.btn-sm{padding:8px 16px;font-size:12px;border-radius:99px;border:none;cursor:pointer;
+  font-family:var(--ff-body);font-weight:700;transition:all var(--ease)}
+.btn-sm.primary{color:#03131f;background:linear-gradient(135deg,var(--ice-100),var(--ice-400))}
+.btn-sm.primary:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(88,198,255,.35)}
+.btn-sm.ghost{background:var(--glass);border:1px solid var(--border-mid);color:var(--text-secondary)}
+.btn-sm.ghost:hover{color:var(--ice-200);border-color:var(--border-strong)}
+.btn-sm:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+/* ── notices ── */
+.notice{padding:14px 18px;border-radius:var(--r-md);font-size:13px;line-height:1.65;margin-bottom:18px}
+.notice.warn{background:rgba(255,180,80,.09);border:1px solid rgba(255,180,80,.28);color:#ffcf95}
+.notice.err {background:rgba(255,110,110,.1);border:1px solid rgba(255,110,110,.3);color:#ffa3a3}
+.notice.ok  {background:rgba(80,220,160,.1);border:1px solid rgba(80,220,160,.28);color:#8ceec2}
+.notice code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  background:rgba(0,0,0,.35);padding:2px 6px;border-radius:5px}
+
+.saving{opacity:.5;pointer-events:none}
+
+@media(max-width:1000px){
+  .shell{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;
+    border-right:none;border-bottom:1px solid var(--border);padding:14px}
+  .side-logo{padding:0 10px 0 4px}
+  .side a.nav-item,.side button.nav-item{width:auto;padding:9px 12px}
+  .side-foot{margin-top:0;padding-top:0;border-top:none;margin-left:auto}
+  .side-user{padding:0 8px}
+  .side-user .u-mail{display:none}
+  .main{padding:24px 20px 50px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .kpis{grid-template-columns:1fr}
+  .page-title{font-size:22px}
+}

@@ -3,7 +3,7 @@
    Cinematic dark-glacial · real depth · WebGL + CSS 3D
    ══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
 
 :root{
   /* ── surfaces (dark glacial) ── */
@@ -64,7 +64,7 @@
   --lift-3: 0 8px 20px rgba(0,0,0,.5), 0 50px 110px rgba(0,0,0,.7);
 
   /* ── type ── */
-  --ff-display:'Unbounded', 'Playfair Display', Georgia, serif;
+  --ff-display:'Manrope', system-ui, -apple-system, sans-serif;
   --ff-body:   'Manrope', system-ui, -apple-system, sans-serif;
 
   --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-2xl: 36px;
@@ -1096,4 +1096,28 @@ body.has-halo .cursor-halo{opacity:1}
   .rate-row{flex-wrap:wrap;gap:6px 12px}
   .rate-dots{display:none}
   .rate-amt{margin-left:auto}
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   SINGLE TYPEFACE
+   The whole site now sets in Manrope. Display sizes carry their
+   weight through 800 + tight tracking rather than a second family.
+   ══════════════════════════════════════════════════════════════ */
+.hero-title,.section-title,.dev-title,.hub-title,.dg-title,.sec-title,
+.io-name,.pack-name,.price-name,.rates-title,.cta-bar h3,
+.stat-num,.sstat-num,.pack-new,.io-new,.price-amount,.fb-num,.ht-num,.hb-num,
+.dep-amount,.s-title,.ref-num,.cryo-temp,
+.nav-logo,.footer-logo,.hub-footer .fl{
+  font-weight:800;
+  letter-spacing:-.045em;
+}
+.card-title,.si-name,.dc-title,.step-item h4,.process-step h4,
+.qr-bank-name,.feat-title,.hs-content h4,.app-name,.modal h3,
+.rate-amt,.card-price,.pack-list b,.benefit-title{
+  font-weight:700;
+  letter-spacing:-.02em;
+}
+.pillar-num,.pack-kicker,.feat-num,.hs-num,.step-bubble,.dc-num{
+  font-weight:800;
 }

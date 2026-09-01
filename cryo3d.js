@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════
    °CRYO MONGOLIA — cryo3d.js
-   1) WebGL raymarched ice-core hero (no libraries, ~0 deps)
+   1) WebGL raymarched 3D brand emblem hero (no libraries, ~0 deps)
    2) CSS-3D interaction layer: tilt cards, device coverflow,
       scroll reveal, magnetic buttons, cursor halo, parallax
    ══════════════════════════════════════════════════════════════ */
@@ -11,7 +11,7 @@
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ════════════════════════════════════════════════════════════
-     1. WEBGL — VOLUMETRIC ICE CORE
+     1. WEBGL — 3D BRAND EMBLEM
      ════════════════════════════════════════════════════════════ */
 
   const VERT = `
@@ -28,6 +28,10 @@
   uniform float uScroll;    // 0..1 hero scroll progress
 
   const float PI = 3.14159265;
+
+  /* brand palette */
+  const vec3 STAR_COL  = vec3(0.436, 0.698, 0.961);   /* #6FB2F5 */
+  const vec3 ARROW_COL = vec3(0.043, 0.388, 0.965);   /* #0B63F6 */
 
   mat2 rot(float a){ float s = sin(a), c = cos(a); return mat2(c, -s, s, c); }
 
@@ -49,202 +53,220 @@
 
   float fbm(vec3 p){
     float a = 0.5, s = 0.0;
-    for (int i = 0; i < 5; i++){ s += a * noise(p); p *= 2.04; a *= 0.5; }
+    for (int i = 0; i < 4; i++){ s += a * noise(p); p *= 2.04; a *= 0.5; }
     return s;
   }
 
-  /* icosahedral gem — sharp natural ice facets */
-  float sdIcosa(vec3 p, float r){
-    const float G = 1.6180339;
-    vec3 n = normalize(vec3(G, 1.0, 0.0));
-    p = abs(p);
-    float d = dot(p, n);
-    d = max(d, dot(p, n.yzx));
-    d = max(d, dot(p, n.zxy));
-    d = max(d, dot(p, vec3(0.5773503)));
-    return d - r;
+  /* ── 2D: eight-pointed star ── */
+  float sdStar(vec2 p, float r, float n, float m){
+    float an = PI / n;
+    float en = PI / m;
+    vec2 acs = vec2(cos(an), sin(an));
+    vec2 ecs = vec2(cos(en), sin(en));
+    float bn = mod(atan(p.x, p.y), 2.0 * an) - an;
+    p = length(p) * vec2(cos(bn), abs(sin(bn)));
+    p -= r * acs;
+    p += ecs * clamp(-dot(p, ecs), 0.0, r * acs.y / ecs.y);
+    return length(p) * sign(p.x);
   }
 
-  vec3 twist(vec3 p){
-    float t = uTime * 0.13;
-    p.xz *= rot(t);
-    p.xy *= rot(t * 0.62);
-    return p;
+  /* ── 2D: distance to one polygon edge ── */
+  float segD(vec2 p, vec2 a, vec2 b){
+    vec2 w = p - a, e = b - a;
+    vec2 q = w - e * clamp(dot(w, e) / dot(e, e), 0.0, 1.0);
+    return dot(q, q);
+  }
+  float segS(vec2 p, vec2 a, vec2 b){
+    vec2 w = p - a, e = b - a;
+    bvec3 c = bvec3(p.y >= a.y, p.y < b.y, e.x * w.y > e.y * w.x);
+    return (all(c) || all(not(c))) ? -1.0 : 1.0;
   }
 
-  /* main crystal field */
-  float mapCrystal(vec3 p){
-    vec3 q = twist(p);
-    float gem  = sdIcosa(q, 0.94);
-    vec3 q2 = q;
-    q2.xy *= rot(0.92);
-    q2.yz *= rot(0.61);
-    float oct = (abs(q2.x) + abs(q2.y) + abs(q2.z)) * 0.5773503 - 1.00;
-    gem = max(gem, oct);
-    float ball = length(q) - 1.07;
-    float d = mix(gem, ball, 0.10);
-    /* frost relief on the surface */
-    d -= (fbm(q * 4.2 + vec3(0.0, uTime * 0.10, 0.0)) - 0.5) * 0.045;
-    /* slow breathing */
-    d -= sin(uTime * 0.7) * 0.012;
-    return d * 0.70;
+  /* ── 2D: navigation / send arrow (4 vertices, pointing up) ── */
+  float sdArrow(vec2 p, float s){
+    vec2 v0 = vec2( 0.000,  1.100) * s;   /* tip        */
+    vec2 v1 = vec2( 0.720, -0.850) * s;   /* right wing */
+    vec2 v2 = vec2( 0.000, -0.420) * s;   /* tail notch */
+    vec2 v3 = vec2(-0.720, -0.850) * s;   /* left wing  */
+
+    float d = min(min(segD(p, v0, v1), segD(p, v1, v2)),
+                  min(segD(p, v2, v3), segD(p, v3, v0)));
+    float sg = segS(p, v0, v1) * segS(p, v1, v2) * segS(p, v2, v3) * segS(p, v3, v0);
+    return sg * sqrt(d);
+  }
+
+  /* ── extrude a 2D field into a rounded slab ── */
+  float extrude(float d2, float z, float h, float round){
+    vec2 w = vec2(d2 + round, abs(z) - h);
+    return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - round;
+  }
+
+  /* ── the emblem: light star behind, deep-blue arrow ribbon in front ──
+     returns vec2(distance, materialId) : 1 = star, 2 = arrow            */
+  vec2 mapLogo(vec3 p){
+    /* gentle 3D presentation — never spins edge-on, so it stays legible */
+    float t = uTime;
+    p.xz *= rot(sin(t * 0.34) * 0.62 + uMouse.x * 0.22);
+    p.yz *= rot(sin(t * 0.23 + 1.1) * 0.20 - uMouse.y * 0.14);
+    p.y  -= sin(t * 0.55) * 0.045;                  /* slow float */
+
+    /* ── star ── */
+    vec2 sp = p.xy * rot(0.20 + sin(t * 0.18) * 0.05);
+    float star2 = sdStar(sp, 1.16, 8.0, 2.75);
+    float star  = extrude(star2, p.z - 0.10, 0.115, 0.028);
+
+    /* ── arrow: outer body minus an inner copy leaves the ribbon ── */
+    vec2 ap = (p.xy - vec2(0.02, -0.02)) * rot(-0.87);   /* points up-right */
+    float outer = sdArrow(ap, 1.16);
+    float inner = sdArrow((ap - vec2(0.0, -0.14)), 0.50);
+    float arrow2 = max(outer, -inner);
+    float arrow  = extrude(arrow2, p.z - 0.30, 0.135, 0.05);
+
+    vec2 res = vec2(star, 1.0);
+    if (arrow < res.x) res = vec2(arrow, 2.0);
+    return res;
   }
 
   vec3 normalAt(vec3 p){
     vec2 e = vec2(0.0022, 0.0);
     return normalize(vec3(
-      mapCrystal(p + e.xyy) - mapCrystal(p - e.xyy),
-      mapCrystal(p + e.yxy) - mapCrystal(p - e.yxy),
-      mapCrystal(p + e.yyx) - mapCrystal(p - e.yyx)));
+      mapLogo(p + e.xyy).x - mapLogo(p - e.xyy).x,
+      mapLogo(p + e.yxy).x - mapLogo(p - e.yxy).x,
+      mapLogo(p + e.yyx).x - mapLogo(p - e.yyx).x));
   }
 
-  /* procedural cold environment for reflections/refraction */
+  /* studio environment the emblem reflects */
   vec3 envColor(vec3 rd){
     float up = rd.y * 0.5 + 0.5;
-    vec3 sky  = mix(vec3(0.016, 0.035, 0.070), vec3(0.10, 0.34, 0.58), pow(up, 1.4));
-    /* two cold key lights */
-    float k1 = pow(max(dot(rd, normalize(vec3(-0.55, 0.62, 0.55))), 0.0), 22.0);
+    vec3 sky = mix(vec3(0.014, 0.032, 0.066), vec3(0.09, 0.30, 0.54), pow(up, 1.4));
+    float k1 = pow(max(dot(rd, normalize(vec3(-0.55, 0.62, 0.55))), 0.0), 20.0);
     float k2 = pow(max(dot(rd, normalize(vec3( 0.80, 0.15, 0.55))), 0.0), 10.0);
-    sky += vec3(0.80, 0.94, 1.00) * k1 * 1.5;
-    sky += vec3(0.16, 0.52, 0.90) * k2 * 0.7;
-    /* faint ice dust */
-    float d = fbm(rd * 9.0 + vec3(uTime * 0.03));
-    sky += vec3(0.25, 0.55, 0.85) * pow(d, 4.0) * 0.35;
+    sky += vec3(0.80, 0.94, 1.00) * k1 * 1.4;
+    sky += vec3(0.16, 0.52, 0.90) * k2 * 0.6;
     return sky;
   }
 
-  /* ── cold mist falling around the core ── */
+  /* cold haze drifting behind the emblem */
   float mistDensity(vec3 p){
     vec3 q = p;
-    q.y += uTime * 0.16;                 /* cold air sinks */
+    q.y += uTime * 0.16;
     q.xz *= rot(uTime * 0.035);
     float n = fbm(q * 0.85);
-    float shell = smoothstep(2.6, 0.75, length(p.xz * vec2(1.0, 1.0)));
-    float band  = smoothstep(1.9, -1.4, p.y);
-    return max(0.0, (n - 0.46)) * shell * band;
+    float shell = smoothstep(3.0, 0.85, length(p.xz));
+    float band  = smoothstep(2.1, -1.6, p.y);
+    return max(0.0, n - 0.47) * shell * band;
   }
 
   void main(){
     float wide = smoothstep(1.05, 1.65, uRes.x / uRes.y);
-    float cx = mix(0.50, 0.735, wide);   /* portrait: centred · landscape: right of the copy */
-    float cy = mix(0.40, 0.52, wide);    /* portrait: sits below the headline */
+    float cx = mix(0.50, 0.735, wide);
+    float cy = mix(0.42, 0.52, wide);
     vec2 uv = (gl_FragCoord.xy - vec2(uRes.x * cx, uRes.y * cy)) / uRes.y;
 
     /* camera */
-    vec3 ro = vec3(0.0, 0.10, 6.90);
-    vec3 target = vec3(0.0, 0.0, 0.0);
-    /* mouse + scroll drive a gentle orbit */
-    float ax = uMouse.x * 0.42;
-    float ay = uMouse.y * 0.26 - uScroll * 0.30;
+    vec3 ro = vec3(0.0, 0.05, 7.60);
+    vec3 target = vec3(0.0);
+    float ax = uMouse.x * 0.20;
+    float ay = uMouse.y * 0.14 - uScroll * 0.28;
     ro.yz *= rot(-ay);
     ro.xz *= rot(ax);
 
     vec3 fwd = normalize(target - ro);
     vec3 rgt = normalize(cross(vec3(0.0, 1.0, 0.0), fwd));
     vec3 up  = cross(fwd, rgt);
-    vec3 rd  = normalize(uv.x * rgt + uv.y * up + 1.50 * fwd);
+    vec3 rd  = normalize(uv.x * rgt + uv.y * up + 1.75 * fwd);
 
     vec3 bg  = envColor(rd) * 0.55;
     vec3 col = bg;
 
-    /* ── raymarch the crystal ── */
-    float t = 0.0, dist = 0.0;
+    /* ── raymarch the emblem ── */
+    float t = 0.0;
+    float mat = 0.0;
     bool hit = false;
-    for (int i = 0; i < 80; i++){
+    for (int i = 0; i < 90; i++){
       vec3 p = ro + rd * t;
-      dist = mapCrystal(p);
-      if (dist < 0.0016){ hit = true; break; }
-      if (t > 12.0) break;
-      t += dist;
+      vec2 h = mapLogo(p);
+      if (h.x < 0.0015){ hit = true; mat = h.y; break; }
+      if (t > 11.0) break;
+      t += h.x * 0.85;
     }
 
     if (hit){
       vec3 p = ro + rd * t;
       vec3 n = normalAt(p);
 
-      float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.2);
+      vec3 base = (mat < 1.5) ? STAR_COL : ARROW_COL;
 
-      /* ── enter the ice ── */
-      vec3 rr  = refract(rd, n, 1.0 / 1.31);
-      vec3 rfl = reflect(rd, n);
-      vec3 mirror = envColor(rfl);
+      vec3 L1 = normalize(vec3(-0.52, 0.74, 0.62));
+      vec3 L2 = normalize(vec3( 0.86, 0.20, 0.44));
+      vec3 L3 = normalize(vec3( 0.10, -0.75, 0.35));
 
-      /* march the inverted field until the ray exits the far surface */
-      vec3 pin = p - n * 0.006;
-      float ti = 0.0;
-      for (int j = 0; j < 26; j++){
-        float dd = -mapCrystal(pin + rr * ti);
-        if (dd < 0.0012) break;
-        ti += max(dd, 0.012);
-      }
-      vec3 pex  = pin + rr * ti;
-      vec3 nex  = -normalAt(pex);
-      vec3 rout = refract(rr, nex, 1.31);
-      if (dot(rout, rout) < 0.0001) rout = reflect(rr, nex);   /* total internal reflection */
+      float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.4);
 
-      vec3 trans = envColor(rout);
+      /* diffuse key + cool fill + warm-ish bounce */
+      float k = max(dot(n, L1), 0.0);
+      float f = max(dot(n, L2), 0.0);
+      float b = max(dot(n, L3), 0.0);
 
-      /* Beer-Lambert: thick ice goes deep cyan */
-      trans = trans * 2.05 * exp(-ti * vec3(0.62, 0.24, 0.12));
+      /* the pale star keeps close to its albedo; the arrow takes the key light */
+      float isStar  = step(mat, 1.5);
+      float ambGain = mix(0.42, 0.66, isStar);
+      float keyGain = mix(1.05, 0.48, isStar);
+      float spcGain = mix(0.85, 0.30, isStar);
 
-      /* frozen veins scatter light inside the body */
-      float veins = fbm(twist(mix(pin, pex, 0.5)) * 5.6 + vec3(0.0, uTime * 0.06, 0.0));
-      trans += vec3(0.30, 0.66, 1.0) * pow(veins, 3.0) * 0.9 * clamp(ti, 0.0, 1.4);
+      col  = base * (ambGain + keyGain * k);
+      col += base * vec3(0.55, 0.75, 1.0) * f * mix(0.30, 0.16, isStar);
+      col += base * 0.22 * b;
 
-      /* a little of the raw backdrop bleeds through thin edges */
-      trans = mix(trans, bg * 1.6, clamp(0.34 - ti * 0.18, 0.0, 0.34));
+      /* glossy coat */
+      col += vec3(1.0) * pow(max(dot(reflect(-L1, n), -rd), 0.0), 120.0) * spcGain;
+      col += vec3(0.70, 0.88, 1.0) * pow(max(dot(reflect(-L2, n), -rd), 0.0), 46.0) * spcGain * 0.6;
 
-      col = mix(trans, mirror, clamp(fres * 1.2, 0.0, 0.95));
+      /* reflected studio + rim */
+      col += envColor(reflect(rd, n)) * (0.06 + 0.22 * fres);
+      col += mix(base, vec3(1.0), 0.45) * pow(fres, 2.4) * 0.30;
 
-      /* specular highlights */
-      vec3 L1 = normalize(vec3(-0.55, 0.72, 0.62));
-      vec3 L2 = normalize(vec3( 0.85, 0.22, 0.42));
-      col += vec3(1.0) * pow(max(dot(reflect(-L1, n), -rd), 0.0), 140.0) * 3.4;
-      col += vec3(0.70, 0.90, 1.0) * pow(max(dot(reflect(-L2, n), -rd), 0.0), 55.0) * 1.5;
-
-      /* rim frost + razor edge highlight */
-      col += vec3(0.62, 0.90, 1.0) * fres * 0.75;
-      col += vec3(1.0, 1.0, 1.0) * pow(fres, 7.0) * 0.85;
-
-      /* faint core bloom */
-      col += vec3(0.08, 0.30, 0.55) * (1.0 - smoothstep(0.0, 1.5, length(p))) * 0.35;
+      /* the arrow reads brighter so it stays legible over the star */
+      if (mat > 1.5) col *= 1.30;
     }
 
-    /* ── volumetric mist (marched in front of / around the core) ── */
+    /* ── haze ── */
     float fogAcc = 0.0;
     float tm = 2.60;
-    for (int i = 0; i < 26; i++){
+    for (int i = 0; i < 22; i++){
       vec3 p = ro + rd * tm;
       if (hit && tm > t) break;
-      fogAcc += mistDensity(p) * 0.105;
+      fogAcc += mistDensity(p) * 0.10;
       tm += 0.235;
     }
     fogAcc = clamp(fogAcc, 0.0, 1.0);
-    vec3 mistCol = mix(vec3(0.16, 0.34, 0.52), vec3(0.72, 0.90, 1.0), 0.35);
-    col = mix(col, mistCol, fogAcc * 0.85);
+    vec3 mistCol = mix(vec3(0.14, 0.30, 0.48), vec3(0.70, 0.88, 1.0), 0.32);
+    col = mix(col, mistCol, fogAcc * 0.62);
 
-    /* halo bloom around the core */
-    float halo = 1.0 - smoothstep(0.0, 1.25, length(uv * vec2(1.0, 1.15)));
-    col += vec3(0.12, 0.44, 0.80) * pow(max(halo, 0.0), 2.2) * 0.55;
+    /* glow pool behind the emblem */
+    float halo = 1.0 - smoothstep(0.0, 1.35, length(uv * vec2(1.0, 1.12)));
+    col += vec3(0.12, 0.42, 0.85) * pow(max(halo, 0.0), 2.2) * 0.55;
 
-    /* drifting ice sparkles */
-    vec2 sp = uv * 8.0;
-    sp.y += uTime * 0.12;
-    vec2 cell = floor(sp);
+    /* drifting sparkles */
+    vec2 sp2 = uv * 8.0;
+    sp2.y += uTime * 0.12;
+    vec2 cell = floor(sp2);
     float sh = hash13(vec3(cell, 1.0));
     if (sh > 0.965){
-      vec2 f = fract(sp) - 0.5;
+      vec2 fq = fract(sp2) - 0.5;
       float tw = 0.55 + 0.45 * sin(uTime * 2.2 + sh * 40.0);
-      col += vec3(0.75, 0.92, 1.0) * smoothstep(0.10, 0.0, length(f)) * tw * 0.8;
+      col += vec3(0.75, 0.92, 1.0) * smoothstep(0.10, 0.0, length(fq)) * tw * 0.8;
     }
 
-    /* grade: filmic-ish + cold lift */
+    /* grade */
     col = max(col, 0.0);
-    col = col / (col + 0.72);
-    col = pow(col, vec3(0.85, 0.92, 0.98));
+    col = col / (col + 0.95);
+    col = pow(col, vec3(0.86, 0.92, 0.98));
+    /* tonemapping desaturates; pull the brand blues back */
+    col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.55);
+    col = max(col, 0.0);
     col *= 1.0 - 0.32 * length(uv) * 0.55;
 
-    /* fade the whole render out as the hero scrolls away */
     float fade = 1.0 - smoothstep(0.35, 1.0, uScroll);
     gl_FragColor = vec4(col * fade, 1.0);
   }

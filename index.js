@@ -288,6 +288,25 @@ function doConfirm() {
   const d = new Date(bk.dateKey);
   const dl = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WD[d.getDay()]})`;
 
+  /* push the booking into the admin dashboard (no-op without Supabase) */
+  if (window.cryoData) {
+    window.cryoData
+      .saveBooking({
+        ref: ref,
+        customer_name: name || "—",
+        phone: phone,
+        booked_date: bk.dateKey || null,
+        booked_time: bk.time || null,
+        amount: 100000,
+        deposit: 100000,
+        bank: bk.bankName || null,
+        status: "pending",
+      })
+      .then(function (r) {
+        if (r && r.error) console.warn("[cryo] booking not saved:", r.error.message);
+      });
+  }
+
   setText("bookingRef", ref);
   const det = document.getElementById("confirmDetails");
   if (det) {

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="robots" content="noindex,nofollow"/>
+<meta name="theme-color" content="#03060c"/>
+<title>Админ — °CRYO Mongolia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="shared.css"/>
+<link rel="stylesheet" href="admin.css"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+</head>
+<body>
+
+<!-- ══════════ NOT CONFIGURED ══════════ -->
+<div class="gate" id="setupGate" style="display:none;">
+  <div class="gate-card">
+    <div class="gate-logo">°CRYO <span>Admin</span></div>
+    <p class="gate-sub">Supabase холболт тохируулагдаагүй байна.</p>
+    <div class="notice warn">
+      <b>2 алхам үлдлээ:</b><br><br>
+      1. Supabase Dashboard → SQL Editor дээр <code>supabase/schema.sql</code>-ийг ажиллуулна.<br><br>
+      2. Project Settings → API Keys → <code>anon / public</code> түлхүүрийг хуулж
+      <code>supabase-config.js</code> доторх <code>anonKey</code> талбарт тавина.
+    </div>
+    <p class="gate-sub" style="margin:0">Дараа нь энэ хуудсыг дахин ачаална уу.</p>
+  </div>
+</div>
+
+<!-- ══════════ LOGIN ══════════ -->
+<div class="gate" id="authGate" style="display:none;">
+  <div class="gate-card">
+    <div class="gate-logo">°CRYO <span>Admin</span></div>
+    <p class="gate-sub">Удирдлагын самбарт нэвтрэх</p>
+
+    <div class="gate-tabs">
+      <button type="button" class="on" data-mode="signin">Нэвтрэх</button>
+      <button type="button" data-mode="signup">Бүртгүүлэх</button>
+    </div>
+
+    <div id="authMsg"></div>
+
+    <form id="authForm">
+      <div class="field" id="nameField" style="display:none;">
+        <label for="au_name">Нэр</label>
+        <input class="ctl" type="text" id="au_name" autocomplete="name" placeholder="Таны нэр"/>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label for="au_email">И-мэйл</label>
+        <input class="ctl" type="email" id="au_email" autocomplete="email" required placeholder="you@cryomongolia.mn"/>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label for="au_pass">Нууц үг</label>
+        <input class="ctl" type="password" id="au_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+      </div>
+      <button class="btn-sm primary" type="submit" id="authBtn"
+              style="width:100%;margin-top:24px;padding:13px;">Нэвтрэх</button>
+    </form>
+
+    <p class="gate-sub" style="margin:20px 0 0;font-size:11.5px;line-height:1.7">
+      Шинээр бүртгүүлсэн хэрэглэгч эхлээд <b>staff</b> эрхтэй байна.
+      Үндсэн админ (owner) л админ эрх олгоно.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════ NO PERMISSION ══════════ -->
+<div class="gate" id="denyGate" style="display:none;">
+  <div class="gate-card">
+    <div class="gate-logo">°CRYO <span>Admin</span></div>
+    <p class="gate-sub" id="denyWho"></p>
+    <div class="notice warn">
+      Таны бүртгэл <b>staff</b> эрхтэй байна. Удирдлагын самбарт нэвтрэхийн тулд
+      үндсэн админаас <b>admin</b> эрх авах шаардлагатай.
+    </div>
+    <button class="btn-sm ghost" id="denyOut" style="width:100%;padding:12px;">Гарах</button>
+  </div>
+</div>
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div class="shell" id="shell" style="display:none;">
+  <aside class="side">
+    <a href="index.html" class="side-logo">°CRYO <span>Admin</span></a>
+
+    <button class="nav-item on" data-view="overview"><span class="ic">◈</span> Хяналтын самбар</button>
+    <button class="nav-item" data-view="bookings"><span class="ic">▤</span> Захиалга</button>
+    <button class="nav-item" data-view="messages"><span class="ic">✉</span> Хүсэлт</button>
+    <button class="nav-item" data-view="services"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
+    <button class="nav-item" data-view="packages"><span class="ic">◎</span> Багц</button>
+    <button class="nav-item" data-view="users" id="navUsers" style="display:none;"><span class="ic">◐</span> Хэрэглэгч, эрх</button>
+
+    <div class="side-foot">
+      <div class="side-user">
+        <div class="u-mail" id="meMail">—</div>
+        <span class="side-role role-staff" id="meRole">—</span>
+      </div>
+      <button class="nav-item" id="signOut"><span class="ic">⏻</span> Гарах</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ── OVERVIEW ── -->
+    <section class="view on" data-panel="overview">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Хяналтын самбар</div>
+          <div class="page-sub" id="ovSub">Байгууллагын үзүүлэлт</div>
+        </div>
+        <button class="btn-sm ghost" id="refreshBtn">↻ Шинэчлэх</button>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Нийт захиалга</div>
+          <div class="kpi-val" id="kTotal">0</div><div class="kpi-note" id="kTotalNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Энэ сарын орлого</div>
+          <div class="kpi-val" id="kRevenue"><small>₮</small>0</div><div class="kpi-note" id="kRevenueNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Хүлээгдэж буй</div>
+          <div class="kpi-val" id="kPending">0</div><div class="kpi-note">Баталгаажаагүй захиалга</div></div>
+        <div class="kpi"><div class="kpi-label">Шинэ хүсэлт</div>
+          <div class="kpi-val" id="kMsg">0</div><div class="kpi-note">Хариу өгөөгүй</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Сүүлийн 12 сарын орлого</div>
+          <div class="page-sub" id="chartNote">—</div>
+        </div>
+        <svg class="chart" id="revChart" viewBox="0 0 720 210" preserveAspectRatio="none" role="img"
+             aria-label="Сарын орлогын график"></svg>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Хамгийн эрэлттэй үйлчилгээ</div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Үйлчилгээ / багц</th><th>Захиалга</th><th>Дүн</th></tr></thead>
+          <tbody id="topBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── BOOKINGS ── -->
+    <section class="view" data-panel="bookings">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Захиалга</div>
+          <div class="page-sub">Төлөв солих, дэлгэрэнгүй харах</div>
+        </div>
+        <div class="filters" id="bkFilters">
+          <button class="chip-btn on" data-status="all">Бүгд</button>
+          <button class="chip-btn" data-status="pending">Хүлээгдэж буй</button>
+          <button class="chip-btn" data-status="confirmed">Баталгаажсан</button>
+          <button class="chip-btn" data-status="done">Биелсэн</button>
+          <button class="chip-btn" data-status="cancelled">Цуцалсан</button>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr>
+            <th>Дугаар</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ</th>
+            <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th>
+          </tr></thead>
+          <tbody id="bkBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── MESSAGES ── -->
+    <section class="view" data-panel="messages">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Холбоо барих хүсэлт</div>
+          <div class="page-sub">Вэбсайтаас ирсэн мессеж</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Огноо</th><th>Нэр</th><th>Холбоо</th><th>Сонирхсон</th><th>Мессеж</th><th></th></tr></thead>
+          <tbody id="msgBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── SERVICES ── -->
+    <section class="view" data-panel="services">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Үйлчилгээ, үнэ</div>
+          <div class="page-sub">Энд өөрчилсөн үнэ вэбсайт дээр шууд харагдана</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Үйлчилгээ</th><th>Ангилал</th><th>Хугацаа</th><th>Үнэ (₮)</th><th>Идэвхтэй</th><th></th></tr></thead>
+          <tbody id="svcBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── PACKAGES ── -->
+    <section class="view" data-panel="packages">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Багц</div>
+          <div class="page-sub">Багцын үнэ, хөнгөлөлт, идэвхтэй эсэх</div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Багц</th><th>Хугацаа</th><th>Үндсэн үнэ</th><th>Багцын үнэ</th><th>Онцлох</th><th>Идэвхтэй</th><th></th></tr></thead>
+          <tbody id="pkgBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── USERS (owner only) ── -->
+    <section class="view" data-panel="users">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Хэрэглэгч, эрх</div>
+          <div class="page-sub">Зөвхөн үндсэн админ (owner) эрх өөрчилнө</div>
+        </div>
+      </div>
+      <div class="notice warn">
+        <b>owner</b> — бүх эрх, бусдад админ эрх олгоно ·
+        <b>admin</b> — захиалга, үнэ, тайлан удирдана ·
+        <b>staff</b> — самбарт нэвтрэхгүй
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>И-мэйл</th><th>Нэр</th><th>Бүртгүүлсэн</th><th>Эрх</th></tr></thead>
+          <tbody id="usrBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="supabase-config.js"></script>
+<script type="module" src="admin.js"></script>
+</body>
+</html>
