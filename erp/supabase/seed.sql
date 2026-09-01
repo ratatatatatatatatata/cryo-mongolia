@@ -1,0 +1,3 @@
+-- Intentionally empty.
+-- Production reference data comes from a reviewed catalog mapping, never directly from
+-- spreadsheet totals or unapproved legacy aliases.
