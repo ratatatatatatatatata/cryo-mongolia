@@ -15,7 +15,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: erp/package-lock.json
+      - name: Install ERP dependencies
+        working-directory: erp
+        run: npm ci
+      - name: Test and build ERP
+        working-directory: erp
+        run: npm run build
+      - name: Verify committed bundle is current
+        run: git diff --exit-code -- erp/assets/app.js
+      - name: Test private legacy-import tooling
+        working-directory: erp/tools
+        run: npm test
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.6
+      - name: Check staff Edge Function
+        working-directory: erp/supabase/functions/manage-staff
+        run: deno check --frozen index.ts
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.116.0
+      - name: Apply migrations to an isolated local database
+        working-directory: erp
+        run: supabase db start
+      - name: Run database security tests
+        working-directory: erp
+        run: supabase test db
+
   deploy:
+    needs: verify
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -23,12 +64,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: erp/package-lock.json
+      - name: Install ERP dependencies
+        working-directory: erp
+        run: npm ci
+      - name: Test and build ERP
+        working-directory: erp
+        run: npm run build
+      - name: Stage public files only
+        run: |
+          mkdir -p _site/photos _site/erp/assets
+          cp index.html index.css index.js shared.css cryo3d.js _site/
+          cp cabin.html hub.html ledpro.html oxypro.html xcryo.html _site/
+          cp photos/*.png _site/photos/
+          cp erp/index.html erp/runtime-config.js _site/erp/
+          cp erp/assets/app.js erp/assets/erp.css _site/erp/assets/
+      - name: Verify private and source files are not published
+        run: |
+          test ! -e _site/erp/src
+          test ! -e _site/erp/tests
+          test ! -e _site/erp/tools
+          test ! -e _site/erp/supabase
+          test ! -e _site/erp/node_modules
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

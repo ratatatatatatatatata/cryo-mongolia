@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "status": "reviewed",
+  "workbookSha256": "REPLACE_WITH_EXACT_DRY_RUN_SHA256",
+  "sheets": [
+    {
+      "sheetIndex": 0,
+      "segments": [
+        {
+          "segmentId": "sheet-0-table-1",
+          "startRow": 1,
+          "endRow": 50,
+          "disposition": "import",
+          "entity": "sales",
+          "mode": "rows",
+          "columns": {
+            "transactionDate": {
+              "index": 0,
+              "parser": "date",
+              "textOrder": "DMY",
+              "required": true
+            },
+            "customerPhone": {
+              "index": 1,
+              "parser": "phone",
+              "required": false
+            },
+            "service": {
+              "index": 2,
+              "parser": "service",
+              "required": true
+            },
+            "netAmount": {
+              "index": 3,
+              "parser": "amount",
+              "currency": "MNT",
+              "maxScale": 0,
+              "required": true
+            }
+          }
+        },
+        {
+          "segmentId": "sheet-0-table-2",
+          "startRow": 51,
+          "endRow": 100,
+          "disposition": "import",
+          "entity": "sales",
+          "mode": "rows",
+          "columns": {
+            "transactionDate": {
+              "index": 1,
+              "parser": "date",
+              "textOrder": "DMY",
+              "required": true
+            },
+            "service": {
+              "index": 3,
+              "parser": "service",
+              "required": true
+            },
+            "netAmount": {
+              "index": 4,
+              "parser": "amount",
+              "currency": "MNT",
+              "maxScale": 0,
+              "required": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "sheetIndex": 1,
+      "segments": [
+        {
+          "segmentId": "sheet-1-reviewed-skip",
+          "startRow": 1,
+          "endRow": 25,
+          "disposition": "skip",
+          "reason": "EXAMPLE_ONLY_REPLACE_WITH_AN_EVIDENCED_OWNER_DECISION"
+        }
+      ]
+    }
+  ]
+}
