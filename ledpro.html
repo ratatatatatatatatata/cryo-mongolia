@@ -3,20 +3,26 @@
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>LedPro™ — °CRYO Mongolia</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <style>
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.wave-bar{display:flex;align-items:center;gap:14px;padding:14px 18px;border:1.5px solid var(--border);border-radius:var(--r-md);background:var(--bg-card);margin-bottom:10px}
-.wave-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
-.wave-red{background:#e05252}
-.wave-nir{background:#8b0000}
-.wave-info h4{font-size:14px;font-weight:500;margin-bottom:3px}
-.wave-info p{font-size:12px;color:var(--text-secondary);line-height:1.5}
+
+
+
+
+
+
 @media(max-width:900px){.hero-img-wrap{display:none}}
 </style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+  <meta name="theme-color" content="#03060c"/>
+  <noscript><style>.reveal,.stagger>*{opacity:1 !important;transform:none !important}.hero-chip,.hero-sub,.hero-actions,.hero-trust,.hero-scroll-hint{opacity:1 !important;animation:none !important}</style></noscript>
 </head>
 <body>
+<div class="atmos" aria-hidden="true"></div>
 <nav class="topnav">
   <a href="hub.html" class="back-btn">Төхөөрөмжүүд</a>
   <a href="hub.html" class="nav-logo">°CRYO <span>Mongolia</span></a>
@@ -54,48 +60,48 @@
       <div class="wave-info"><h4>Ойрын инфра улаан (NIR) — 700–1100 нанометр</h4><p>Биеийн гүн рүү нэвтэрч булчин, мэдрэл, ясанд нөлөөлдөг. Эсийн засвар болон цусны эргэлтийг сайжруулдаг.</p></div>
     </div>
     <!-- Гэрлийн нэвтрэлтийн дүрслэл -->
-    <div style="margin-top:32px;border-radius:var(--r-xl);overflow:hidden;border:1.5px solid var(--border);background:linear-gradient(135deg,#eef7fc,#d4e8f5);padding:36px 28px;">
-      <h4 style="font-family:var(--ff-display);font-size:18px;font-weight:600;color:var(--text-primary);margin-bottom:24px;text-align:center;">Биеийн давхаргад нэвтрэх гүн</h4>
+    <div style="margin-top:32px;border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--border-mid);background:radial-gradient(70% 80% at 50% 8%,rgba(88,198,255,.10),transparent 70%),linear-gradient(160deg,rgba(20,38,62,.75),rgba(7,14,26,.92));padding:36px 28px;">
+      <h4 style="font-family:var(--ff-display);font-size:18px;font-weight:600;color:var(--ice-50);letter-spacing:-.02em;margin-bottom:26px;text-align:center;">Биеийн давхаргад нэвтрэх гүн</h4>
       <svg viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
         <!-- Skin layers -->
         <defs>
           <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f0f8fc"/>
-            <stop offset="100%" stop-color="#d4e8f0"/>
+            <stop offset="0%" stop-color="#2b4c6e"/>
+            <stop offset="100%" stop-color="#1e3a56"/>
           </linearGradient>
           <linearGradient id="dermisGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#d4e8f0"/>
-            <stop offset="100%" stop-color="#a8cce0"/>
+            <stop offset="0%" stop-color="#1e3a56"/>
+            <stop offset="100%" stop-color="#152a40"/>
           </linearGradient>
           <linearGradient id="muscleGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#a8cce0"/>
-            <stop offset="100%" stop-color="#6ba0c0"/>
+            <stop offset="0%" stop-color="#152a40"/>
+            <stop offset="100%" stop-color="#0e1e2f"/>
           </linearGradient>
           <linearGradient id="boneGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#6ba0c0"/>
-            <stop offset="100%" stop-color="#3a6a8a"/>
+            <stop offset="0%" stop-color="#0e1e2f"/>
+            <stop offset="100%" stop-color="#071120"/>
           </linearGradient>
           <linearGradient id="redLight" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#e05252" stop-opacity=".6"/>
-            <stop offset="100%" stop-color="#e05252" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#ff6f5a" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="#ff6f5a" stop-opacity="0"/>
           </linearGradient>
           <linearGradient id="nirLight" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#8b0000" stop-opacity=".5"/>
-            <stop offset="100%" stop-color="#8b0000" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#c0322a" stop-opacity=".8"/>
+            <stop offset="100%" stop-color="#c0322a" stop-opacity="0"/>
           </linearGradient>
         </defs>
 
         <!-- LED panel -->
-        <rect x="40" y="0" width="620" height="20" rx="4" fill="#2a1f1a"/>
-        <circle cx="120" cy="10" r="3" fill="#e05252"/>
-        <circle cx="180" cy="10" r="3" fill="#e05252"/>
-        <circle cx="240" cy="10" r="3" fill="#e05252"/>
-        <circle cx="300" cy="10" r="3" fill="#e05252"/>
-        <circle cx="360" cy="10" r="3" fill="#8b0000"/>
-        <circle cx="420" cy="10" r="3" fill="#e05252"/>
-        <circle cx="480" cy="10" r="3" fill="#8b0000"/>
-        <circle cx="540" cy="10" r="3" fill="#e05252"/>
-        <text x="50" y="14" fill="#e05252" font-size="9" font-family="sans-serif" font-weight="600">LED</text>
+        <rect x="40" y="0" width="620" height="20" rx="4" fill="#0a1220"/>
+        <circle cx="120" cy="10" r="3" fill="#ff6f5a"/>
+        <circle cx="180" cy="10" r="3" fill="#ff6f5a"/>
+        <circle cx="240" cy="10" r="3" fill="#ff6f5a"/>
+        <circle cx="300" cy="10" r="3" fill="#ff6f5a"/>
+        <circle cx="360" cy="10" r="3" fill="#d8443a"/>
+        <circle cx="420" cy="10" r="3" fill="#ff6f5a"/>
+        <circle cx="480" cy="10" r="3" fill="#d8443a"/>
+        <circle cx="540" cy="10" r="3" fill="#ff6f5a"/>
+        <text x="50" y="14" fill="#ff6f5a" font-size="9" font-family="sans-serif" font-weight="600">LED</text>
 
         <!-- Red light beam -->
         <path d="M 100 20 L 80 95 L 240 95 L 220 20 Z" fill="url(#redLight)" opacity=".7"/>
@@ -103,36 +109,36 @@
         <path d="M 320 20 L 280 195 L 520 195 L 480 20 Z" fill="url(#nirLight)" opacity=".7"/>
 
         <!-- Skin layer 1: epidermis -->
-        <rect x="40" y="40" width="620" height="40" fill="url(#skinGrad)" stroke="#a8cce0" stroke-width=".5"/>
-        <text x="55" y="65" fill="#1a4a68" font-size="11" font-family="sans-serif" font-weight="600">Эпидермис</text>
-        <text x="55" y="77" fill="#3a6a8a" font-size="9" font-family="sans-serif">~ 0.1 мм</text>
+        <rect x="40" y="40" width="620" height="40" fill="url(#skinGrad)" stroke="#3d6c96" stroke-width=".5"/>
+        <text x="55" y="65" fill="#cfe6f7" font-size="11" font-family="sans-serif" font-weight="600">Эпидермис</text>
+        <text x="55" y="77" fill="#8fb4cf" font-size="9" font-family="sans-serif">~ 0.1 мм</text>
 
         <!-- Skin layer 2: dermis -->
-        <rect x="40" y="80" width="620" height="50" fill="url(#dermisGrad)" stroke="#6ba0c0" stroke-width=".5"/>
-        <text x="55" y="105" fill="#0d3a58" font-size="11" font-family="sans-serif" font-weight="600">Дермис · Коллаген</text>
-        <text x="55" y="118" fill="#1a4a68" font-size="9" font-family="sans-serif">1–4 мм · Улаан гэрэл (630–660 nm)</text>
+        <rect x="40" y="80" width="620" height="50" fill="url(#dermisGrad)" stroke="#33587c" stroke-width=".5"/>
+        <text x="55" y="105" fill="#d8efff" font-size="11" font-family="sans-serif" font-weight="600">Дермис · Коллаген</text>
+        <text x="55" y="118" fill="#cfe6f7" font-size="9" font-family="sans-serif">1–4 мм · Улаан гэрэл (630–660 nm)</text>
 
         <!-- Layer 3: subcutaneous / muscle -->
-        <rect x="40" y="130" width="620" height="60" fill="url(#muscleGrad)" stroke="#4a7a98" stroke-width=".5"/>
-        <text x="55" y="158" fill="#0a2a48" font-size="11" font-family="sans-serif" font-weight="600">Булчин · Эс · Цусны судас</text>
-        <text x="55" y="171" fill="#0d3a58" font-size="9" font-family="sans-serif">5–40 мм · Ойрын инфра улаан (700–940 nm)</text>
+        <rect x="40" y="130" width="620" height="60" fill="url(#muscleGrad)" stroke="#2a4766" stroke-width=".5"/>
+        <text x="55" y="158" fill="#e8f2fb" font-size="11" font-family="sans-serif" font-weight="600">Булчин · Эс · Цусны судас</text>
+        <text x="55" y="171" fill="#d8efff" font-size="9" font-family="sans-serif">5–40 мм · Ойрын инфра улаан (700–940 nm)</text>
 
         <!-- Layer 4: bone/deep -->
-        <rect x="40" y="190" width="620" height="40" fill="url(#boneGrad)" stroke="#1a4a68" stroke-width=".5"/>
+        <rect x="40" y="190" width="620" height="40" fill="url(#boneGrad)" stroke="#22394f" stroke-width=".5"/>
         <text x="55" y="214" fill="#fff" font-size="11" font-family="sans-serif" font-weight="600">Гүн эд · Яс · Мэдрэл</text>
-        <text x="55" y="225" fill="#d4e8f0" font-size="9" font-family="sans-serif">40+ мм</text>
+        <text x="55" y="225" fill="#9fc2da" font-size="9" font-family="sans-serif">40+ мм</text>
 
         <!-- Wavelength labels on right -->
         <g>
-          <circle cx="610" cy="105" r="8" fill="#e05252"/>
-          <text x="624" y="109" fill="#e05252" font-size="11" font-family="sans-serif" font-weight="600">630–660 nm</text>
+          <circle cx="610" cy="105" r="8" fill="#ff6f5a"/>
+          <text x="624" y="109" fill="#ff6f5a" font-size="11" font-family="sans-serif" font-weight="600">630–660 nm</text>
         </g>
         <g>
-          <circle cx="610" cy="170" r="8" fill="#8b0000"/>
-          <text x="624" y="174" fill="#8b0000" font-size="11" font-family="sans-serif" font-weight="600">700–940 nm</text>
+          <circle cx="610" cy="170" r="8" fill="#d8443a"/>
+          <text x="624" y="174" fill="#d8443a" font-size="11" font-family="sans-serif" font-weight="600">700–940 nm</text>
         </g>
       </svg>
-      <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:18px;line-height:1.6;">Улаан гэрэл нь арьсны гадаргын давхаргад нэвтэрч <b style="color:#e05252;">коллагенийг</b> идэвхжүүлдэг бол<br>NIR нь биеийн гүн рүү нэвтэрч <b style="color:#8b0000;">булчин, эс, мэдрэлд</b> үйлчилдэг.</p>
+      <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:18px;line-height:1.6;">Улаан гэрэл нь арьсны гадаргын давхаргад нэвтэрч <b style="color:#ff8a78;">коллагенийг</b> идэвхжүүлдэг бол<br>NIR нь биеийн гүн рүү нэвтэрч <b style="color:#e0655a;">булчин, эс, мэдрэлд</b> үйлчилдэг.</p>
     </div>
   </div>
 </section>
@@ -245,10 +251,6 @@
   <a href="hub.html" class="btn btn-outline" style="margin-left:10px;">← Буцах</a>
 </div>
 <footer><p>© 2025 °CRYO Mongolia</p><p>CTN.FI Recovery Technologies · LedPro™</p></footer>
-<script>
-document.querySelectorAll('.reveal').forEach(r=>
-  new IntersectionObserver(([e])=>e.isIntersecting&&r.classList.add('visible'),{threshold:.1}).observe(r)
-);
-</script>
+<script src="cryo3d.js"></script>
 </body>
 </html>

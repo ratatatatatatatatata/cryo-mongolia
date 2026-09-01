@@ -3,33 +3,45 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <!-- Open Graph / Facebook Messenger -->
-<meta property="og:type"        content="website"/>
-<meta property="og:url"         content="http://cryomongolia.mn"/>
-<meta property="og:title"       content="°CRYO Mongolia – Эрүүл мэнд · Гоо сайхан · Нөхөн сэргэлт"/>
-<meta property="og:description" content="Монголын анхны мэргэжлийн крио эмчилгээний төв. −140°C хүйтний хүчээр биеийг нөхөн сэргээ."/>
-<meta property="og:image"       content="http://cryomongolia.mn/og-image.jpg"/>
-<meta property="og:image:width"  content="1200"/>
-<meta property="og:image:height" content="630"/>
-<meta property="og:locale"      content="mn_MN"/>
+  <meta name="theme-color" content="#03060c"/>
+  <meta name="description" content="Монголын анхны мэргэжлийн крио эмчилгээний төв. −140°C хүйтний хүчээр биеийг нөхөн сэргээ."/>
 
-<!-- Twitter / iMessage -->
-<meta name="twitter:card"        content="summary_large_image"/>
-<meta name="twitter:title"       content="°CRYO Mongolia"/>
-<meta name="twitter:description" content="Монголын анхны крио эмчилгээний төв. −140°C хүйтний хүчээр биеийг нөхөн сэргээ."/>
-<meta name="twitter:image"       content="http://cryomongolia.mn/og-image.jpg"/>
+  <!-- Open Graph / Facebook Messenger -->
+  <meta property="og:type"        content="website"/>
+  <meta property="og:url"         content="http://cryomongolia.mn"/>
+  <meta property="og:title"       content="°CRYO Mongolia – Эрүүл мэнд · Гоо сайхан · Нөхөн сэргэлт"/>
+  <meta property="og:description" content="Монголын анхны мэргэжлийн крио эмчилгээний төв. −140°C хүйтний хүчээр биеийг нөхөн сэргээ."/>
+  <meta property="og:image"       content="http://cryomongolia.mn/og-image.jpg"/>
+  <meta property="og:image:width"  content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta property="og:locale"      content="mn_MN"/>
+
+  <!-- Twitter / iMessage -->
+  <meta name="twitter:card"        content="summary_large_image"/>
+  <meta name="twitter:title"       content="°CRYO Mongolia"/>
+  <meta name="twitter:description" content="Монголын анхны крио эмчилгээний төв. −140°C хүйтний хүчээр биеийг нөхөн сэргээ."/>
+  <meta name="twitter:image"       content="http://cryomongolia.mn/og-image.jpg"/>
+
   <title>°CRYO Mongolia – Эрүүл мэнд · Гоо сайхан · Нөхөн сэргэлт</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="index.css"/>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+  <noscript><style>.reveal,.stagger>*{opacity:1 !important;transform:none !important}.hero-chip,.hero-sub,.hero-actions,.hero-trust,.hero-scroll-hint{opacity:1 !important;animation:none !important}</style></noscript>
 </head>
 <body>
+
+<!-- global atmosphere: film grain + vignette -->
+<div class="atmos" aria-hidden="true"></div>
 
 <nav id="navbar">
   <a href="#" class="nav-logo">°CRYO <span>Mongolia</span></a>
   <ul class="nav-links">
     <li><a href="#about">Бидний тухай</a></li>
     <li><a href="#treatments">Үйлчилгээ</a></li>
-    <li><a href="hub.html">Төхөөрөмж</a></li>
+    <li><a href="#devices">Төхөөрөмж</a></li>
     <li><a href="#pricing">Үнэ</a></li>
     <li><a href="#contact">Холбоо барих</a></li>
   </ul>
@@ -42,40 +54,52 @@
 <div class="mobile-menu" id="mobileMenu">
   <a href="#about" onclick="toggleMenu()">Бидний тухай</a>
   <a href="#treatments" onclick="toggleMenu()">Үйлчилгээ</a>
-  <a href="hub.html" onclick="toggleMenu()">Төхөөрөмж</a>
+  <a href="#devices" onclick="toggleMenu()">Төхөөрөмж</a>
+  <a href="#pricing" onclick="toggleMenu()">Үнэ</a>
   <a href="#contact" onclick="toggleMenu()">Холбоо барих</a>
   <a href="#" class="btn btn-primary" onclick="openModal();toggleMenu();return false;">Цаг захиалах</a>
 </div>
 
-<!-- HERO -->
+<!-- ══════════ HERO — WebGL volumetric ice core ══════════ -->
 <section class="hero" id="home">
-  <div class="hero-bg-shape s1"></div>
-  <div class="hero-bg-shape s2"></div>
-  <div id="particles" style="position:absolute;inset:0;pointer-events:none;"></div>
+  <canvas id="cryoCanvas" aria-hidden="true"></canvas>
+  <div class="hero-bg-shape s1" aria-hidden="true"></div>
+  <div class="hero-bg-shape s2" aria-hidden="true"></div>
+
   <div class="hero-inner">
     <div class="hero-chip">Монголын анхны крио эмчилгээний төв</div>
-    <h1 class="hero-title">CRYO<br><span class="accent">MONGOLIA</span></h1>
-    <p class="hero-sub">Хүйтний хүчээр биеийг нөхөн сэргээж, гоо сайхнаа нээ. Эрүүл мэнд, фитнес, гоо сайхны шинэ хэмжээнд хүрэ.</p>
+    <h1 class="hero-title">
+      <span data-split>CRYO</span><br>
+      <span class="accent" data-split>MONGOLIA</span>
+    </h1>
+    <p class="hero-sub">−140°C хүйтний цэвэр хүчээр биеэ нөхөн сэргээ. Эрүүл мэнд, фитнес, гоо сайхны шинэ хэмжээнд хүр — гурван минутын дотор.</p>
     <div class="hero-actions">
       <a href="#" class="btn btn-primary" onclick="openModal();return false;">Цаг захиалах</a>
       <a href="#treatments" class="btn btn-outline">Үйлчилгээ үзэх</a>
     </div>
-  </div>
-  <div class="hero-temp-badge">
-    <div class="temp-ring">
-      <div class="cryo-ring"></div>
-      <div class="cryo-ring"></div>
-      <div class="cryo-ring"></div>
-      <div class="cryo-core">
-        <div class="cryo-temp">−140<br><small style="font-size:.4em;color:var(--text-muted)">°C</small></div>
+
+    <div class="hero-trust">
+      <div class="ht-item">
+        <div class="ht-num">−140°</div>
+        <div class="ht-lab">Хамгийн<br>хүйтэн</div>
+      </div>
+      <div class="ht-sep"></div>
+      <div class="ht-item">
+        <div class="ht-num">3 мин</div>
+        <div class="ht-lab">Нэг<br>сеанс</div>
+      </div>
+      <div class="ht-sep"></div>
+      <div class="ht-item">
+        <div class="ht-num">CTN.FI</div>
+        <div class="ht-lab">Албан ёсны<br>түнш</div>
       </div>
     </div>
-    <div class="t-unit" style="margin-top:12px;">Хамгийн хүйтэн туршлага</div>
   </div>
+
   <div class="hero-scroll-hint"><div class="scroll-line"></div>Доош гүйл</div>
 </section>
 
-<!-- ABOUT -->
+<!-- ══════════ ABOUT ══════════ -->
 <section class="section alt" id="about">
   <div class="about">
     <div class="about-visual reveal">
@@ -94,7 +118,7 @@
       <div class="section-chip">Бидний тухай</div>
       <h2 class="section-title">Крио эмчилгээний <span class="accent">шинэ хуудас</span></h2>
       <p class="section-desc">°CRYO Mongolia нь дэлхийн тэргүүлэгч CTN.FI компанитай хамтарч, Монголд анх удаа хүйтний дэвшилтэт технологийг нэвтрүүлж байна.</p>
-      <div class="pillars">
+      <div class="pillars stagger">
         <div class="pillar"><div class="pillar-num">01</div><h4>Хамгийн хүйтэн</h4><p>−140°C хүртэл хүйтэн эмчилгээ, дэлхийд хамгийн дэвшилтэт</p></div>
         <div class="pillar"><div class="pillar-num">02</div><h4>Аюулгүй</h4><p>Цэвэр агаарын технологи, лицензтэй эмч нарын хяналтан дор</p></div>
         <div class="pillar"><div class="pillar-num">03</div><h4>Хувийн хандлага</h4><p>Үнэгүй зөвлөгөө, таны биед тохирсон эмчилгээний төлөвлөгөө</p></div>
@@ -104,7 +128,7 @@
   </div>
 </section>
 
-<!-- TREATMENTS -->
+<!-- ══════════ TREATMENTS ══════════ -->
 <section class="section white" id="treatments">
   <div class="treatments-header reveal">
     <div>
@@ -119,27 +143,114 @@
       <button class="tab-btn" onclick="filterTreatments('slim',this)">Нарийслах</button>
     </div>
   </div>
+
   <div class="treatment-grid reveal">
-    <div class="treatment-card active-card" data-cat="wellness"><div class="card-visual"><span class="card-icon">🧊</span></div><div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Бүхэл Биеийн Криотерапи</div><p class="card-desc">−140°C хүртэл хүйтэнд 3 минут байснаар дархлаа дэмжиж, стрессийг бууруулна.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="wellness"><div class="card-visual"><span class="card-icon">💨</span></div><div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Хүчилтөрөгчийн Эмчилгээ</div><p class="card-desc">Цэвэр хүчилтөрөгчөөр тэжээгдэж биеийн эд эсийг сэргээнэ.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="wellness"><div class="card-visual"><span class="card-icon">🛁</span></div><div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Инфра Улаан Туяаны Сауна</div><p class="card-desc">Биеийн гүн хэсэгт нэвтэрч хорт бодисыг ялгаруулна, тайвшруулна.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="fitness"><div class="card-visual"><span class="card-icon">⚡</span></div><div class="card-body"><span class="card-tag">Фитнес</span><div class="card-title">Компрессийн Эмчилгээ</div><p class="card-desc">Цусны эргэлтийг нэмэгдүүлж, булчин нөхөн сэргээлтийг хурдасгана.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="fitness"><div class="card-visual"><span class="card-icon">🔴</span></div><div class="card-body"><span class="card-tag">Фитнес</span><div class="card-title">Улаан Гэрлийн Эмчилгээ</div><p class="card-desc">Биоидэвхит гэрлийн долгионоор эдийг нөхөн сэргээж, булчин бэхжүүлнэ.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="beauty"><div class="card-visual"><span class="card-icon">✨</span></div><div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">Крио Нүүрний Эмчилгээ</div><p class="card-desc">Коллагены үйлдвэрлэлийг нэмэгдүүлж, арьсыг чангалж, өнгө цайлгана.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="beauty"><div class="card-visual"><span class="card-icon">💎</span></div><div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">HydraFacial</div><p class="card-desc">Гүнзгий цэвэрлэгээ, ус тэжээлт, антиоксидант эмчилгээний хослол.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="slim"><div class="card-visual"><span class="card-icon">🎯</span></div><div class="card-body"><span class="card-tag">Нарийслах</span><div class="card-title">Крио Биеийн Нарийслах</div><p class="card-desc">Хэцүү газрын өөхийг хөлдөөж, 60 минутад 3 см хүртэл бууруулна.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
-    <div class="treatment-card active-card" data-cat="slim"><div class="card-visual"><span class="card-icon">💪</span></div><div class="card-body"><span class="card-tag">Нарийслах</span><div class="card-title">EMS Биеийн Хэлбэрлэлт</div><p class="card-desc">Цахилгаан цочролоор булчин ажиллуулж, хурдтай хэлбэрт оруулна.</p><a class="card-link" href="#">Дэлгэрэнгүй →</a></div></div>
+    <div class="treatment-card active-card" data-cat="wellness" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-cabin-1.png" alt="" loading="lazy"/><span class="card-icon">🧊</span></div>
+      <div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Бүхэл Биеийн Криотерапи</div><p class="card-desc">−140°C хүртэл хүйтэнд 3 минут байснаар дархлаа дэмжиж, стрессийг бууруулна.</p><a class="card-link" href="cabin.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="wellness" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-oxypro-1.png" alt="" loading="lazy"/><span class="card-icon">💨</span></div>
+      <div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Хүчилтөрөгчийн Эмчилгээ</div><p class="card-desc">Цэвэр хүчилтөрөгчөөр тэжээгдэж биеийн эд эсийг сэргээнэ.</p><a class="card-link" href="oxypro.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="wellness" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-ecabin.png" alt="" loading="lazy"/><span class="card-icon">🛁</span></div>
+      <div class="card-body"><span class="card-tag">Эрүүл мэнд</span><div class="card-title">Инфра Улаан Туяаны Сауна</div><p class="card-desc">Биеийн гүн хэсэгт нэвтэрч хорт бодисыг ялгаруулна, тайвшруулна.</p><a class="card-link" href="cabin.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="fitness" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-oxypro-2.png" alt="" loading="lazy"/><span class="card-icon">⚡</span></div>
+      <div class="card-body"><span class="card-tag">Фитнес</span><div class="card-title">Компрессийн Эмчилгээ</div><p class="card-desc">Цусны эргэлтийг нэмэгдүүлж, булчин нөхөн сэргээлтийг хурдасгана.</p><a class="card-link" href="oxypro.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="fitness" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-ledpro-1.png" alt="" loading="lazy"/><span class="card-icon">🔴</span></div>
+      <div class="card-body"><span class="card-tag">Фитнес</span><div class="card-title">Улаан Гэрлийн Эмчилгээ</div><p class="card-desc">Биоидэвхит гэрлийн долгионоор эдийг нөхөн сэргээж, булчин бэхжүүлнэ.</p><a class="card-link" href="ledpro.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="beauty" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-xcryo-1.png" alt="" loading="lazy"/><span class="card-icon">✨</span></div>
+      <div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">Крио Нүүрний Эмчилгээ</div><p class="card-desc">Коллагены үйлдвэрлэлийг нэмэгдүүлж, арьсыг чангалж, өнгө цайлгана.</p><a class="card-link" href="xcryo.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="beauty" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-xcryo-2.png" alt="" loading="lazy"/><span class="card-icon">💎</span></div>
+      <div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">HydraFacial</div><p class="card-desc">Гүнзгий цэвэрлэгээ, ус тэжээлт, антиоксидант эмчилгээний хослол.</p><a class="card-link" href="xcryo.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="slim" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-cabin-2.png" alt="" loading="lazy"/><span class="card-icon">🎯</span></div>
+      <div class="card-body"><span class="card-tag">Нарийслах</span><div class="card-title">Крио Биеийн Нарийслах</div><p class="card-desc">Хэцүү газрын өөхийг хөлдөөж, 60 минутад 3 см хүртэл бууруулна.</p><a class="card-link" href="cabin.html">Дэлгэрэнгүй →</a></div>
+    </div>
+    <div class="treatment-card active-card" data-cat="slim" data-tilt="7">
+      <div class="card-visual"><img src="photos/img-ledpro-4.png" alt="" loading="lazy"/><span class="card-icon">💪</span></div>
+      <div class="card-body"><span class="card-tag">Нарийслах</span><div class="card-title">EMS Биеийн Хэлбэрлэлт</div><p class="card-desc">Цахилгаан цочролоор булчин ажиллуулж, хурдтай хэлбэрт оруулна.</p><a class="card-link" href="ledpro.html">Дэлгэрэнгүй →</a></div>
+    </div>
   </div>
 </section>
 
-<!-- BENEFITS -->
-<section class="section alt" id="benefits">
+<!-- ══════════ 3D DEVICE STAGE ══════════ -->
+<section class="section alt" id="devices">
+  <div style="text-align:center;max-width:640px;margin:0 auto;" class="reveal">
+    <div class="section-chip">Төхөөрөмж</div>
+    <h2 class="section-title">CTN.FI-ийн <span class="accent">жинхэнэ технологи</span></h2>
+    <p class="section-desc" style="margin:0 auto;">Финландын CTN.FI-аас шууд нийлүүлсэн эх төхөөрөмжүүд. Эргүүлж, ойртож, дэлгэрэнгүйг нь үз.</p>
+  </div>
+
+  <div class="stage-wrap reveal">
+    <div class="stage" data-stage>
+      <div class="stage-item" data-href="cabin.html">
+        <div class="si-frame">
+          <img src="photos/img-cabin-2.png" alt="Крио Кабин"/>
+          <div class="si-name">Крио Кабин</div>
+          <div class="si-sub">−140°C · Бүхэл бие</div>
+        </div>
+      </div>
+      <div class="stage-item" data-href="xcryo.html">
+        <div class="si-frame">
+          <img src="photos/img-xcryo-1.png" alt="X°CRYO"/>
+          <div class="si-name">X°CRYO</div>
+          <div class="si-sub">Локал крио · 1–3 мин</div>
+        </div>
+      </div>
+      <div class="stage-item" data-href="ledpro.html">
+        <div class="si-frame">
+          <img src="photos/img-ledpro-1.png" alt="LedPro"/>
+          <div class="si-name">LedPro</div>
+          <div class="si-sub">28,515 LED · Улаан гэрэл</div>
+        </div>
+      </div>
+      <div class="stage-item" data-href="oxypro.html">
+        <div class="si-frame">
+          <img src="photos/img-oxypro-1.png" alt="OxyPro"/>
+          <div class="si-name">OxyPro</div>
+          <div class="si-sub">1.4 ATA · Хүчилтөрөгч</div>
+        </div>
+      </div>
+      <div class="stage-item" data-href="cabin.html">
+        <div class="si-frame">
+          <img src="photos/img-ecabin.png" alt="e°Cabin"/>
+          <div class="si-name">e°Cabin</div>
+          <div class="si-sub">Цахилгаан · Автомат</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-nav">
+      <button class="stage-btn" data-stage-prev aria-label="Өмнөх төхөөрөмж">‹</button>
+      <div class="stage-dots" data-stage-dots></div>
+      <button class="stage-btn" data-stage-next aria-label="Дараах төхөөрөмж">›</button>
+    </div>
+
+    <div style="text-align:center;margin-top:34px;">
+      <a href="hub.html" class="btn btn-outline">Бүх төхөөрөмж үзэх</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ BENEFITS ══════════ -->
+<section class="section white" id="benefits">
   <div style="text-align:center;" class="reveal">
     <div class="section-chip">Ашиг тус</div>
     <h2 class="section-title">5 үндсэн <span class="accent">ашиг тус</span></h2>
-    <p class="section-desc" style="margin:0 auto 0;">Крио эмчилгээ нь таны амьдралын 5 чухал хэсэгт гайхамшигтай үр дүн өгнө.</p>
+    <p class="section-desc" style="margin:0 auto;">Крио эмчилгээ нь таны амьдралын 5 чухал хэсэгт гайхамшигтай үр дүн өгнө.</p>
   </div>
-  <div class="benefits-grid reveal">
+  <div class="benefits-grid stagger">
     <div class="benefit-item"><span class="benefit-icon">🌿</span><div class="benefit-title">Эрүүл мэнд</div><ul class="benefit-list"><li>Дархлаа дэмжинэ</li><li>Стресс бууруулна</li><li>400–800 калори шатаана</li><li>Нойрыг сайжруулна</li></ul></div>
     <div class="benefit-item"><span class="benefit-icon">⚡</span><div class="benefit-title">Фитнес</div><ul class="benefit-list"><li>Цусны эргэлт нэмэгдэнэ</li><li>Булчин хурдан сэргэнэ</li><li>Эдийн гэмтэл буурна</li><li>Гүйцэтгэл нэмэгдэнэ</li></ul></div>
     <div class="benefit-item"><span class="benefit-icon">✨</span><div class="benefit-title">Гоо сайхан</div><ul class="benefit-list"><li>Коллаген нэмэгдэнэ</li><li>Арьс чангарна</li><li>Үрчлээ багасна</li><li>Гялалзах байдал</li></ul></div>
@@ -148,7 +259,7 @@
   </div>
 </section>
 
-<!-- STATS -->
+<!-- ══════════ STATS ══════════ -->
 <div class="stats">
   <div class="stats-grid reveal">
     <div class="stat-item"><span class="stat-num" data-target="140">0<span class="stat-unit">°C</span></span><div class="stat-label">Хамгийн хүйтэн</div></div>
@@ -158,13 +269,13 @@
   </div>
 </div>
 
-<!-- PROCESS -->
+<!-- ══════════ PROCESS ══════════ -->
 <section class="section white">
   <div style="text-align:center;" class="reveal">
     <div class="section-chip">Явц</div>
     <h2 class="section-title">Яаж ажилладаг вэ?</h2>
   </div>
-  <div class="process-steps reveal">
+  <div class="process-steps stagger">
     <div class="process-step"><div class="step-bubble">01</div><h4>Зөвлөгөө</h4><p>Үнэгүй зөвлөгөөгөөр эхэлж, таны зорилго болон эрүүл мэндийн байдлыг тодруулна.</p></div>
     <div class="process-step"><div class="step-bubble">02</div><h4>Төлөвлөлт</h4><p>Хувийн эмчилгээний төлөвлөгөө боловсруулж, хамгийн тохирсон процедурыг сонгоно.</p></div>
     <div class="process-step"><div class="step-bubble">03</div><h4>Эмчилгээ</h4><p>Мэргэжлийн эмч нарын хяналтан дор аюулгүй, үр дүнтэй эмчилгээ хийгдэнэ.</p></div>
@@ -172,21 +283,21 @@
   </div>
 </section>
 
-<!-- PRICING -->
+<!-- ══════════ PRICING ══════════ -->
 <section class="section alt" id="pricing">
-  <div style="text-align:center;max-width:600px;margin:0 auto;" class="reveal">
+  <div style="text-align:center;max-width:620px;margin:0 auto;" class="reveal">
     <div class="section-chip">Үнийн мэдээлэл</div>
     <h2 class="section-title">Үнэ тариф</h2>
     <p class="section-desc" style="margin:0 auto;">Хэрэгцээндээ тохирсон багцыг сонго. Бүх багцад үнэгүй зөвлөгөө багтана.</p>
   </div>
-  <div class="pricing-grid reveal">
+  <div class="pricing-grid stagger">
     <div class="price-card">
       <div class="price-name">Анхан шатны</div>
       <p class="price-desc">Крио эмчилгээг анх туршихад тохиромжтой. Нэг удаагийн эмчилгээ.</p>
       <div class="price-amount"><span class="price-currency">₮</span>89,000</div>
       <div class="price-period">нэг удаагийн үйлчилгээ</div>
       <ul class="price-features"><li>1 удаа бүхэл биеийн криотерапи</li><li>Үнэгүй зөвлөгөө</li><li>Хувийн төлөвлөгөө</li><li>Тусгай хувцас хэрэгсэл</li></ul>
-      <a href="#" class="btn btn-outline" style="display:block;text-align:center;" onclick="openModal();return false;">Цаг захиалах</a>
+      <a href="#" class="btn btn-outline" style="display:flex;width:100%;" onclick="openModal();return false;">Цаг захиалах</a>
     </div>
     <div class="price-card featured">
       <div class="price-badge-top">Хамгийн эрэлттэй</div>
@@ -195,7 +306,7 @@
       <div class="price-amount"><span class="price-currency">₮</span>650,000</div>
       <div class="price-period">/ сар (8 удаа)</div>
       <ul class="price-features"><li>8 удаа бүхэл биеийн криотерапи</li><li>2 удаа нүүрний эмчилгээ</li><li>Компрессийн эмчилгээ</li><li>Тогтмол хяналт, зөвлөгөө</li><li>10% нэмэлт хөнгөлөлт</li></ul>
-      <a href="#" class="btn btn-primary" style="display:block;text-align:center;" onclick="openModal();return false;">Цаг захиалах</a>
+      <a href="#" class="btn btn-primary" style="display:flex;width:100%;" onclick="openModal();return false;">Цаг захиалах</a>
     </div>
     <div class="price-card">
       <div class="price-name">Premium VIP</div>
@@ -203,14 +314,14 @@
       <div class="price-amount"><span class="price-currency">₮</span>1,200,000</div>
       <div class="price-period">/ сар (хязгааргүй)</div>
       <ul class="price-features"><li>Хязгааргүй криотерапи</li><li>Бүх үйлчилгээнд нэвтрэх эрх</li><li>Хувийн менежер</li><li>VIP зочны зал</li><li>20% найзлагын хөнгөлөлт</li></ul>
-      <a href="#" class="btn btn-outline" style="display:block;text-align:center;" onclick="openModal();return false;">Цаг захиалах</a>
+      <a href="#" class="btn btn-outline" style="display:flex;width:100%;" onclick="openModal();return false;">Цаг захиалах</a>
     </div>
   </div>
 </section>
 
-<!-- CONTACT -->
+<!-- ══════════ CONTACT ══════════ -->
 <section class="section white" id="contact">
-  <div style="text-align:center;max-width:600px;margin:0 auto 16px;" class="reveal">
+  <div style="text-align:center;max-width:620px;margin:0 auto 16px;" class="reveal">
     <div class="section-chip">Холбоо барих</div>
     <h2 class="section-title">Бидэнтэй холбогдох</h2>
     <p class="section-desc" style="margin:0 auto;">Аливаа асуулт, цаг захиалга, зөвлөгөөний хүсэлтэй бол бидэнтэй холбогдоорой.</p>
@@ -232,23 +343,23 @@
       <div class="info-block"><div class="info-label">И-мэйл</div><div class="info-value">info@cryomongolia.mn</div></div>
       <div class="info-block"><div class="info-label">Цагийн хуваарь</div><div class="info-value">Даваа – Баасан: 08:00 – 21:00<br>Бямба – Ням: 09:00 – 19:00</div></div>
       <div class="social-row">
-        <a class="social-btn" href="#">f</a>
-        <a class="social-btn" href="#">◎</a>
-        <a class="social-btn" href="#">▷</a>
+        <a class="social-btn" href="#" aria-label="Facebook">f</a>
+        <a class="social-btn" href="#" aria-label="Instagram">◎</a>
+        <a class="social-btn" href="#" aria-label="YouTube">▷</a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- ══════════ FOOTER ══════════ -->
 <footer>
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="footer-logo">°CRYO <span>Mongolia</span></div>
       <p>Монголын анхны мэргэжлийн крио эмчилгээний төв. Эрүүл мэнд, гоо сайхан, нөхөн сэргэлтийн дэлхийн стандартыг Монголд нэвтрүүлж байна.</p>
     </div>
-    <div class="footer-col"><h5>Үйлчилгээ</h5><ul><li><a href="#">Бүхэл биеийн криотерапи</a></li><li><a href="#">Нүүрний эмчилгээ</a></li><li><a href="#">Компрессийн эмчилгээ</a></li><li><a href="#">Улаан гэрэл</a></li><li><a href="#">EMS хэлбэрлэлт</a></li></ul></div>
-    <div class="footer-col"><h5>Компани</h5><ul><li><a href="#">Бидний тухай</a></li><li><a href="#">Баг</a></li><li><a href="#">Блог</a></li><li><a href="#">Ажлын байр</a></li><li><a href="#">Франчайз</a></li></ul></div>
+    <div class="footer-col"><h5>Үйлчилгээ</h5><ul><li><a href="cabin.html">Бүхэл биеийн криотерапи</a></li><li><a href="xcryo.html">Нүүрний эмчилгээ</a></li><li><a href="oxypro.html">Компрессийн эмчилгээ</a></li><li><a href="ledpro.html">Улаан гэрэл</a></li><li><a href="ledpro.html">EMS хэлбэрлэлт</a></li></ul></div>
+    <div class="footer-col"><h5>Компани</h5><ul><li><a href="#about">Бидний тухай</a></li><li><a href="#">Баг</a></li><li><a href="#">Блог</a></li><li><a href="#">Ажлын байр</a></li><li><a href="#">Франчайз</a></li></ul></div>
     <div class="footer-col"><h5>Холбоо</h5><ul><li><a href="#" onclick="openModal();return false;">Цаг захиалах</a></li><li><a href="#">Асуулт хариулт</a></li><li><a href="#">Нууцлалын бодлого</a></li><li><a href="#">Үйлчилгээний нөхцөл</a></li></ul></div>
   </div>
   <div class="footer-bottom">
@@ -257,7 +368,7 @@
   </div>
 </footer>
 
-<!-- MODAL -->
+<!-- ══════════ BOOKING MODAL ══════════ -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -270,7 +381,7 @@
     </div>
 
     <div class="step-panel active" id="step1">
-      <h3 style="font-family:var(--ff-display);font-size:26px;font-weight:600;margin-bottom:4px;">Цаг захиалах</h3>
+      <h3 style="font-family:var(--ff-display);font-size:25px;font-weight:600;margin-bottom:6px;">Цаг захиалах</h3>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">Огноо болон цагаа сонгоно уу</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">
         <div class="form-group"><label>Нэр</label><input type="text" id="b_name" placeholder="Таны нэр"/></div>
@@ -280,26 +391,26 @@
         <div class="dep-amount">₮100,000</div>
         <div class="dep-info"><div class="dep-title">Урьдчилгаа төлбөр</div><div class="dep-sub">Цаг баталгаажуулахад шаардлагатай.<br>Үлдэгдлийг ирэхдээ бэлнээр төлнө.</div></div>
       </div>
-      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Огноо сонгох</label>
+      <label style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);">Огноо сонгох</label>
       <div class="date-nav">
         <button class="date-nav-btn" id="datePrevBtn" onclick="shiftDates(-1)" disabled>‹</button>
         <div class="date-tabs" id="dateTabs"></div>
         <button class="date-nav-btn" onclick="shiftDates(1)">›</button>
       </div>
-      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);display:block;margin-top:4px;">Цаг сонгох</label>
+      <label style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);display:block;margin-top:4px;">Цаг сонгох</label>
       <div class="time-grid" id="timeGrid" style="margin-top:8px;"></div>
-      <button class="btn btn-primary" style="width:100%;margin-top:20px;" onclick="goStep2()">Үргэлжлүүлэх →</button>
+      <button class="btn btn-primary" style="width:100%;margin-top:22px;" onclick="goStep2()">Үргэлжлүүлэх →</button>
     </div>
 
     <div class="step-panel" id="step2">
-      <h3 style="font-family:var(--ff-display);font-size:26px;font-weight:600;margin-bottom:4px;">Төлбөр</h3>
+      <h3 style="font-family:var(--ff-display);font-size:25px;font-weight:600;margin-bottom:6px;">Төлбөр</h3>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Банкаа сонгоод QR код авна уу</p>
       <div class="order-summary">
         <div class="order-row"><span>Огноо</span><span id="sum_date">–</span></div>
         <div class="order-row"><span>Цаг</span><span id="sum_time">–</span></div>
         <div class="order-row"><span>Урьдчилгаа</span><span>₮100,000</span></div>
       </div>
-      <label style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:8px;">Банк сонгох</label>
+      <label style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:8px;">Банк сонгох</label>
       <div class="bank-grid">
         <div class="bank-btn" onclick="selectBank(this,'khan','Хаан банк')"><div class="bank-logo" style="background:#1a3a8c;">🏦</div><div><div class="bank-name">Хаан банк</div><div class="bank-app">Khan Bank App</div></div></div>
         <div class="bank-btn" onclick="selectBank(this,'golomt','Голомт банк')"><div class="bank-logo" style="background:#c8102e;">🏦</div><div><div class="bank-name">Голомт банк</div><div class="bank-app">Golomt Mobile</div></div></div>
@@ -310,7 +421,7 @@
         <div class="bank-btn" onclick="selectBank(this,'state','Төрийн банк')"><div class="bank-logo" style="background:#b8960a;">🏦</div><div><div class="bank-name">Төрийн банк</div><div class="bank-app">State Bank App</div></div></div>
         <div class="bank-btn" onclick="selectBank(this,'arig','Ариг банк')"><div class="bank-logo" style="background:#0060b0;">🏦</div><div><div class="bank-name">Ариг банк</div><div class="bank-app">Arig Bank App</div></div></div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:20px;">
+      <div style="display:flex;gap:10px;margin-top:22px;">
         <button class="btn btn-outline" style="flex:1;" onclick="goStepNum(1)">← Буцах</button>
         <button class="btn btn-primary" style="flex:2;" onclick="showQR()">QR код авах →</button>
       </div>
@@ -343,18 +454,19 @@
 
     <div class="step-panel" id="step3">
       <div class="success-screen">
-        <span class="s-icon">🌿</span>
+        <span class="s-icon">❄️</span>
         <div class="s-title">Амжилттай!</div>
         <p class="s-sub">Таны захиалга баталгаажлаа.<br>Бид тантай удахгүй холбогдох болно.</p>
         <div class="booking-ref"><div class="ref-label">Захиалгын дугаар</div><div class="ref-num" id="bookingRef">CRYO-0000</div></div>
         <div class="s-details" id="confirmDetails"></div>
-        <button class="btn btn-primary" style="margin-top:20px;" onclick="closeModal()">Хаах</button>
+        <button class="btn btn-primary" style="margin-top:22px;" onclick="closeModal()">Хаах</button>
       </div>
     </div>
   </div>
 </div>
 
 <script src="index.js"></script>
+<script src="cryo3d.js"></script>
 <script>
 function handleContact(e){e.preventDefault();showToast('Таны хүсэлт амжилттай илгээгдлээ! Бид тантай удахгүй холбогдоно.');e.target.reset();}
 </script>

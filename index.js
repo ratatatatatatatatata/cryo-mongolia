@@ -8,55 +8,6 @@ window.addEventListener("scroll", () => {
   document.getElementById("navbar").classList.toggle("scrolled", scrollY > 50);
 });
 
-/* ── Floating particles ── */
-(function spawnParticles() {
-  const container = document.getElementById("particles");
-  if (!container) return;
-  for (let i = 0; i < 20; i++) {
-    const p = document.createElement("div");
-    const size = Math.random() * 3 + 1;
-    p.style.cssText = [
-      "position:absolute",
-      "border-radius:50%",
-      `width:${size}px`,
-      `height:${size}px`,
-      `background:rgba(31,107,94,${(Math.random() * 0.2 + 0.08).toFixed(2)})`,
-      `left:${Math.random() * 100}%`,
-      `animation:float-particle ${8 + Math.random() * 12}s ${Math.random() * 8}s linear infinite`,
-      "opacity:0",
-    ].join(";");
-    container.appendChild(p);
-  }
-
-  if (!document.getElementById("particle-style")) {
-    const s = document.createElement("style");
-    s.id = "particle-style";
-    s.textContent = `
-      @keyframes float-particle {
-        0%   { transform: translateY(100vh) scale(0); opacity: 0; }
-        10%  { opacity: .6; }
-        90%  { opacity: .15; }
-        100% { transform: translateY(-20px) scale(1); opacity: 0; }
-      }
-    `;
-    document.head.appendChild(s);
-  }
-})();
-
-/* ── Scroll reveal ── */
-(function initReveal() {
-  const els = document.querySelectorAll(".reveal");
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) e.target.classList.add("visible");
-      });
-    },
-    { threshold: 0.08 },
-  );
-  els.forEach((el) => obs.observe(el));
-})();
-
 /* ── Counter animation ── */
 (function initCounters() {
   const counterObs = new IntersectionObserver(
@@ -387,7 +338,7 @@ function setText(id, val) {
 function shakeInput(id) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.style.borderColor = "#e05252";
+  el.style.borderColor = "#ff6b6b";
   el.style.animation = "shake .35s ease";
   setTimeout(() => {
     el.style.borderColor = "";
@@ -415,30 +366,12 @@ function showToast(msg) {
 
   const toast = document.createElement("div");
   toast.id = "cryo-toast";
+  toast.className = "toast";
   toast.textContent = msg;
-  toast.style.cssText = [
-    "position:fixed",
-    "bottom:28px",
-    "left:50%",
-    "transform:translateX(-50%) translateY(12px)",
-    "background:var(--text-primary)",
-    "color:#fff",
-    "padding:10px 22px",
-    "border-radius:99px",
-    "font-size:13px",
-    "font-family:var(--ff-body)",
-    "z-index:9999",
-    "opacity:0",
-    "transition:all .3s",
-    "pointer-events:none",
-  ].join(";");
   document.body.appendChild(toast);
-  requestAnimationFrame(() => {
-    toast.style.opacity = "1";
-    toast.style.transform = "translateX(-50%) translateY(0)";
-  });
+  requestAnimationFrame(() => toast.classList.add("show"));
   setTimeout(() => {
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 2200);
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 500);
+  }, 2800);
 }
