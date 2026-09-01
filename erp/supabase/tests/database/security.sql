@@ -482,18 +482,25 @@ update public.staff_invites
 set processing_started_at = now() - interval '6 minutes'
 where lower(email) = 'stale-attempt@example.invalid';
 
+create temporary table stale_takeover_result on commit drop as
+select *
+from public.reserve_staff_invite(
+  '00000000-0000-4000-8000-000000000105',
+  '00000000-0000-4000-8000-000000000207',
+  'stale-attempt@example.invalid',
+  'Stale Attempt Worker',
+  'reception',
+  '00000000-0000-4000-8000-000000000003'
+);
+
 select ok(
-  (
-    select r.should_send
-      and r.reservation_token = '00000000-0000-4000-8000-000000000207'
-    from public.reserve_staff_invite(
-      '00000000-0000-4000-8000-000000000105',
-      '00000000-0000-4000-8000-000000000207',
-      'stale-attempt@example.invalid',
-      'Stale Attempt Worker',
-      'reception',
-      '00000000-0000-4000-8000-000000000003'
-    ) as r
+  coalesce(
+    (
+      select r.should_send
+        and r.reservation_token = '00000000-0000-4000-8000-000000000207'
+      from stale_takeover_result as r
+    ),
+    false
   )
   and exists (
     select 1
