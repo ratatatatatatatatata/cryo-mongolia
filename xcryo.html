@@ -3,20 +3,26 @@
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>X°CRYO™ — °CRYO Mongolia</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <style>
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @media(max-width:900px){.hero-img-wrap{display:none}}
-.treatment-table-wrap{overflow-x:auto;border-radius:var(--r-lg);border:1.5px solid var(--border)}
-.treatment-table{width:100%;border-collapse:collapse;font-size:12px}
-.treatment-table th{background:var(--accent-soft);padding:10px 14px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);font-weight:600}
-.treatment-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text-secondary)}
-.treatment-table tr:last-child td{border:none}
-.treatment-table tr:hover td{background:rgba(31,107,94,.03)}
+
+
+
+
+
+
 </style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+  <meta name="theme-color" content="#03060c"/>
+  <noscript><style>.reveal,.stagger>*{opacity:1 !important;transform:none !important}.hero-chip,.hero-sub,.hero-actions,.hero-trust,.hero-scroll-hint{opacity:1 !important;animation:none !important}</style></noscript>
 </head>
 <body>
+<div class="atmos" aria-hidden="true"></div>
 <nav class="topnav">
   <a href="hub.html" class="back-btn">Төхөөрөмжүүд</a>
   <a href="hub.html" class="nav-logo">°CRYO <span>Mongolia</span></a>
@@ -188,10 +194,6 @@
   <a href="hub.html" class="btn btn-outline" style="margin-left:10px;">← Буцах</a>
 </div>
 <footer><p>© 2025 °CRYO Mongolia</p><p>CTN.FI Recovery Technologies · X°CRYO™</p></footer>
-<script>
-document.querySelectorAll('.reveal').forEach(r=>
-  new IntersectionObserver(([e])=>e.isIntersecting&&r.classList.add('visible'),{threshold:.1}).observe(r)
-);
-</script>
+<script src="cryo3d.js"></script>
 </body>
 </html>
