@@ -46,9 +46,9 @@
     <li><a href="#contact">Холбоо барих</a></li>
   </ul>
   <a href="#" class="nav-cta" onclick="openModal();return false;">Цаг захиалах</a>
-  <div class="hamburger" onclick="toggleMenu()" id="hamburger">
+  <button class="hamburger" type="button" onclick="toggleMenu()" id="hamburger" aria-label="Цэс нээх" aria-expanded="false" aria-controls="mobileMenu">
     <span></span><span></span><span></span>
-  </div>
+  </button>
 </nav>
 
 <div class="mobile-menu" id="mobileMenu">
@@ -94,6 +94,24 @@
         <div class="ht-lab">Албан ёсны<br>түнш</div>
       </div>
     </div>
+  </div>
+
+  <div class="hero-3d" aria-hidden="true">
+    <div class="orbit orbit-a"></div>
+    <div class="orbit orbit-b"></div>
+    <div class="cryo-pod">
+      <div class="pod-glow"></div>
+      <div class="pod-cap"><span></span></div>
+      <div class="pod-body">
+        <div class="pod-window"><div class="cold-mist"></div></div>
+        <div class="pod-screen"><b>−140</b><small>°C</small></div>
+        <div class="pod-mark">CRYO</div>
+      </div>
+      <div class="pod-base"></div>
+    </div>
+    <div class="float-card fc-temp"><span>LIVE TEMP</span><strong>−140°C</strong></div>
+    <div class="float-card fc-session"><span>SESSION</span><strong>03:00</strong></div>
+    <div class="hero-floor"></div>
   </div>
 
   <div class="hero-scroll-hint"><div class="scroll-line"></div>Доош гүйл</div>
