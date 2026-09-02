@@ -112,13 +112,13 @@
 
     /* ── star ── */
     vec2 sp = p.xy * rot(0.20 + sin(t * 0.18) * 0.05);
-    float star2 = sdStar(sp, 1.26, 8.0, 3.05);
-    float star  = extrude(star2, p.z - 0.10, 0.115, 0.028);
+    float star2 = sdStar(sp, 1.24, 8.0, 3.05);
+    float star  = extrude(star2, p.z - 0.06, 0.150, 0.070);
 
-    /* ── arrow: outer body minus an inner copy leaves the ribbon ── */
+    /* ── arrow: a thick outlined band, the way the mark draws it ── */
     vec2 ap = (p.xy - vec2(0.02, -0.02)) * rot(-0.87);   /* points up-right */
-    float arrow2 = sdArrow(ap, 0.94);
-    float arrow  = extrude(arrow2, p.z - 0.30, 0.135, 0.05);
+    float arrow2 = abs(sdArrow(ap, 1.00)) - 0.165;
+    float arrow  = extrude(arrow2, p.z - 0.34, 0.170, 0.042);
 
     vec2 res = vec2(star, 1.0);
     if (arrow < res.x) res = vec2(arrow, 2.0);
@@ -216,13 +216,18 @@
       col += base * vec3(0.55, 0.75, 1.0) * f * mix(0.30, 0.16, isStar);
       col += base * 0.22 * b;
 
-      /* glossy coat */
-      col += vec3(1.0) * pow(max(dot(reflect(-L1, n), -rd), 0.0), 120.0) * spcGain;
-      col += vec3(0.70, 0.88, 1.0) * pow(max(dot(reflect(-L2, n), -rd), 0.0), 46.0) * spcGain * 0.6;
+      /* glossy coat: a tight hot spot plus a broad sheen, the way the
+         moulded mark catches a studio light along its bevels */
+      col += vec3(1.0) * pow(max(dot(reflect(-L1, n), -rd), 0.0), 220.0) * 2.6;
+      col += vec3(1.0) * pow(max(dot(reflect(-L1, n), -rd), 0.0), 34.0) * 0.55 * spcGain;
+      col += vec3(0.78, 0.92, 1.0) * pow(max(dot(reflect(-L2, n), -rd), 0.0), 70.0) * 1.1 * spcGain;
+
+      /* the bevel catches a bright line where it turns away */
+      col += mix(base, vec3(1.0), 0.75) * pow(fres, 3.6) * 1.15;
 
       /* reflected studio + rim */
       col += envColor(reflect(rd, n)) * (0.06 + 0.22 * fres) * mix(1.0, 0.45, isStar);
-      col += mix(base, vec3(1.0), 0.45) * pow(fres, 2.4) * mix(0.30, 0.14, isStar);
+      col += mix(base, vec3(1.0), 0.45) * pow(fres, 2.4) * mix(0.20, 0.10, isStar);
 
       /* the arrow reads brighter so it stays legible over the star */
       if (mat > 1.5) col *= 1.30;
