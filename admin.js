@@ -17,6 +17,24 @@ const STATUS_MN = {
   done: "Биелсэн",
   cancelled: "Цуцалсан",
 };
+const DEVICES = [
+  ["cryo_cabin", "Cabin", "f_cabin"],
+  ["oxy_pro", "OxyPro", "f_oxy"],
+  ["led_pro", "LedPro", "f_led"],
+  ["x_cryo", "X°Cryo", "f_xcryo"],
+  ["zerobody", "Zero", "f_zero"],
+  ["normatec", "Norma", "f_norma"],
+  ["oxygen", "Oxygen", "f_oxygen"],
+];
+const PAYS = [
+  ["golomt", "Голомт", "f_golomt"],
+  ["khan", "Хаан", "f_khan"],
+  ["cash", "Бэлэн", "f_cash"],
+  ["invoice", "Нэхэмжлэх", "f_invoice"],
+  ["barter", "Barter", "f_barter"],
+  ["refund", "Буцаалт", "f_refund"],
+];
+
 const ROLE_MN = {
   owner: "Үндсэн админ",
   admin: "Админ",
@@ -26,7 +44,10 @@ const ROLE_MN = {
 
 let sb = null;
 let me = null; // { id, email, full_name, role }
-let cache = { bookings: [], messages: [], services: [], packages: [], users: [], months: [] };
+let cache = {
+  bookings: [], messages: [], services: [], packages: [], users: [], months: [],
+  sales: [], expenses: [], staff: [],
+};
 let bkFilter = "all";
 
 /* ── tiny DOM helpers ─────────────────────────────────────────── */
@@ -60,6 +81,8 @@ function fmtDate(v) {
   wireNav();
   wireBookingFilters();
   wireReports();
+  wireLedger();
+  wireExpenses();
 
   /* the login screen always renders; it just explains itself when the
      project has no anon key yet, instead of vanishing behind a setup page */
@@ -218,7 +241,11 @@ async function loadAll() {
     sb.from("services").select("*").order("sort", { ascending: true }),
     sb.from("packages").select("*").order("sort", { ascending: true }),
     sb.from("report_monthly").select("*"),
+    sb.from("sales").select("*").order("sale_date", { ascending: false }).limit(5000),
+    sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
+    sb.from("staff").select("*").order("sort", { ascending: true }),
   ];
+  const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
     jobs.push(sb.from("profiles").select("*").order("created_at", { ascending: true }));
   }
@@ -229,7 +256,10 @@ async function loadAll() {
   cache.services = res[2].data || [];
   cache.packages = res[3].data || [];
   cache.months = res[4].data || [];
-  cache.users = res[5] ? res[5].data || [] : [];
+  cache.sales = res[5].data || [];
+  cache.expenses = res[6].data || [];
+  cache.staff = res[7].data || [];
+  cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
   if (firstErr && firstErr.error) {
@@ -237,6 +267,8 @@ async function loadAll() {
   }
 
   renderOverview();
+  renderLedger();
+  renderExpenses();
   renderReports();
   renderBookings();
   renderMessages();
@@ -937,3 +969,381 @@ function exportCsv() {
 }
 
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   SALES LEDGER — the daily book that used to live in the workbook
+   ══════════════════════════════════════════════════════════════ */
+
+
+let ledMonth = "all";
+let ledStaff = "all";
+let ledSearch = "";
+let ledReviewOnly = false;
+let ledEditing = null;
+let ledLimit = 100;
+
+const rowTotal = (r) =>
+  (r.golomt || 0) + (r.khan || 0) + (r.cash || 0) + (r.invoice || 0) + (r.barter || 0) - (r.refund || 0);
+
+function ledRows() {
+  return cache.sales.filter((r) => {
+    if (ledMonth !== "all" && String(r.sale_date).slice(0, 7) !== ledMonth) return false;
+    if (ledStaff !== "all" && (r.therapist || "—") !== ledStaff) return false;
+    if (ledReviewOnly && !r.needs_review) return false;
+    if (ledSearch) {
+      const hay = ((r.customer_name || "") + " " + (r.services || "") + " " + (r.note || "")).toLowerCase();
+      if (!hay.includes(ledSearch)) return false;
+    }
+    return true;
+  });
+}
+
+function wireLedger() {
+  if (!$("ledBody")) return;
+  $("ledMonth").addEventListener("change", () => {
+    ledMonth = $("ledMonth").value;
+    ledLimit = 100;
+    renderLedger();
+  });
+  $("ledStaff").addEventListener("change", () => {
+    ledStaff = $("ledStaff").value;
+    ledLimit = 100;
+    renderLedger();
+  });
+  $("ledSearch").addEventListener("input", () => {
+    ledSearch = $("ledSearch").value.trim().toLowerCase();
+    ledLimit = 100;
+    renderLedger();
+  });
+  $("ledReview").addEventListener("change", () => {
+    ledReviewOnly = $("ledReview").checked;
+    ledLimit = 100;
+    renderLedger();
+  });
+  $("ledAdd").addEventListener("click", () => openLedForm(null));
+  $("ledCancel").addEventListener("click", () => {
+    $("ledForm").style.display = "none";
+    ledEditing = null;
+  });
+  $("ledSave").addEventListener("click", saveLedger);
+  $("ledCsv").addEventListener("click", exportLedgerCsv);
+  [...PAYS.map((p) => p[2])].forEach((id) =>
+    $(id).addEventListener("input", updateFormTotal),
+  );
+}
+
+function updateFormTotal() {
+  const v = (id) => Number($(id).value) || 0;
+  const t =
+    v("f_golomt") + v("f_khan") + v("f_cash") + v("f_invoice") + v("f_barter") - v("f_refund");
+  $("ledFormTotal").textContent = "Нийт: " + money(t);
+}
+
+function openLedForm(row) {
+  ledEditing = row;
+  $("ledFormTitle").textContent = row ? "Борлуулалт засах" : "Шинэ борлуулалт";
+  $("f_date").value = row ? row.sale_date : new Date().toISOString().slice(0, 10);
+  $("f_name").value = row ? row.customer_name || "" : "";
+  $("f_svc").value = row ? row.services || "" : "";
+  $("f_note").value = row ? row.note || "" : "";
+  $("f_internal").checked = row ? !!row.is_internal : false;
+  $("f_staffamt").value = row ? row.therapist_amount || 0 : 0;
+  $("f_gift").value = row ? row.gift_card || 0 : 0;
+  PAYS.forEach(([k, , id]) => ($(id).value = row ? row[k] || 0 : 0));
+  DEVICES.forEach(([k, , id]) => ($(id).value = row ? row[k] || 0 : 0));
+
+  const sel = $("f_staff");
+  sel.innerHTML = '<option value="">—</option>';
+  cache.staff.forEach((st) => {
+    const o = document.createElement("option");
+    o.value = st.name;
+    o.textContent = st.name;
+    if (row && row.therapist === st.name) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  updateFormTotal();
+  $("ledForm").style.display = "";
+  $("ledForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function saveLedger() {
+  const btn = $("ledSave");
+  const v = (id) => Number($(id).value) || 0;
+  const patch = {
+    sale_date: $("f_date").value,
+    customer_name: $("f_name").value.trim() || null,
+    services: $("f_svc").value.trim() || null,
+    note: $("f_note").value.trim() || null,
+    is_internal: $("f_internal").checked,
+    therapist: $("f_staff").value || null,
+    therapist_amount: v("f_staffamt"),
+    gift_card: v("f_gift"),
+    needs_review: false,
+    source: ledEditing ? ledEditing.source : "manual",
+  };
+  PAYS.forEach(([k, , id]) => (patch[k] = v(id)));
+  DEVICES.forEach(([k, , id]) => (patch[k] = v(id)));
+
+  if (!patch.sale_date) return alert("Огноо оруулна уу.");
+
+  btn.disabled = true;
+  const res = ledEditing
+    ? await sb.from("sales").update(patch).eq("id", ledEditing.id).select().maybeSingle()
+    : await sb.from("sales").insert(patch).select().maybeSingle();
+  btn.disabled = false;
+
+  if (res.error) return alert("Хадгалж чадсангүй: " + res.error.message);
+
+  if (ledEditing) {
+    Object.assign(ledEditing, res.data || patch);
+  } else if (res.data) {
+    cache.sales.unshift(res.data);
+  }
+  $("ledForm").style.display = "none";
+  ledEditing = null;
+  renderLedger();
+  renderReports();
+}
+
+function renderLedger() {
+  const body = $("ledBody");
+  if (!body) return;
+
+  /* month + staff pickers, built from the data itself */
+  const months = [...new Set(cache.sales.map((r) => String(r.sale_date).slice(0, 7)))].sort().reverse();
+  const mSel = $("ledMonth");
+  if (mSel.options.length !== months.length + 1) {
+    mSel.innerHTML = '<option value="all">Бүх сар</option>';
+    months.forEach((m) => {
+      const o = document.createElement("option");
+      o.value = m;
+      o.textContent = m;
+      mSel.appendChild(o);
+    });
+    mSel.value = ledMonth;
+  }
+  const staffNames = [...new Set(cache.sales.map((r) => r.therapist).filter(Boolean))].sort();
+  const sSel = $("ledStaff");
+  if (sSel.options.length !== staffNames.length + 1) {
+    sSel.innerHTML = '<option value="all">Бүгд</option>';
+    staffNames.forEach((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      o.textContent = n;
+      sSel.appendChild(o);
+    });
+    sSel.value = ledStaff;
+  }
+
+  const rows = ledRows();
+  const total = rows.reduce((a, r) => a + rowTotal(r), 0);
+  const review = rows.filter((r) => r.needs_review).length;
+
+  const tiles = [
+    ["Нийт орлого", "<small>₮</small>" + total.toLocaleString("en-US"), rows.length + " гүйлгээ"],
+  ];
+  PAYS.slice(0, 3).forEach(([k, label]) => {
+    const v = rows.reduce((a, r) => a + (r[k] || 0), 0);
+    tiles.push([label, "<small>₮</small>" + v.toLocaleString("en-US"),
+      total ? Math.round((v / total) * 100) + "%" : "—"]);
+  });
+  $("ledKpis").innerHTML = tiles
+    .map(
+      ([l, v, n]) =>
+        '<div class="kpi"><div class="kpi-label">' + l + '</div><div class="kpi-val">' + v +
+        '</div><div class="kpi-note">' + n + "</div></div>",
+    )
+    .join("");
+  $("ledSub").textContent =
+    rows.length + " гүйлгээ" + (review ? " · " + review + " шалгах шаардлагатай" : "");
+
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty">Бүртгэл алга байна.</div></td></tr>';
+    $("ledMore").textContent = "";
+    return;
+  }
+
+  rows.slice(0, ledLimit).forEach((r) => {
+    const tr = document.createElement("tr");
+    if (r.needs_review) tr.className = "review";
+    tr.appendChild(cell(r.sale_date, "t-mono"));
+
+    const nm = document.createElement("td");
+    nm.className = "t-strong";
+    nm.textContent = r.customer_name || (r.needs_review ? "⚠ нэргүй" : "—");
+    tr.appendChild(nm);
+
+    const sv = document.createElement("td");
+    sv.style.cssText = "max-width:220px;white-space:normal;line-height:1.5";
+    sv.textContent = r.services || "—";
+    tr.appendChild(sv);
+
+    const dv = document.createElement("td");
+    const chips = document.createElement("div");
+    chips.className = "dev-chips";
+    DEVICES.forEach(([k, label]) => {
+      if (!r[k]) return;
+      const c = document.createElement("span");
+      c.className = "dev-chip";
+      c.textContent = label + (r[k] > 1 ? " ×" + r[k] : "");
+      chips.appendChild(c);
+    });
+    dv.appendChild(chips);
+    tr.appendChild(dv);
+
+    tr.appendChild(cell(r.therapist || "—"));
+
+    const pay = document.createElement("td");
+    const pc = document.createElement("div");
+    pc.className = "pay-chips";
+    PAYS.forEach(([k, label]) => {
+      if (!r[k]) return;
+      const c = document.createElement("span");
+      c.className = "pay-chip " + k;
+      c.textContent = label;
+      pc.appendChild(c);
+    });
+    pay.appendChild(pc);
+    tr.appendChild(pay);
+
+    tr.appendChild(cell(money(rowTotal(r)), "t-mono t-strong"));
+
+    const act = document.createElement("td");
+    const ed = document.createElement("button");
+    ed.className = "btn-sm ghost";
+    ed.textContent = "Засах";
+    ed.addEventListener("click", () => openLedForm(r));
+    act.appendChild(ed);
+    tr.appendChild(act);
+
+    body.appendChild(tr);
+  });
+
+  if (rows.length > ledLimit) {
+    $("ledMore").innerHTML = "";
+    const b = document.createElement("button");
+    b.className = "btn-sm ghost";
+    b.textContent = "Цааш үзэх (" + (rows.length - ledLimit) + ")";
+    b.addEventListener("click", () => {
+      ledLimit += 200;
+      renderLedger();
+    });
+    $("ledMore").appendChild(b);
+  } else {
+    $("ledMore").textContent = rows.length + " мөр";
+  }
+}
+
+function exportLedgerCsv() {
+  const rows = ledRows();
+  const head = [
+    "Огноо", "Үйлчлүүлэгч", "Үйлчилгээ", "Голомт", "Хаан", "Бэлэн", "Нэхэмжлэх",
+    "Barter", "Буцаалт", "Нийт", "Cabin", "OxyPro", "LedPro", "XCryo", "Zerobody",
+    "Normatec", "Oxygen", "Ажилтан", "Ажилтны дүн", "Gift card", "Дотоод", "Тэмдэглэл",
+  ];
+  const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const lines = [head.map(q).join(",")];
+  rows.forEach((r) => {
+    lines.push(
+      [
+        r.sale_date, r.customer_name, r.services, r.golomt, r.khan, r.cash, r.invoice,
+        r.barter, r.refund, rowTotal(r), r.cryo_cabin, r.oxy_pro, r.led_pro, r.x_cryo,
+        r.zerobody, r.normatec, r.oxygen, r.therapist, r.therapist_amount, r.gift_card,
+        r.is_internal ? "тийм" : "", r.note,
+      ].map(q).join(","),
+    );
+  });
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "cryo-borluulalt-" + (ledMonth === "all" ? "bugd" : ledMonth) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 500);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EXPENSES
+   ══════════════════════════════════════════════════════════════ */
+let expEditing = null;
+
+function wireExpenses() {
+  if (!$("expBody")) return;
+  $("expAdd").addEventListener("click", () => openExpForm(null));
+  $("expCancel").addEventListener("click", () => {
+    $("expForm").style.display = "none";
+    expEditing = null;
+  });
+  $("expSave").addEventListener("click", saveExpense);
+}
+
+function openExpForm(row) {
+  expEditing = row;
+  $("e_date").value = row ? row.spend_date : new Date().toISOString().slice(0, 10);
+  $("e_item").value = row ? row.item || "" : "";
+  $("e_qty").value = row ? (row.qty ?? "") : "";
+  $("e_amount").value = row ? row.amount || 0 : 0;
+  $("e_paid").value = row ? row.paid_with || "" : "";
+  $("expForm").style.display = "";
+}
+
+async function saveExpense() {
+  const btn = $("expSave");
+  const patch = {
+    spend_date: $("e_date").value,
+    item: $("e_item").value.trim(),
+    qty: $("e_qty").value === "" ? null : Number($("e_qty").value),
+    amount: Number($("e_amount").value) || 0,
+    paid_with: $("e_paid").value.trim() || null,
+  };
+  if (!patch.spend_date || !patch.item) return alert("Огноо, зарлагын нэрийг оруулна уу.");
+
+  btn.disabled = true;
+  const res = expEditing
+    ? await sb.from("expenses").update(patch).eq("id", expEditing.id).select().maybeSingle()
+    : await sb.from("expenses").insert(patch).select().maybeSingle();
+  btn.disabled = false;
+  if (res.error) return alert("Хадгалж чадсангүй: " + res.error.message);
+
+  if (expEditing) Object.assign(expEditing, res.data || patch);
+  else if (res.data) cache.expenses.unshift(res.data);
+  $("expForm").style.display = "none";
+  expEditing = null;
+  renderExpenses();
+  renderReports();
+}
+
+function renderExpenses() {
+  const body = $("expBody");
+  if (!body) return;
+  body.innerHTML = "";
+  const total = cache.expenses.reduce((a, r) => a + (r.amount || 0), 0);
+  $("expSub").textContent = cache.expenses.length + " бичилт · нийт " + money(total);
+
+  if (!cache.expenses.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty">Зардал алга байна.</div></td></tr>';
+    return;
+  }
+  cache.expenses.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(r.spend_date, "t-mono"));
+    tr.appendChild(cell(r.item, "t-strong"));
+    tr.appendChild(cell(r.qty ?? "—", "t-mono"));
+    tr.appendChild(cell(money(r.amount), "t-mono"));
+    tr.appendChild(cell(r.paid_with || "—"));
+    const act = document.createElement("td");
+    const ed = document.createElement("button");
+    ed.className = "btn-sm ghost";
+    ed.textContent = "Засах";
+    ed.addEventListener("click", () => openExpForm(r));
+    act.appendChild(ed);
+    tr.appendChild(act);
+    body.appendChild(tr);
+  });
+}

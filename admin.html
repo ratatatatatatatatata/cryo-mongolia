@@ -83,6 +83,8 @@
 
     <button class="nav-item on" data-view="overview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="reports"><span class="ic">▦</span> Тайлан</button>
+    <button class="nav-item" data-view="ledger"><span class="ic">₮</span> Борлуулалт</button>
+    <button class="nav-item" data-view="expenses"><span class="ic">▽</span> Зардал</button>
     <button class="nav-item" data-view="bookings"><span class="ic">▤</span> Захиалга</button>
     <button class="nav-item" data-view="messages"><span class="ic">✉</span> Хүсэлт</button>
     <button class="nav-item" data-view="services"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
@@ -210,6 +212,129 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Төлөв</th><th>Тоо</th><th>Дүн</th><th>Эзлэх хувь</th></tr></thead>
           <tbody id="repStatusBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── SALES LEDGER ── -->
+    <section class="view" data-panel="ledger">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Борлуулалт</div>
+          <div class="page-sub" id="ledSub">Өдөр тутмын борлуулалтын бүртгэл</div>
+        </div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn-sm primary" id="ledAdd">+ Шинэ борлуулалт</button>
+          <button class="btn-sm ghost" id="ledCsv">↓ CSV</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="filters">
+          <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+            <label style="margin:0">Сар</label>
+            <select class="ctl sm" id="ledMonth" style="width:auto"></select>
+          </div>
+          <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+            <label style="margin:0">Ажилтан</label>
+            <select class="ctl sm" id="ledStaff" style="width:auto"></select>
+          </div>
+          <div class="field" style="flex-direction:row;align-items:center;gap:8px;flex:1;min-width:180px">
+            <label style="margin:0">Хайх</label>
+            <input class="ctl sm" type="search" id="ledSearch" placeholder="Нэр, үйлчилгээ…"/>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+            <input type="checkbox" id="ledReview" style="width:16px;height:16px;accent-color:#58c6ff"/>
+            Шалгах шаардлагатай
+          </label>
+        </div>
+      </div>
+
+      <div class="kpis" id="ledKpis"></div>
+
+      <!-- add / edit form -->
+      <div class="panel" id="ledForm" style="display:none;">
+        <div class="panel-head"><div class="panel-title" id="ledFormTitle">Шинэ борлуулалт</div></div>
+        <div class="form-grid">
+          <div class="field"><label>Огноо</label><input class="ctl" type="date" id="f_date"/></div>
+          <div class="field"><label>Үйлчлүүлэгч</label><input class="ctl" type="text" id="f_name" placeholder="Нэр"/></div>
+          <div class="field" style="grid-column:span 2"><label>Үйлчилгээ</label><input class="ctl" type="text" id="f_svc" placeholder="CC; RL; Oxy pro"/></div>
+          <div class="field"><label>Ажилтан</label><select class="ctl" id="f_staff"></select></div>
+          <div class="field"><label>Ажилтны дүн</label><input class="ctl" type="number" id="f_staffamt" value="0" step="1000"/></div>
+        </div>
+        <div class="form-sub">Төлбөр</div>
+        <div class="form-grid">
+          <div class="field"><label>Голомт</label><input class="ctl" type="number" id="f_golomt" value="0" step="1000"/></div>
+          <div class="field"><label>Хаан</label><input class="ctl" type="number" id="f_khan" value="0" step="1000"/></div>
+          <div class="field"><label>Бэлэн</label><input class="ctl" type="number" id="f_cash" value="0" step="1000"/></div>
+          <div class="field"><label>Нэхэмжлэх</label><input class="ctl" type="number" id="f_invoice" value="0" step="1000"/></div>
+          <div class="field"><label>Barter</label><input class="ctl" type="number" id="f_barter" value="0" step="1000"/></div>
+          <div class="field"><label>Буцаалт</label><input class="ctl" type="number" id="f_refund" value="0" step="1000"/></div>
+        </div>
+        <div class="form-sub">Ашигласан төхөөрөмж</div>
+        <div class="form-grid dev">
+          <div class="field"><label>Cryo Cabin</label><input class="ctl" type="number" id="f_cabin" value="0" min="0"/></div>
+          <div class="field"><label>Oxy Pro</label><input class="ctl" type="number" id="f_oxy" value="0" min="0"/></div>
+          <div class="field"><label>Led Pro</label><input class="ctl" type="number" id="f_led" value="0" min="0"/></div>
+          <div class="field"><label>X°Cryo</label><input class="ctl" type="number" id="f_xcryo" value="0" min="0"/></div>
+          <div class="field"><label>Zerobody</label><input class="ctl" type="number" id="f_zero" value="0" min="0"/></div>
+          <div class="field"><label>Normatec</label><input class="ctl" type="number" id="f_norma" value="0" min="0"/></div>
+          <div class="field"><label>Oxygen</label><input class="ctl" type="number" id="f_oxygen" value="0" min="0"/></div>
+          <div class="field"><label>Gift card</label><input class="ctl" type="number" id="f_gift" value="0" step="1000"/></div>
+        </div>
+        <div class="form-grid">
+          <div class="field" style="grid-column:span 2"><label>Тэмдэглэл</label><input class="ctl" type="text" id="f_note"/></div>
+          <label style="display:flex;align-items:flex-end;gap:8px;font-size:12.5px;color:var(--text-secondary);padding-bottom:11px;cursor:pointer">
+            <input type="checkbox" id="f_internal" style="width:16px;height:16px;accent-color:#58c6ff"/> Дотоод
+          </label>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap">
+          <button class="btn-sm primary" id="ledSave">Хадгалах</button>
+          <button class="btn-sm ghost" id="ledCancel">Болих</button>
+          <span class="page-sub" id="ledFormTotal" style="margin-left:auto"></span>
+        </div>
+      </div>
+
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr>
+            <th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ</th><th>Төхөөрөмж</th>
+            <th>Ажилтан</th><th>Төлбөр</th><th>Дүн</th><th></th>
+          </tr></thead>
+          <tbody id="ledBody"></tbody>
+        </table></div>
+      </div>
+      <div class="page-sub" id="ledMore" style="margin-top:14px;text-align:center"></div>
+    </section>
+
+    <!-- ── EXPENSES ── -->
+    <section class="view" data-panel="expenses">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Зардал</div>
+          <div class="page-sub" id="expSub">Гарсан зардлын бүртгэл</div>
+        </div>
+        <button class="btn-sm primary" id="expAdd">+ Шинэ зардал</button>
+      </div>
+
+      <div class="panel" id="expForm" style="display:none;">
+        <div class="form-grid">
+          <div class="field"><label>Огноо</label><input class="ctl" type="date" id="e_date"/></div>
+          <div class="field" style="grid-column:span 2"><label>Юунд</label><input class="ctl" type="text" id="e_item" placeholder="Зарлагын нэр"/></div>
+          <div class="field"><label>Тоо</label><input class="ctl" type="number" id="e_qty" step="1"/></div>
+          <div class="field"><label>Дүн (₮)</label><input class="ctl" type="number" id="e_amount" value="0" step="1000"/></div>
+          <div class="field"><label>Төлсөн хэлбэр</label><input class="ctl" type="text" id="e_paid" placeholder="Бэлнээр"/></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <button class="btn-sm primary" id="expSave">Хадгалах</button>
+          <button class="btn-sm ghost" id="expCancel">Болих</button>
+        </div>
+      </div>
+
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Огноо</th><th>Юунд</th><th>Тоо</th><th>Дүн</th><th>Хэлбэр</th><th></th></tr></thead>
+          <tbody id="expBody"></tbody>
         </table></div>
       </div>
     </section>

@@ -181,3 +181,29 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
   .chart .bar{fill:#1a7fc4 !important}
   .chart text{fill:#333 !important}
 }
+
+
+/* ══════════ LEDGER FORMS ══════════ */
+.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 16px}
+.form-grid.dev{grid-template-columns:repeat(8,minmax(0,1fr))}
+.form-sub{font-size:9.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ice-400);margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--border)}
+.dev-chips{display:flex;gap:5px;flex-wrap:wrap}
+.dev-chip{padding:3px 9px;border-radius:99px;font-size:10px;font-weight:700;
+  background:rgba(88,198,255,.12);color:var(--ice-200);border:1px solid rgba(88,198,255,.24);white-space:nowrap}
+.pay-chips{display:flex;gap:5px;flex-wrap:wrap}
+.pay-chip{padding:3px 9px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap;
+  background:var(--glass);color:var(--text-secondary);border:1px solid var(--border)}
+.pay-chip.golomt{background:rgba(88,198,255,.12);color:var(--ice-200);border-color:rgba(88,198,255,.24)}
+.pay-chip.khan{background:rgba(80,220,160,.12);color:#8ceec2;border-color:rgba(80,220,160,.24)}
+.pay-chip.cash{background:rgba(255,180,80,.12);color:#ffcf95;border-color:rgba(255,180,80,.24)}
+.pay-chip.barter{background:rgba(160,120,255,.12);color:#c9b2ff;border-color:rgba(160,120,255,.24)}
+.pay-chip.refund{background:rgba(255,110,110,.12);color:#ffa3a3;border-color:rgba(255,110,110,.26)}
+tr.review td{background:rgba(255,180,80,.05)}
+@media(max-width:1100px){
+  .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form-grid.dev{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .form-grid,.form-grid.dev{grid-template-columns:1fr 1fr}
+}
