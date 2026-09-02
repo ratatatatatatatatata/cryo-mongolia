@@ -100,7 +100,7 @@ function injectMarkup() {
    NAV
    ══════════════════════════════════════════════════════════════ */
 function renderNav() {
-  const login = document.querySelector(".nav-login");
+  const login = document.querySelector(".nav-login:not(.acct-trigger)");
   const menu = $("mobileMenu");
   if (!login) return;
 
@@ -145,6 +145,7 @@ function renderNav() {
     e.stopPropagation();
     const on = box.classList.toggle("open");
     trigger.setAttribute("aria-expanded", String(on));
+    if (on) syncRole();
   });
   document.addEventListener("click", () => box.classList.remove("open"));
   box.querySelector('[data-act="mine"]').addEventListener("click", openMine);
@@ -369,6 +370,28 @@ async function openMine() {
 /* ══════════════════════════════════════════════════════════════
    BOOT
    ══════════════════════════════════════════════════════════════ */
+/* the role can change from the dashboard or the SQL editor while this
+   tab stays open, so re-read it rather than trusting the first load */
+async function syncRole() {
+  if (!session) return;
+  const { data: p } = await sb
+    .from("profiles")
+    .select("id,email,full_name,role")
+    .eq("id", session.user.id)
+    .maybeSingle();
+  if (!p) return;
+  const changed = !profile || p.role !== profile.role || p.full_name !== profile.full_name;
+  profile = p;
+  if (changed) {
+    const wasOpen = !!document.querySelector(".nav-account.open");
+    renderNav();
+    if (wasOpen) {
+      const box = document.querySelector(".nav-account");
+      if (box) box.classList.add("open");
+    }
+  }
+}
+
 async function refresh() {
   const { data } = await sb.auth.getSession();
   session = data.session;
@@ -395,5 +418,9 @@ async function refresh() {
   injectMarkup();
   wireAuth();
   sb.auth.onAuthStateChange(() => refresh());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) syncRole();
+  });
   refresh();
 })();
+
