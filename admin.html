@@ -225,6 +225,7 @@
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
           <button class="btn-sm primary" id="ledAdd">+ Шинэ борлуулалт</button>
+          <button class="btn-sm ghost" id="ledImport">⇪ Файлаас импортлох</button>
           <button class="btn-sm ghost" id="ledCsv">↓ CSV</button>
         </div>
       </div>
@@ -251,6 +252,62 @@
       </div>
 
       <div class="kpis" id="ledKpis"></div>
+
+      <!-- file import -->
+      <div class="panel" id="impPanel" style="display:none;">
+        <div class="panel-head">
+          <div class="panel-title">Файлаас импортлох</div>
+          <button class="btn-sm ghost" id="impClose">✕ Хаах</button>
+        </div>
+
+        <label class="dropzone" id="impDrop">
+          <input type="file" id="impFile" accept=".xlsx,.xls,.csv,.docx" hidden/>
+          <div class="dz-ic">⇪</div>
+          <div class="dz-title">Excel, CSV эсвэл Word файл сонгох</div>
+          <div class="dz-sub">Энд чирж оруулж бас болно · .xlsx · .xls · .csv · .docx</div>
+        </label>
+
+        <div id="impStatus"></div>
+
+        <div id="impSetup" style="display:none;">
+          <div class="filters" style="margin-bottom:18px">
+            <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+              <label style="margin:0">Хуудас</label>
+              <select class="ctl sm" id="impSheet" style="width:auto"></select>
+            </div>
+            <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+              <label style="margin:0">Толгой мөр</label>
+              <select class="ctl sm" id="impHeader" style="width:auto"></select>
+            </div>
+            <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+              <label style="margin:0">Он</label>
+              <input class="ctl sm" type="number" id="impYear" style="width:90px"/>
+            </div>
+            <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
+              <label style="margin:0">Нийт дүнг хаана</label>
+              <select class="ctl sm" id="impTotalTo" style="width:auto">
+                <option value="cash">Бэлэн</option>
+                <option value="golomt">Голомт</option>
+                <option value="khan">Хаан</option>
+                <option value="invoice">Нэхэмжлэх</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-sub" style="margin-top:0">Багана тааруулах</div>
+          <div class="map-grid" id="impMap"></div>
+
+          <div class="form-sub">Урьдчилан харах</div>
+          <div class="tbl-wrap"><table class="tbl" id="impPreview"></table></div>
+
+          <div id="impSummary" style="margin-top:18px"></div>
+
+          <div style="display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap">
+            <button class="btn-sm primary" id="impRun">Оруулах</button>
+            <button class="btn-sm ghost" id="impCancel">Болих</button>
+          </div>
+        </div>
+      </div>
 
       <!-- add / edit form -->
       <div class="panel" id="ledForm" style="display:none;">

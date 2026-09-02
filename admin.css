@@ -207,3 +207,27 @@ tr.review td{background:rgba(255,180,80,.05)}
 @media(max-width:560px){
   .form-grid,.form-grid.dev{grid-template-columns:1fr 1fr}
 }
+
+
+/* ══════════ FILE IMPORT ══════════ */
+.dropzone{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:38px 20px;border-radius:var(--r-xl);cursor:pointer;text-align:center;
+  border:1.5px dashed var(--border-mid);background:rgba(3,6,12,.35);
+  transition:border-color var(--ease),background var(--ease),transform var(--ease);
+}
+.dropzone:hover,.dropzone.over{border-color:rgba(88,198,255,.55);background:rgba(88,198,255,.06)}
+.dropzone.over{transform:scale(1.01)}
+.dz-ic{font-size:30px;color:var(--ice-400);line-height:1}
+.dz-title{font-size:14.5px;font-weight:700;color:var(--ice-100)}
+.dz-sub{font-size:11.5px;color:var(--text-muted)}
+
+.map-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 16px}
+.map-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;
+  border:1px solid var(--border);background:rgba(3,6,12,.3)}
+.map-row.matched{border-color:rgba(88,198,255,.28);background:rgba(88,198,255,.05)}
+.map-row label{flex:0 0 108px;font-size:11.5px;font-weight:700;color:var(--text-secondary)}
+.map-row select{flex:1;min-width:0}
+#impPreview{min-width:640px}
+@media(max-width:1100px){.map-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.map-grid{grid-template-columns:1fr}.map-row label{flex:0 0 90px}}

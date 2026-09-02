@@ -82,6 +82,7 @@ function fmtDate(v) {
   wireBookingFilters();
   wireReports();
   wireLedger();
+  wireImport();
   wireExpenses();
 
   /* the login screen always renders; it just explains itself when the
@@ -1346,4 +1347,469 @@ function renderExpenses() {
     tr.appendChild(act);
     body.appendChild(tr);
   });
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   FILE IMPORT — drop an Excel / CSV / Word file, map it, load it
+
+   Columns are matched by their heading, so a sheet laid out like the
+   tracking workbook needs no configuration; anything unusual can be
+   remapped by hand before the rows go in.
+   ══════════════════════════════════════════════════════════════ */
+
+/* our field ← headings that mean it */
+const IMPORT_FIELDS = [
+  ["sale_date",     "Огноо",             ["он сар өдөр", "он сар", "огноо", "date", "он"]],
+  ["customer_name", "Үйлчлүүлэгч",       ["нэрс", "харилцагчийн нэр", "харилцагч", "нэр", "customer", "name"]],
+  ["services",      "Үйлчилгээ",         ["үйлчилгээ", "service", "services"]],
+  ["golomt",        "Голомт",            ["голомт", "golomt"]],
+  ["khan",          "Хаан",              ["хаан", "khan", "khaan"]],
+  ["cash",          "Бэлэн",             ["бэлэн", "cash", "бэлнээр"]],
+  ["invoice",       "Нэхэмжлэх",         ["нэхэмжлэх", "invoice"]],
+  ["barter",        "Barter",            ["barter", "бартер"]],
+  ["refund",        "Буцаалт",           ["буцаалт", "refund", "буцаах"]],
+  ["total_amount",  "Нийт дүн",          ["total income", "нийт төлбөр", "нийт дүн", "дүн", "төлбөр", "total", "amount"]],
+  ["cryo_cabin",    "Cryo Cabin",        ["cryo cabin", "cryocabin", "cabin", "крио кабин"]],
+  ["oxy_pro",       "Oxy Pro",           ["oxy pro", "oxypro"]],
+  ["led_pro",       "Led Pro",           ["led pro", "ledpro"]],
+  ["x_cryo",        "X°Cryo",            ["x cryo", "xcryo", "x°cryo"]],
+  ["zerobody",      "Zerobody",          ["zerobody", "zero body"]],
+  ["normatec",      "Normatec",          ["normatec"]],
+  ["oxygen",        "Oxygen",            ["oxygen", "хүчилтөрөгч"]],
+  ["therapist",     "Ажилтан",           ["ажилтан", "therapist", "эмч", "staff"]],
+  ["gift_card",     "Gift card",         ["gift card", "giftcard", "бэлгийн карт"]],
+  ["note",          "Тэмдэглэл",         ["тэмдэглэл", "notes", "note", "тайлбар"]],
+];
+const MONEY_FIELDS = ["golomt", "khan", "cash", "invoice", "barter", "refund", "gift_card"];
+const COUNT_FIELDS = ["cryo_cabin", "oxy_pro", "led_pro", "x_cryo", "zerobody", "normatec", "oxygen"];
+
+let imp = null; // { sheets, sheetIdx, headerRow, map, year }
+
+/* ── loaders, fetched only when the panel is first used ── */
+let XLSXlib = null;
+async function loadXLSX() {
+  if (!XLSXlib) XLSXlib = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+  return XLSXlib;
+}
+let JSZiplib = null;
+async function loadZip() {
+  if (!JSZiplib) {
+    const m = await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");
+    JSZiplib = m.default || m;
+  }
+  return JSZiplib;
+}
+
+const impNorm = (v) => String(v || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+function impNum(v) {
+  if (v == null) return 0;
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+  return isNaN(n) ? 0 : Math.round(n);
+}
+
+/* same calendar rules the workbook importer uses */
+function impYmd(y, mo, d) {
+  if (!(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return null;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+  return y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+}
+function impPair(a, b, year) {
+  if (a > 12 && b <= 12) return impYmd(year, b, a); // a over 12 can only be a day
+  return impYmd(year, a, b);
+}
+function impDate(v, year) {
+  if (v == null || v === "") return null;
+  if (v instanceof Date && !isNaN(v))
+    return impYmd(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  const t = String(v).trim().replace(/[\/.]{2,}/g, "/");
+  let m = t.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})$/);
+  if (m) return impYmd(+m[1], +m[2], +m[3]);
+  m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (m) return impPair(+m[1], +m[2], +m[3]);
+  m = t.match(/^(\d{1,2})[\/.-](\d{1,2})$/);
+  if (m) return impPair(+m[1], +m[2], year);
+  return null;
+}
+
+/* ── wiring ── */
+function wireImport() {
+  if (!$("impPanel")) return;
+  $("ledImport").addEventListener("click", () => {
+    $("impPanel").style.display = "";
+    $("ledForm").style.display = "none";
+    $("impPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  const close = () => {
+    $("impPanel").style.display = "none";
+    $("impSetup").style.display = "none";
+    $("impStatus").innerHTML = "";
+    $("impFile").value = "";
+    imp = null;
+  };
+  $("impClose").addEventListener("click", close);
+  $("impCancel").addEventListener("click", close);
+
+  const drop = $("impDrop");
+  $("impFile").addEventListener("change", (e) => {
+    if (e.target.files[0]) readImportFile(e.target.files[0]);
+  });
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("over");
+    }),
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("over");
+    }),
+  );
+  drop.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f) readImportFile(f);
+  });
+
+  ["impSheet", "impHeader", "impYear", "impTotalTo"].forEach((id) =>
+    $(id).addEventListener("change", () => {
+      if (id === "impSheet") imp.headerRow = null;
+      renderImportSetup();
+    }),
+  );
+  $("impRun").addEventListener("click", runImport);
+}
+
+function impSay(kind, html) {
+  $("impStatus").innerHTML = '<div class="notice ' + kind + '">' + html + "</div>";
+}
+
+/* ── read a file into { name, rows[][], formulaRows:Set } per sheet ── */
+async function readImportFile(file) {
+  impSay("warn", "Уншиж байна…");
+  try {
+    const buf = await file.arrayBuffer();
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    let sheets;
+
+    if (ext === "docx") {
+      sheets = await readDocxTables(buf);
+      if (!sheets.length) {
+        impSay("err", "Word файлаас хүснэгт олдсонгүй. Өгөгдөл хүснэгт хэлбэртэй байх шаардлагатай.");
+        return;
+      }
+    } else {
+      const XLSX = await loadXLSX();
+      const wb = XLSX.read(new Uint8Array(buf), { type: "array", cellDates: true, cellFormula: true });
+      sheets = wb.SheetNames.map((n) => {
+        const ws = wb.Sheets[n];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false });
+        /* a SUM in a row means a subtotal, not a sale */
+        const formulaRows = new Set();
+        Object.keys(ws).forEach((addr) => {
+          if (addr[0] === "!") return;
+          if (ws[addr] && ws[addr].f) formulaRows.add(XLSX.utils.decode_cell(addr).r);
+        });
+        return { name: n, rows, formulaRows };
+      });
+    }
+
+    sheets = sheets.filter((sh) => sh.rows.some((r) => r && r.some((c) => c != null && String(c).trim() !== "")));
+    if (!sheets.length) {
+      impSay("err", "Файл хоосон байна.");
+      return;
+    }
+
+    imp = { sheets, sheetIdx: 0, headerRow: null, map: {}, fileName: file.name };
+    $("impYear").value = new Date().getFullYear();
+
+    const sel = $("impSheet");
+    sel.innerHTML = "";
+    sheets.forEach((sh, i) => {
+      const o = document.createElement("option");
+      o.value = i;
+      o.textContent = sh.name;
+      sel.appendChild(o);
+    });
+
+    impSay("ok", "<b>" + file.name + "</b> уншигдлаа · " + sheets.length + " хуудас");
+    $("impSetup").style.display = "";
+    renderImportSetup();
+  } catch (e) {
+    impSay("err", "Уншиж чадсангүй: " + (e.message || e));
+  }
+}
+
+/* Word tables: docx is a zip, the tables live in word/document.xml */
+async function readDocxTables(buf) {
+  const JSZip = await loadZip();
+  const zip = await JSZip.loadAsync(buf);
+  const f = zip.file("word/document.xml");
+  if (!f) return [];
+  const xml = await f.async("string");
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const tables = [...doc.getElementsByTagName("w:tbl")];
+  return tables.map((tbl, i) => {
+    const rows = [...tbl.getElementsByTagName("w:tr")].map((tr) =>
+      [...tr.getElementsByTagName("w:tc")].map((tc) =>
+        [...tc.getElementsByTagName("w:t")].map((t) => t.textContent).join("").trim() || null,
+      ),
+    );
+    return { name: "Хүснэгт " + (i + 1), rows, formulaRows: new Set() };
+  });
+}
+
+/* ── guess the header row and the column mapping ── */
+function guessHeaderRow(rows) {
+  let best = 0,
+    bestScore = -1;
+  rows.slice(0, 15).forEach((r, i) => {
+    if (!r) return;
+    let score = 0;
+    r.forEach((c) => {
+      const v = impNorm(c);
+      if (!v) return;
+      IMPORT_FIELDS.forEach(([, , aliases]) => {
+        if (aliases.some((a) => v === a || v.includes(a))) score++;
+      });
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  });
+  return bestScore > 0 ? best : 0;
+}
+
+function guessMap(header) {
+  const map = {};
+  const taken = new Set();
+  IMPORT_FIELDS.forEach(([field, , aliases]) => {
+    let hit = -1;
+    header.forEach((c, i) => {
+      if (hit >= 0 || taken.has(i)) return;
+      const v = impNorm(c);
+      if (!v) return;
+      if (aliases.some((a) => v === a)) hit = i;
+    });
+    if (hit < 0)
+      header.forEach((c, i) => {
+        if (hit >= 0 || taken.has(i)) return;
+        const v = impNorm(c);
+        if (!v) return;
+        if (aliases.some((a) => v.includes(a))) hit = i;
+      });
+    if (hit >= 0) {
+      map[field] = hit;
+      taken.add(hit);
+    }
+  });
+  return map;
+}
+
+function renderImportSetup() {
+  if (!imp) return;
+  imp.sheetIdx = +$("impSheet").value || 0;
+  const sh = imp.sheets[imp.sheetIdx];
+
+  const hSel = $("impHeader");
+  if (imp.headerRow == null) {
+    imp.headerRow = guessHeaderRow(sh.rows);
+    hSel.innerHTML = "";
+    sh.rows.slice(0, 15).forEach((r, i) => {
+      const o = document.createElement("option");
+      o.value = i;
+      o.textContent =
+        "Мөр " + (i + 1) + ": " + (r || []).filter(Boolean).slice(0, 4).join(" · ").slice(0, 60);
+      hSel.appendChild(o);
+    });
+    hSel.value = imp.headerRow;
+    imp.map = guessMap(sh.rows[imp.headerRow] || []);
+  } else {
+    imp.headerRow = +hSel.value || 0;
+    imp.map = guessMap(sh.rows[imp.headerRow] || []);
+  }
+
+  const header = sh.rows[imp.headerRow] || [];
+
+  /* mapping controls */
+  const grid = $("impMap");
+  grid.innerHTML = "";
+  IMPORT_FIELDS.forEach(([field, label]) => {
+    const wrap = document.createElement("div");
+    wrap.className = "map-row";
+    const l = document.createElement("label");
+    l.textContent = label;
+    const sel = document.createElement("select");
+    sel.className = "ctl sm";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "—";
+    sel.appendChild(none);
+    header.forEach((c, i) => {
+      const o = document.createElement("option");
+      o.value = i;
+      o.textContent = (String(c || "").trim() || "Багана " + (i + 1)).slice(0, 34);
+      if (imp.map[field] === i) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => {
+      if (sel.value === "") delete imp.map[field];
+      else imp.map[field] = +sel.value;
+      renderImportPreview();
+    });
+    if (imp.map[field] != null) wrap.classList.add("matched");
+    wrap.append(l, sel);
+    grid.appendChild(wrap);
+  });
+
+  renderImportPreview();
+}
+
+/* ── turn the sheet into sales rows using the current mapping ── */
+function buildImportRows() {
+  const sh = imp.sheets[imp.sheetIdx];
+  const year = +$("impYear").value || new Date().getFullYear();
+  const totalTo = $("impTotalTo").value;
+  const get = (r, f) => (imp.map[f] == null ? null : r[imp.map[f]]);
+
+  const out = [];
+  let skippedSubtotal = 0,
+    skippedEmpty = 0,
+    lastDate = null;
+
+  sh.rows.forEach((r, i) => {
+    if (i <= imp.headerRow || !r) return;
+
+    const d = impDate(get(r, "sale_date"), year);
+    if (d) lastDate = d;
+
+    const name = String(get(r, "customer_name") || "").trim();
+    const row = {
+      sale_date: lastDate,
+      customer_name: name || null,
+      services: String(get(r, "services") || "").trim() || null,
+      note: String(get(r, "note") || "").trim() || null,
+      therapist: String(get(r, "therapist") || "").trim() || null,
+      golomt: 0, khan: 0, cash: 0, invoice: 0, barter: 0, refund: 0, gift_card: 0,
+      cryo_cabin: 0, oxy_pro: 0, led_pro: 0, x_cryo: 0, zerobody: 0, normatec: 0, oxygen: 0,
+      therapist_amount: 0,
+      needs_review: !name,
+      source: "import",
+    };
+    MONEY_FIELDS.forEach((f) => {
+      if (imp.map[f] != null) row[f] = impNum(r[imp.map[f]]);
+    });
+    COUNT_FIELDS.forEach((f) => {
+      if (imp.map[f] != null) row[f] = Math.max(0, Math.min(99, impNum(r[imp.map[f]])));
+    });
+    /* a single total column goes to whichever method they picked */
+    if (imp.map.total_amount != null) {
+      const t = impNum(r[imp.map.total_amount]);
+      const split = MONEY_FIELDS.some((f) => f !== "gift_card" && row[f]);
+      if (t && !split) row[totalTo] = t;
+    }
+
+    const money = row.golomt + row.khan + row.cash + row.invoice + row.barter - row.refund;
+    const devices = COUNT_FIELDS.reduce((a, f) => a + row[f], 0);
+
+    if (!row.sale_date) return void skippedEmpty++;
+    if (!name && !money && !devices) return void skippedEmpty++;
+    if (sh.formulaRows.has(i)) return void skippedSubtotal++;
+
+    row._total = money;
+    out.push(row);
+  });
+
+  return { rows: out, skippedSubtotal, skippedEmpty };
+}
+
+function renderImportPreview() {
+  if (!imp) return;
+  const { rows, skippedSubtotal, skippedEmpty } = buildImportRows();
+
+  const cols = ["sale_date", "customer_name", "services", "therapist"];
+  const tbl = $("impPreview");
+  tbl.innerHTML = "";
+  const thead = document.createElement("thead");
+  const htr = document.createElement("tr");
+  ["Огноо", "Үйлчлүүлэгч", "Үйлчилгээ", "Ажилтан", "Төхөөрөмж", "Дүн"].forEach((h) => {
+    const th = document.createElement("th");
+    th.textContent = h;
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr);
+  tbl.appendChild(thead);
+  const tb = document.createElement("tbody");
+  rows.slice(0, 6).forEach((r) => {
+    const tr = document.createElement("tr");
+    cols.forEach((c) => tr.appendChild(cell(r[c] || "—")));
+    tr.appendChild(cell(COUNT_FIELDS.reduce((a, f) => a + r[f], 0) || "—", "t-mono"));
+    tr.appendChild(cell(money(r._total), "t-mono t-strong"));
+    tb.appendChild(tr);
+  });
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 6;
+    td.innerHTML = '<div class="empty">Тохирох мөр олдсонгүй. Толгой мөр, багануудаа шалгана уу.</div>';
+    tr.appendChild(td);
+    tb.appendChild(tr);
+  }
+  tbl.appendChild(tb);
+
+  const total = rows.reduce((a, r) => a + r._total, 0);
+  const flagged = rows.filter((r) => r.needs_review).length;
+  $("impSummary").innerHTML =
+    '<div class="notice ' + (rows.length ? "ok" : "warn") + '">' +
+    "<b>" + rows.length + " мөр</b> · нийт " + money(total) +
+    (skippedSubtotal ? " · " + skippedSubtotal + " дэд дүнгийн мөр алгасав" : "") +
+    (skippedEmpty ? " · " + skippedEmpty + " хоосон мөр алгасав" : "") +
+    (flagged ? " · " + flagged + " нэргүй (тэмдэглэгдэнэ)" : "") +
+    "</div>";
+  $("impRun").disabled = !rows.length;
+}
+
+async function runImport() {
+  const btn = $("impRun");
+  const { rows } = buildImportRows();
+  if (!rows.length) return;
+  if (!confirm(rows.length + " мөр нэмэх үү?")) return;
+
+  btn.disabled = true;
+  const clean = rows.map((r) => {
+    const c = { ...r };
+    delete c._total;
+    return c;
+  });
+
+  let done = 0;
+  for (let i = 0; i < clean.length; i += 200) {
+    const chunk = clean.slice(i, i + 200);
+    const { data, error } = await sb.from("sales").insert(chunk).select();
+    if (error) {
+      btn.disabled = false;
+      impSay("err", done + " мөр орсны дараа алдаа гарлаа: " + error.message);
+      if (done) {
+        await loadAll();
+      }
+      return;
+    }
+    done += chunk.length;
+    if (data) cache.sales.unshift(...data);
+    impSay("warn", done + " / " + clean.length + " мөр орлоо…");
+  }
+
+  btn.disabled = false;
+  impSay("ok", "<b>" + done + " мөр амжилттай орлоо.</b>");
+  renderLedger();
+  renderReports();
+  setTimeout(() => {
+    $("impPanel").style.display = "none";
+    $("impSetup").style.display = "none";
+    $("impFile").value = "";
+    imp = null;
+  }, 1800);
 }
