@@ -328,6 +328,11 @@ ${report.map((l) => "--  " + l).join("\n")}
 --  anything you typed by hand (source = 'manual') untouched.
 -- ═══════════════════════════════════════════════════════════════
 
+-- self-sufficient: works even if this file is run before setup.sql,
+-- or against tables created by an earlier version of it
+alter table public.sales    add column if not exists source text not null default 'manual';
+alter table public.expenses add column if not exists source text not null default 'manual';
+
 delete from public.sales    where source = 'import';
 delete from public.expenses where source = 'import';
 
