@@ -30,8 +30,8 @@
   const float PI = 3.14159265;
 
   /* brand palette */
-  const vec3 STAR_COL  = vec3(0.436, 0.698, 0.961);   /* #6FB2F5 */
-  const vec3 ARROW_COL = vec3(0.043, 0.388, 0.965);   /* #0B63F6 */
+  const vec3 STAR_COL  = vec3(0.478, 0.714, 0.988);   /* #7ab6fc */
+  const vec3 ARROW_COL = vec3(0.031, 0.416, 0.973);   /* #086af8 */
 
   mat2 rot(float a){ float s = sin(a), c = cos(a); return mat2(c, -s, s, c); }
 
@@ -84,10 +84,10 @@
 
   /* ── 2D: navigation / send arrow (4 vertices, pointing up) ── */
   float sdArrow(vec2 p, float s){
-    vec2 v0 = vec2( 0.000,  1.100) * s;   /* tip        */
-    vec2 v1 = vec2( 0.720, -0.850) * s;   /* right wing */
-    vec2 v2 = vec2( 0.000, -0.420) * s;   /* tail notch */
-    vec2 v3 = vec2(-0.720, -0.850) * s;   /* left wing  */
+    vec2 v0 = vec2( 0.000,  1.320) * s;   /* tip        */
+    vec2 v1 = vec2( 0.640, -0.980) * s;   /* right wing */
+    vec2 v2 = vec2( 0.000, -0.380) * s;   /* tail notch */
+    vec2 v3 = vec2(-0.640, -0.980) * s;   /* left wing  */
 
     float d = min(min(segD(p, v0, v1), segD(p, v1, v2)),
                   min(segD(p, v2, v3), segD(p, v3, v0)));
@@ -112,14 +112,12 @@
 
     /* ── star ── */
     vec2 sp = p.xy * rot(0.20 + sin(t * 0.18) * 0.05);
-    float star2 = sdStar(sp, 1.16, 8.0, 2.75);
+    float star2 = sdStar(sp, 1.26, 8.0, 3.05);
     float star  = extrude(star2, p.z - 0.10, 0.115, 0.028);
 
     /* ── arrow: outer body minus an inner copy leaves the ribbon ── */
     vec2 ap = (p.xy - vec2(0.02, -0.02)) * rot(-0.87);   /* points up-right */
-    float outer = sdArrow(ap, 1.16);
-    float inner = sdArrow((ap - vec2(0.0, -0.14)), 0.50);
-    float arrow2 = max(outer, -inner);
+    float arrow2 = sdArrow(ap, 0.94);
     float arrow  = extrude(arrow2, p.z - 0.30, 0.135, 0.05);
 
     vec2 res = vec2(star, 1.0);
@@ -210,8 +208,8 @@
 
       /* the pale star keeps close to its albedo; the arrow takes the key light */
       float isStar  = step(mat, 1.5);
-      float ambGain = mix(0.42, 0.66, isStar);
-      float keyGain = mix(1.05, 0.48, isStar);
+      float ambGain = mix(0.42, 0.82, isStar);
+      float keyGain = mix(1.05, 0.60, isStar);
       float spcGain = mix(0.85, 0.30, isStar);
 
       col  = base * (ambGain + keyGain * k);
@@ -223,8 +221,8 @@
       col += vec3(0.70, 0.88, 1.0) * pow(max(dot(reflect(-L2, n), -rd), 0.0), 46.0) * spcGain * 0.6;
 
       /* reflected studio + rim */
-      col += envColor(reflect(rd, n)) * (0.06 + 0.22 * fres);
-      col += mix(base, vec3(1.0), 0.45) * pow(fres, 2.4) * 0.30;
+      col += envColor(reflect(rd, n)) * (0.06 + 0.22 * fres) * mix(1.0, 0.45, isStar);
+      col += mix(base, vec3(1.0), 0.45) * pow(fres, 2.4) * mix(0.30, 0.14, isStar);
 
       /* the arrow reads brighter so it stays legible over the star */
       if (mat > 1.5) col *= 1.30;
@@ -263,7 +261,7 @@
     col = col / (col + 0.95);
     col = pow(col, vec3(0.86, 0.92, 0.98));
     /* tonemapping desaturates; pull the brand blues back */
-    col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.55);
+    col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.85);
     col = max(col, 0.0);
     col *= 1.0 - 0.32 * length(uv) * 0.55;
 
