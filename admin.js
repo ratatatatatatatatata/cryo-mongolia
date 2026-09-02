@@ -525,7 +525,7 @@ function renderServices() {
   body.innerHTML = "";
   if (!cache.services.length) {
     body.innerHTML =
-      '<tr><td colspan="6"><div class="empty">Үйлчилгээ алга. schema.sql-ийг ажиллуулсан уу?</div></td></tr>';
+      '<tr><td colspan="6"><div class="empty">Үйлчилгээ алга. setup.sql-ийг ажиллуулсан уу?</div></td></tr>';
     return;
   }
   cache.services.forEach((s) => {
@@ -584,7 +584,7 @@ function renderPackages() {
   body.innerHTML = "";
   if (!cache.packages.length) {
     body.innerHTML =
-      '<tr><td colspan="7"><div class="empty">Багц алга. schema.sql-ийг ажиллуулсан уу?</div></td></tr>';
+      '<tr><td colspan="7"><div class="empty">Багц алга. setup.sql-ийг ажиллуулсан уу?</div></td></tr>';
     return;
   }
   cache.packages.forEach((p) => {

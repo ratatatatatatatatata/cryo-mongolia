@@ -44,15 +44,36 @@ const q = (v) =>
 const norm = (s) =>
   String(s || "").toLowerCase().replace(/[^a-zа-яөүё0-9]+/gi, " ").trim();
 
+/* The sheets mix conventions in the same column: "6/8/2025" is
+   month/day but "14/9/2025" is day/month, and some cells double the
+   separator ("12//21"). Anything that cannot be resolved to a real
+   calendar date is skipped rather than guessed at. */
+function ymd(y, mo, d) {
+  if (!(mo >= 1 && mo <= 12) || !(d >= 1 && d <= 31)) return null;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null; // e.g. 2/30
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function pair(a, b, year) {
+  /* a value over 12 can only be the day */
+  if (a > 12 && b <= 12) return ymd(year, b, a);
+  return ymd(year, a, b);
+}
+
 function toDate(v, year) {
   if (!v) return null;
-  const s = String(v).trim();
-  let m = s.match(/^(\d{1,2})[\/.](\d{1,2})$/);
-  if (m) return `${year}-${String(+m[1]).padStart(2, "0")}-${String(+m[2]).padStart(2, "0")}`;
-  m = s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})$/);
-  if (m) return `${m[1]}-${String(+m[2]).padStart(2, "0")}-${String(+m[3]).padStart(2, "0")}`;
-  m = s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/);
-  if (m) return `${m[3]}-${String(+m[1]).padStart(2, "0")}-${String(+m[2]).padStart(2, "0")}`;
+  const s = String(v).trim().replace(/[\/.]{2,}/g, "/");
+
+  let m = s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})$/); // 2026.01.02
+  if (m) return ymd(+m[1], +m[2], +m[3]);
+
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); // 6/8/2025 or 14/9/2025
+  if (m) return pair(+m[1], +m[2], +m[3]);
+
+  m = s.match(/^(\d{1,2})[\/.-](\d{1,2})$/); // 1/2 — year comes from the sheet
+  if (m) return pair(+m[1], +m[2], year);
+
   return null;
 }
 
@@ -282,12 +303,12 @@ if (exp.length) {
   const expSum = exp.reduce((s, r) => s + r.amount, 0);
   report.push(`Зардал: ${exp.length} expenses · ₮${expSum.toLocaleString("en-US")}`);
   const values = exp.map(
-    (r) => `(${q(r.date)},${q(r.item)},${r.qty ?? "null"},${r.amount},${q(r.paid_with)},${q(r.note)})`,
+    (r) => `(${q(r.date)},${q(r.item)},${r.qty ?? "null"},${r.amount},${q(r.paid_with)},${q(r.note)},'import')`,
   );
   chunks.push("-- ── Зардал ──");
   for (let i = 0; i < values.length; i += 200) {
     chunks.push(
-      "insert into public.expenses (spend_date,item,qty,amount,paid_with,note) values\n" +
+      "insert into public.expenses (spend_date,item,qty,amount,paid_with,note,source) values\n" +
         values.slice(i, i + 200).join(",\n") +
         ";",
     );
@@ -302,10 +323,13 @@ ${report.map((l) => "--  " + l).join("\n")}
 --
 --  Total imported: ${grandRows} sales · ₮${grand.toLocaleString("en-US")}
 --
---  Run migration-003-sales-ledger.sql first, then paste this in.
---  Re-running duplicates rows; to start over:
---     delete from public.sales where source = 'import';
+--  Run setup.sql first, then paste this in.
+--  Safe to re-run: it clears the previous import first and leaves
+--  anything you typed by hand (source = 'manual') untouched.
 -- ═══════════════════════════════════════════════════════════════
+
+delete from public.sales    where source = 'import';
+delete from public.expenses where source = 'import';
 
 `;
 
