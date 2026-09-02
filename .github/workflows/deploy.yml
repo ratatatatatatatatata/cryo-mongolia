@@ -23,6 +23,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Generate Supabase config
+        env:
+          SUPABASE_url: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_anon_public: ${{ secrets.SUPABASE_ANON_PUBLIC }}
+        run: node scripts/build-config.mjs
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
