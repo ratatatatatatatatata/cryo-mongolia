@@ -17,7 +17,12 @@ const STATUS_MN = {
   done: "Биелсэн",
   cancelled: "Цуцалсан",
 };
-const ROLE_MN = { owner: "Үндсэн админ", admin: "Админ", staff: "Ажилтан" };
+const ROLE_MN = {
+  owner: "Үндсэн админ",
+  admin: "Админ",
+  staff: "Ажилтан",
+  customer: "Үйлчлүүлэгч",
+};
 
 let sb = null;
 let me = null; // { id, email, full_name, role }
@@ -673,7 +678,7 @@ function renderUsers() {
       const sel = document.createElement("select");
       sel.className = "ctl sm";
       sel.style.maxWidth = "180px";
-      ["staff", "admin", "owner"].forEach((r) => {
+      ["customer", "staff", "admin", "owner"].forEach((r) => {
         const o = document.createElement("option");
         o.value = r;
         o.textContent = ROLE_MN[r];

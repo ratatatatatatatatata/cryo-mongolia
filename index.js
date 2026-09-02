@@ -301,6 +301,8 @@ function doConfirm() {
         deposit: 100000,
         bank: bk.bankName || null,
         status: "pending",
+        user_id:
+          window.cryoAuth && window.cryoAuth.user ? window.cryoAuth.user.id : null,
       })
       .then(function (r) {
         if (r && r.error) console.warn("[cryo] booking not saved:", r.error.message);
@@ -321,6 +323,15 @@ function doConfirm() {
 
 /* Modal open / close */
 function openModal() {
+  /* customers book from an account; with no Supabase this opens straight through */
+  if (window.cryoAuth) {
+    window.cryoAuth.require(openBookingModal);
+    return;
+  }
+  openBookingModal();
+}
+
+function openBookingModal() {
   bk = { dateKey: "", time: "", bank: "", bankName: "" };
   dateOffset = 0;
   buildDateTabs();
@@ -330,7 +341,8 @@ function openModal() {
     .forEach((b) => b.classList.remove("selected"));
   const nameEl = document.getElementById("b_name");
   const phoneEl = document.getElementById("b_phone");
-  if (nameEl) nameEl.value = "";
+  const prof = window.cryoAuth && window.cryoAuth.profile;
+  if (nameEl) nameEl.value = (prof && prof.full_name) || "";
   if (phoneEl) phoneEl.value = "";
   setStepDots(1);
   showPanel("step1");

@@ -1224,3 +1224,62 @@ body.has-halo .cursor-halo{opacity:1}
 .pillar-num,.pack-kicker,.feat-num,.hs-num,.step-bubble,.dc-num{
   font-weight:800;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   CUSTOMER ACCOUNTS — auth modal, account menu, my bookings
+   ══════════════════════════════════════════════════════════════ */
+.auth-modal{max-width:440px}
+.auth-modal h3{font-size:26px;font-weight:800;letter-spacing:-.04em;color:var(--ice-50);margin-bottom:8px}
+.auth-lead{font-size:13px;color:var(--text-muted);line-height:1.65;margin-bottom:22px}
+.auth-tabs{display:flex;gap:6px;margin-bottom:22px}
+.auth-tabs button{flex:1;padding:10px;border-radius:99px;border:1px solid var(--border);
+  background:var(--glass);color:var(--text-secondary);font-family:var(--ff-body);
+  font-size:12.5px;font-weight:700;cursor:pointer;transition:all var(--ease)}
+.auth-tabs button:hover{color:var(--ice-200);border-color:var(--border-mid)}
+.auth-tabs button.on{color:#03131f;border-color:transparent;
+  background:linear-gradient(135deg,var(--ice-100),var(--ice-400))}
+.auth-note{padding:12px 15px;border-radius:var(--r-md);font-size:12.5px;line-height:1.6;margin-bottom:16px}
+.auth-note.err{background:rgba(255,110,110,.1);border:1px solid rgba(255,110,110,.3);color:#ffa3a3}
+.auth-note.ok{background:rgba(80,220,160,.1);border:1px solid rgba(80,220,160,.28);color:#8ceec2}
+
+/* account button + dropdown */
+.nav-account{position:relative;flex-shrink:0}
+.acct-trigger{cursor:pointer;font-family:var(--ff-body);max-width:190px}
+.acct-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-menu{
+  position:absolute;top:calc(100% + 10px);right:0;min-width:230px;padding:8px;z-index:210;
+  border-radius:var(--r-lg);background:rgba(10,18,32,.96);border:1px solid var(--border-mid);
+  backdrop-filter:blur(22px);box-shadow:var(--lift-2), var(--hairline);
+  opacity:0;visibility:hidden;transform:translateY(-8px);
+  transition:opacity var(--ease),transform var(--ease),visibility var(--ease);
+}
+.nav-account.open .acct-menu{opacity:1;visibility:visible;transform:none}
+.acct-head{padding:10px 12px 12px;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.acct-head .acct-mail{display:block;font-size:12px;color:var(--ice-100);font-weight:700;word-break:break-all}
+.acct-head .acct-role{display:inline-block;margin-top:6px;font-size:9.5px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ice-400)}
+.acct-menu button,.acct-menu a{
+  display:block;width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:none;
+  background:none;color:var(--text-secondary);font-family:var(--ff-body);font-size:13px;
+  font-weight:600;cursor:pointer;text-decoration:none;transition:all var(--ease)}
+.acct-menu button:hover,.acct-menu a:hover{background:var(--glass-2);color:var(--ice-100)}
+
+/* my bookings */
+.my-row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;
+  padding:16px 0;border-bottom:1px solid var(--border)}
+.my-row:last-child{border-bottom:none}
+.my-ref{font-size:14px;font-weight:800;color:var(--ice-100);letter-spacing:.04em}
+.my-when{font-size:12px;color:var(--text-muted);margin-top:5px}
+.my-amt{font-size:13px;font-weight:700;color:var(--ice-200)}
+.my-pill{display:inline-block;padding:4px 12px;border-radius:99px;font-size:9.5px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.my-pill.st-pending{background:rgba(255,180,80,.14);color:#ffcf95;border:1px solid rgba(255,180,80,.3)}
+.my-pill.st-confirmed{background:rgba(88,198,255,.14);color:var(--ice-200);border:1px solid rgba(88,198,255,.32)}
+.my-pill.st-done{background:rgba(80,220,160,.14);color:#8ceec2;border:1px solid rgba(80,220,160,.3)}
+.my-pill.st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
+
+@media(max-width:680px){
+  .acct-menu{right:auto;left:0}
+  .acct-trigger{max-width:140px}
+}

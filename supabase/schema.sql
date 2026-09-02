@@ -5,17 +5,21 @@
 -- ═══════════════════════════════════════════════════════════════
 
 -- ── roles ──────────────────────────────────────────────────────
-do $$ begin
-  create type public.user_role as enum ('owner', 'admin', 'staff');
-exception when duplicate_object then null; end $$;
-
+--  customer — books online, sees only their own bookings (default)
+--  staff    — no dashboard access
+--  admin    — runs the centre
+--  owner    — admin, plus grants roles to everyone else
 create table if not exists public.profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
   email      text,
   full_name  text default '',
-  role       public.user_role not null default 'staff',
+  role       text not null default 'customer',
   created_at timestamptz not null default now()
 );
+alter table public.profiles drop constraint if exists profiles_role_chk;
+alter table public.profiles
+  add constraint profiles_role_chk
+  check (role in ('owner', 'admin', 'staff', 'customer'));
 
 -- SECURITY DEFINER so policies can read the role without recursing into RLS
 create or replace function public.is_admin() returns boolean
@@ -33,7 +37,7 @@ create or replace function public.handle_new_user() returns trigger
   language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, email, full_name, role)
-  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name',''), 'staff')
+  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name',''), 'customer')
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -48,6 +52,11 @@ drop policy if exists "read own profile"      on public.profiles;
 drop policy if exists "admins read profiles"  on public.profiles;
 drop policy if exists "owner writes profiles" on public.profiles;
 create policy "read own profile"      on public.profiles for select using (id = auth.uid());
+drop policy if exists "users update own name" on public.profiles;
+create policy "users update own name" on public.profiles for update to authenticated
+  using (id = auth.uid())
+  with check (id = auth.uid()
+              and role = (select p.role from public.profiles p where p.id = auth.uid()));
 create policy "admins read profiles"  on public.profiles for select using (public.is_admin());
 -- only the owner may change roles, so no one can promote themselves
 create policy "owner writes profiles" on public.profiles for update
@@ -70,19 +79,31 @@ create table if not exists public.bookings (
   status        text not null default 'pending'
                 check (status in ('pending','confirmed','done','cancelled')),
   note          text,
+  user_id       uuid references auth.users(id) on delete set null,
   created_at    timestamptz not null default now()
 );
 create index if not exists bookings_created_idx on public.bookings (created_at desc);
 create index if not exists bookings_date_idx    on public.bookings (booked_date);
+create index if not exists bookings_user_idx    on public.bookings (user_id);
 
 alter table public.bookings enable row level security;
 drop policy if exists "public creates booking" on public.bookings;
+drop policy if exists "create own booking"     on public.bookings;
+drop policy if exists "customers read own"     on public.bookings;
+drop policy if exists "customers cancel own"   on public.bookings;
 drop policy if exists "admins read bookings"   on public.bookings;
 drop policy if exists "admins update bookings" on public.bookings;
 drop policy if exists "owner deletes bookings" on public.bookings;
--- the public site writes here, but can never read anyone's booking back
-create policy "public creates booking" on public.bookings for insert
-  to anon, authenticated with check (true);
+-- a signed-in customer may only file a booking under their own id
+create policy "create own booking" on public.bookings for insert
+  to anon, authenticated
+  with check (user_id is null or user_id = auth.uid());
+create policy "customers read own" on public.bookings for select
+  to authenticated using (user_id = auth.uid());
+create policy "customers cancel own" on public.bookings for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid() and status in ('pending','cancelled'));
 create policy "admins read bookings"   on public.bookings for select using (public.is_admin());
 create policy "admins update bookings" on public.bookings for update
   using (public.is_admin()) with check (public.is_admin());
@@ -198,7 +219,7 @@ on conflict (slug) do nothing;
 
 -- ═══════════════════════════════════════════════════════════════
 --  LAST STEP — make yourself the owner
---  1. Register once at /admin.html (or Authentication → Add user)
+--  1. Register once on the site (or Authentication → Add user)
 --  2. Replace the email below and run this line
 -- ═══════════════════════════════════════════════════════════════
 -- update public.profiles set role = 'owner' where email = 'tumee.jav@gmail.com';
