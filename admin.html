@@ -224,7 +224,7 @@
     <section class="view" data-panel="reports">
       <div class="page-head">
         <div>
-          <div class="page-title">Тайлан</div>
+          <div class="page-title" id="repTitle">Тайлан</div>
           <div class="page-sub" id="repRange">—</div>
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
@@ -267,7 +267,7 @@
         <div class="kpi"><div class="kpi-label">Дундаж дүн</div>
           <div class="kpi-val" id="rAvg"><small>₮</small>0</div>
           <div class="kpi-note">Нэг захиалгад</div></div>
-        <div class="kpi"><div class="kpi-label">Цэвэр ашиг</div>
+        <div class="kpi"><div class="kpi-label" id="rRateLabel">Цэвэр ашиг</div>
           <div class="kpi-val" id="rRate">0<small style="margin:0 0 0 2px">%</small></div>
           <div class="kpi-note" id="rRateNote">—</div></div>
       </div>
@@ -335,7 +335,7 @@
             <label style="margin:0">Хайх</label>
             <input class="ctl sm" type="search" id="ledSearch" placeholder="Нэр, үйлчилгээ…"/>
           </div>
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+          <label id="ledReviewWrap" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);cursor:pointer">
             <input type="checkbox" id="ledReview" style="width:16px;height:16px;accent-color:#58c6ff"/>
             Шалгах шаардлагатай
           </label>
@@ -462,9 +462,13 @@
         <div class="field"><label>Нэр *</label><input class="ctl" id="st_name" maxlength="120"/></div>
         <div class="field"><label>Албан тушаал</label><input class="ctl" id="st_title" maxlength="120" placeholder="Терапист, ресепшн…"/></div>
         <div class="field"><label>Утас</label><input class="ctl" id="st_phone" inputmode="tel" maxlength="24"/></div>
+        <div class="field"><label>Нэвтрэх и-мэйл *</label><input class="ctl" type="email" id="st_email" autocomplete="email" maxlength="254" placeholder="employee@example.com"/></div>
         <div class="field"><label>Ажилтны код</label><input class="ctl" id="st_code" maxlength="32" placeholder="EMP-001"/></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-secondary);cursor:pointer;padding:10px 0">
+          <input type="checkbox" id="st_active" style="width:16px;height:16px;accent-color:#58c6ff" checked/> Идэвхтэй ажилтан
+        </label>
       </div><div class="form-actions"><button class="btn-sm primary" id="staffSave">Хадгалах</button><button class="btn-sm ghost" id="staffCancel">Болих</button></div></div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Код</th><th>Нэр</th><th>Албан тушаал</th><th>Утас</th><th>Ажилласан өдөр</th><th>Борлуулалт</th><th>Төлөв</th><th></th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Код</th><th>Нэр</th><th>Албан тушаал</th><th>Утас</th><th>И-мэйл</th><th>Ажилласан өдөр</th><th>Борлуулалт</th><th>Төлөв</th><th></th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
     </section>
 
     <!-- ── ATTENDANCE ── -->

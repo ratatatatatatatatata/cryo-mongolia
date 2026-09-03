@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════════════════════
    °CRYO Mongolia — admin dashboard
    Supabase auth + role-gated reporting. No build step.
-   Roles: owner (grants admin) › admin (runs the centre) › staff (no access)
+   Roles: owner (grants admin) › admin (runs the centre) › staff (own sales and attendance)
    ══════════════════════════════════════════════════════════════ */
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -170,6 +170,11 @@ async function route() {
   show($("navReports"), true);
   show($("navAttendance"), true);
   show($("attAdd"), isAdmin);
+  show($("ledImport"), isAdmin);
+  show($("ledReviewWrap"), isAdmin);
+
+  $("navReports").lastChild.textContent = me.role === "staff" ? " Миний борлуулалт" : " Борлуулалт, тайлан";
+  $("repTitle").textContent = me.role === "staff" ? "Миний борлуулалтын тайлан" : "Тайлан";
 
   if (!isAdmin) {
     switchView("reports");
@@ -1090,6 +1095,7 @@ function renderReports() {
   });
   const expenses = expenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const profit = revenue - expenses;
+  const isStaffReport = me?.role === "staff";
 
   $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
   const compareFrom = new Date(from); compareFrom.setFullYear(compareFrom.getFullYear() - 1);
@@ -1109,8 +1115,13 @@ function renderReports() {
   $("rAvg").innerHTML =
     '<small>₮</small>' +
     (rows.length ? Math.round(revenue / rows.length) : 0).toLocaleString("en-US");
-  $("rRate").innerHTML = '<small>₮</small>' + profit.toLocaleString("en-US");
-  $("rRateNote").textContent = "Зардал " + money(expenses);
+  const staffAmount = rows.reduce((sum, row) => sum + Number(row.therapist_amount || 0), 0);
+  $("rRateLabel").textContent = isStaffReport ? "Ажилтны дүн" : "Цэвэр ашиг";
+  $("rRate").innerHTML =
+    '<small>₮</small>' + (isStaffReport ? staffAmount : profit).toLocaleString("en-US");
+  $("rRateNote").textContent = isStaffReport
+    ? "Таны борлуулалтын бүртгэлээс"
+    : "Зардал " + money(expenses);
 
   /* daily (or monthly for long ranges) trend */
   const spanDays = Math.round((to - from) / 86400000);
@@ -1365,7 +1376,7 @@ function openLedForm(row) {
 
   const sel = $("f_staff");
   sel.innerHTML = '<option value="">—</option>';
-  cache.staff.forEach((st) => {
+  cache.staff.filter((st) => st.active || Number(row?.staff_id) === Number(st.id)).forEach((st) => {
     const o = document.createElement("option");
     o.value = st.name;
     o.textContent = st.name;
@@ -1373,12 +1384,17 @@ function openLedForm(row) {
     if (row && row.therapist === st.name) o.selected = true;
     sel.appendChild(o);
   });
-  if (me.role === "staff" && !row) {
-    const ownName = me.full_name || me.email;
+  if (me.role === "staff") {
+    const ownStaff = cache.staff.find((staff) =>
+      staff.user_id === me.id ||
+      String(staff.email || "").toLowerCase() === String(me.email || "").toLowerCase(),
+    );
+    const ownName = ownStaff?.name || me.full_name || me.email;
     if (![...sel.options].some((option) => option.value === ownName)) {
       const option = document.createElement("option");
       option.value = ownName;
       option.textContent = ownName;
+      if (ownStaff) option.dataset.staffId = ownStaff.id;
       sel.appendChild(option);
     }
     sel.value = ownName;
@@ -1408,16 +1424,25 @@ function openStaffForm(row = null) {
   $("st_name").value = row?.name || "";
   $("st_title").value = row?.title || "";
   $("st_phone").value = row?.phone || "";
+  $("st_email").value = row?.email || "";
   $("st_code").value = row?.employee_code || "";
+  $("st_active").checked = row ? row.active !== false : true;
   show($("staffForm"));
+  $("st_name").focus();
 }
 
 async function saveStaff() {
+  const email = $("st_email").value.trim().toLowerCase();
   const patch = {
     name: $("st_name").value.trim(), title: $("st_title").value.trim() || null,
     phone: $("st_phone").value.trim() || null, employee_code: $("st_code").value.trim() || null,
+    email: email || null, active: $("st_active").checked,
   };
   if (!patch.name) return alert("Ажилтны нэрийг оруулна уу.");
+  if (patch.active && !patch.email) return alert("Ажилтны нэвтрэх и-мэйл хаягийг оруулна уу.");
+  if (patch.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patch.email)) return alert("И-мэйл хаяг буруу байна.");
+  const duplicate = cache.staff.find((row) => row.id !== staffEditing?.id && row.active && String(row.email || "").toLowerCase() === patch.email);
+  if (patch.email && duplicate) return alert("Энэ и-мэйл өөр ажилтанд бүртгэлтэй байна.");
   const query = staffEditing
     ? sb.from("staff").update(patch).eq("id", staffEditing.id)
     : sb.from("staff").insert({ ...patch, sort: cache.staff.length + 1 });
@@ -1429,20 +1454,37 @@ async function saveStaff() {
 
 function renderStaff() {
   const body = $("staffBody"); if (!body) return;
-  $("staffSub").textContent = `${cache.staff.filter((s) => s.active).length} идэвхтэй ажилтан`;
+  const rows = cache.staff.filter((staff) => staff.active);
+  const archived = cache.staff.length - rows.length;
+  $("staffSub").textContent = `${rows.length} идэвхтэй ажилтан${archived ? ` · ${archived} архивласан` : ""}`;
   body.innerHTML = "";
-  if (!cache.staff.length) return void (body.innerHTML = '<tr><td colspan="8"><div class="empty">Ажилтан бүртгэгдээгүй байна.</div></td></tr>');
-  cache.staff.forEach((row) => {
+  if (!rows.length) return void (body.innerHTML = '<tr><td colspan="9"><div class="empty">Идэвхтэй ажилтан бүртгэгдээгүй байна.</div></td></tr>');
+  rows.forEach((row) => {
     const tr = document.createElement("tr");
-    [row.employee_code || "—", row.name, row.title || "—", row.phone || "—"].forEach((value, i) => tr.appendChild(cell(value, i === 1 ? "t-strong" : "")));
+    [row.employee_code || "—", row.name, row.title || "—", row.phone || "—", row.email || "—"].forEach((value, i) => tr.appendChild(cell(value, i === 1 ? "t-strong" : "")));
     const names = [row.name, ...(row.aliases || [])].map((name) => String(name).toLowerCase());
     const workedDays = [...cache.attendance, ...cache.workdays].filter((a) => a.staff_id === row.id || (!a.staff_id && names.includes(String(a.staff_name).toLowerCase()))).length;
     const salesTotal = cache.sales.filter((s) => s.staff_id === row.id || (!s.staff_id && names.includes(String(s.therapist).toLowerCase()))).reduce((sum, sale) => sum + rowTotal(sale), 0);
     tr.appendChild(cell(`${workedDays} өдөр`, "t-mono"));
     tr.appendChild(cell(money(salesTotal), "t-mono t-strong"));
     tr.appendChild(cell(row.active ? "Идэвхтэй" : "Идэвхгүй", row.active ? "status-ok" : ""));
-    const td = document.createElement("td"); const edit = document.createElement("button"); edit.className = "btn-sm ghost"; edit.textContent = "Засах"; edit.onclick = () => openStaffForm(row); td.appendChild(edit); tr.appendChild(td); body.appendChild(tr);
+    const td = document.createElement("td");
+    const actions = document.createElement("div"); actions.className = "row-actions";
+    const edit = document.createElement("button"); edit.className = "btn-sm ghost"; edit.textContent = "Засах"; edit.onclick = () => openStaffForm(row); actions.appendChild(edit);
+    if (row.active) {
+      const remove = document.createElement("button"); remove.className = "btn-sm danger"; remove.textContent = "Устгах"; remove.onclick = () => removeStaff(row); actions.appendChild(remove);
+    }
+    td.appendChild(actions); tr.appendChild(td); body.appendChild(tr);
   });
+}
+
+async function removeStaff(row) {
+  if (!confirm(`${row.name} ажилтны эрхийг цуцалж, идэвхтэй жагсаалтаас хасах уу? Өмнөх борлуулалт, ирцийн тайлан хадгалагдана.`)) return;
+  const { data, error } = await sb.from("staff").update({ active: false, email: null, user_id: null }).eq("id", row.id).select().maybeSingle();
+  if (error) return alert("Ажилтныг хасаж чадсангүй: " + error.message);
+  Object.assign(row, data || { active: false, email: null, user_id: null });
+  renderStaff();
+  fillAttendanceFilters();
 }
 
 let attendanceEditing = null;
@@ -1804,11 +1846,13 @@ function renderLedger() {
     tr.appendChild(cell(money(rowTotal(r)), "t-mono t-strong"));
 
     const act = document.createElement("td");
-    const ed = document.createElement("button");
-    ed.className = "btn-sm ghost";
-    ed.textContent = "Засах";
-    ed.addEventListener("click", () => openLedForm(r));
-    act.appendChild(ed);
+    if (isAdminUser() || r.created_by === me?.id) {
+      const ed = document.createElement("button");
+      ed.className = "btn-sm ghost";
+      ed.textContent = "Засах";
+      ed.addEventListener("click", () => openLedForm(r));
+      act.appendChild(ed);
+    }
     tr.appendChild(act);
 
     body.appendChild(tr);
