@@ -234,7 +234,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="repFiltersPanel">
         <div class="filters" id="repFilters">
           <button class="chip-btn on" data-range="month">Энэ сар</button>
           <button class="chip-btn" data-range="prev">Өнгөрсөн сар</button>
@@ -474,17 +474,9 @@
     <!-- ── ATTENDANCE ── -->
     <section class="view" data-panel="attendance">
       <div class="page-head">
-        <div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Ажил эхэлсэн, дууссан цагийн бүртгэл</div></div>
+        <div><div class="page-title">Өнөөдрийн ээлж</div><div class="page-sub" id="attSub">Өнөөдрийн ажилтны төлөв</div></div>
         <div class="head-actions">
           <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
-          <button class="btn-sm ghost" id="clockIn">▶ Ажил эхлэх</button>
-          <button class="btn-sm ghost" id="clockOut">■ Ажил дуусгах</button>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="filters">
-          <div class="field inline-field"><label for="attYear">Жил</label><select class="ctl sm" id="attYear"></select></div>
-          <div class="field inline-field"><label for="attStaff">Ажилтан</label><select class="ctl sm" id="attStaff"><option value="all">Бүх ажилтан</option></select></div>
         </div>
       </div>
       <div class="panel" id="attForm" style="display:none">
@@ -495,11 +487,11 @@
           <div class="field"><label for="att_day">Хэд дэх өдөр *</label><input class="ctl" id="att_day" type="number" min="1" step="1" required/></div>
           <div class="field"><label for="att_in">Эхэлсэн цаг *</label><input class="ctl" id="att_in" type="time"/></div>
           <div class="field"><label for="att_out">Дууссан цаг</label><input class="ctl" id="att_out" type="time"/></div>
-          <div class="field" style="grid-column:span 2"><label for="att_note">Тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500"/></div>
+          <div class="field" style="grid-column:span 2"><label for="att_note">Төлөв, тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500" placeholder="Жишээ: Гарсан, Өөр хүнд шилжүүлсэн"/></div>
         </div>
         <div class="form-actions"><button class="btn-sm primary" id="attSave">Хадгалах</button><button class="btn-sm ghost" id="attFormCancel">Болих</button></div>
       </div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Эхэлсэн</th><th>Дууссан</th><th>Нийт цаг</th><th>Тэмдэглэл</th><th>Эх үүсвэр</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Ажилтан</th><th>Ээлжийн цаг</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
     <!-- ── INVENTORY ── -->
