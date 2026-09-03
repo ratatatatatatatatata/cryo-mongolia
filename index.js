@@ -49,6 +49,8 @@ function toggleMenu() {
   const menu = document.getElementById("mobileMenu");
   const burger = document.getElementById("hamburger");
   const isOpen = menu.classList.toggle("open");
+  burger?.setAttribute("aria-expanded", String(isOpen));
+  burger?.setAttribute("aria-label", isOpen ? "Цэс хаах" : "Цэс нээх");
   document.body.style.overflow = isOpen ? "hidden" : "";
   if (burger) {
     const spans = burger.querySelectorAll("span");
@@ -346,19 +348,28 @@ function openBookingModal() {
   if (phoneEl) phoneEl.value = "";
   setStepDots(1);
   showPanel("step1");
-  document.getElementById("modalOverlay").classList.add("open");
+  const overlay = document.getElementById("modalOverlay");
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
+  setTimeout(() => document.getElementById("b_name")?.focus(), 80);
 }
 
 function closeModal() {
   if (qrInterval) clearInterval(qrInterval);
-  document.getElementById("modalOverlay").classList.remove("open");
+  const overlay = document.getElementById("modalOverlay");
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
 }
 
 function closeModalOnBg(e) {
   if (e.target === document.getElementById("modalOverlay")) closeModal();
 }
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.getElementById("modalOverlay")?.classList.contains("open")) closeModal();
+});
 
 /* ── Helpers ── */
 function setText(id, val) {
