@@ -111,8 +111,8 @@
     p.y  -= sin(t * 0.55) * 0.045;                  /* slow float */
 
     /* ── star ── */
-    vec2 sp = p.xy * rot(0.20 + sin(t * 0.18) * 0.05);
-    float star2 = sdStar(sp, 1.44, 4.0, 2.30);
+    vec2 sp = p.xy * rot(0.98 + sin(t * 0.18) * 0.05);
+    float star2 = sdStar(sp, 1.44, 4.0, 2.55);
     float star  = extrude(star2, p.z - 0.06, 0.150, 0.070);
 
     /* ── arrow: a thick outlined band, the way the mark draws it ── */
