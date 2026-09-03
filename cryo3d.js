@@ -57,7 +57,12 @@
     return s;
   }
 
-  /* ── 2D: eight-pointed star ── */
+  /* ── 2D: four chevron arms, each a little arrowhead pointing outward,
+     spaced 90° apart with a gap between them — the way the mark draws
+     the light-blue half ── */
+  float sdArms(vec2 p, float reach, float size);
+
+  /* ── 2D: n-pointed star (kept for reference) ── */
   float sdStar(vec2 p, float r, float n, float m){
     float an = PI / n;
     float en = PI / m;
@@ -95,6 +100,28 @@
     return sg * sqrt(d);
   }
 
+  /* one arm: wide and shallow, with a notch cut into its base */
+  float sdChevron(vec2 p, float s){
+    vec2 v0 = vec2( 0.000,  0.900) * s;   /* tip        */
+    vec2 v1 = vec2( 0.880, -0.520) * s;   /* right wing */
+    vec2 v2 = vec2( 0.000, -0.060) * s;   /* base notch */
+    vec2 v3 = vec2(-0.880, -0.520) * s;   /* left wing  */
+    float d = min(min(segD(p, v0, v1), segD(p, v1, v2)),
+                  min(segD(p, v2, v3), segD(p, v3, v0)));
+    float sg = segS(p, v0, v1) * segS(p, v1, v2) * segS(p, v2, v3) * segS(p, v3, v0);
+    return sg * sqrt(d);
+  }
+
+  float sdArms(vec2 p, float reach, float size){
+    float d = 1e9;
+    for (int i = 0; i < 4; i++){
+      vec2 q = p * rot(float(i) * 1.5707963);
+      q.y -= reach;                 /* push the arm out from the centre */
+      d = min(d, sdChevron(q, size));
+    }
+    return d;
+  }
+
   /* ── extrude a 2D field into a rounded slab ── */
   float extrude(float d2, float z, float h, float round){
     vec2 w = vec2(d2 + round, abs(z) - h);
@@ -111,8 +138,8 @@
     p.y  -= sin(t * 0.55) * 0.045;                  /* slow float */
 
     /* ── star ── */
-    vec2 sp = p.xy * rot(0.98 + sin(t * 0.18) * 0.05);
-    float star2 = sdStar(sp, 1.44, 4.0, 2.55);
+    vec2 sp = p.xy * rot(0.30 + sin(t * 0.18) * 0.05);
+    float star2 = sdArms(sp, 0.74, 0.78);
     float star  = extrude(star2, p.z - 0.06, 0.150, 0.070);
 
     /* ── arrow: a thick outlined band, the way the mark draws it ── */
