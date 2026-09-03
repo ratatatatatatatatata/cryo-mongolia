@@ -36,7 +36,8 @@ const grid = (n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: 
 
 const num = (v) => {
   if (v == null) return 0;
-  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+  const match = String(v).replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  const n = match ? Number(match[0]) : NaN;
   return isNaN(n) ? 0 : Math.round(n);
 };
 const q = (v) =>
@@ -176,6 +177,7 @@ function readIncome(sheet, year, visits) {
     };
     const total = money.golomt + money.khan + money.cash + money.invoice + money.barter - money.refund;
     const name = String(r[col.name] || "").trim();
+    if (/^Нэрс$/i.test(name) || /^Total:$/i.test(name)) return;
     if (total === 0 && !name) return;
     if (!last) return;
 

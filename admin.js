@@ -51,7 +51,7 @@ let sb = null;
 let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
-  sales: [], expenses: [], staff: [], customers: [], attendance: [], inventory: [],
+  sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], inventory: [],
 };
 let bkFilter = "all";
 
@@ -265,12 +265,13 @@ async function loadAll() {
     sb.from("services").select("*").order("sort", { ascending: true }),
     sb.from("packages").select("*").order("sort", { ascending: true }),
     sb.from("report_monthly").select("*"),
-    sb.from("sales").select("*").order("sale_date", { ascending: false }).limit(5000),
+    sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).limit(5000),
     sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
     sb.from("staff").select("*").order("sort", { ascending: true }),
     sb.from("customers").select("id,full_name,phone,email,created_at").order("updated_at", { ascending: false }).limit(1000),
     sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
+    sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).limit(2000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -289,6 +290,7 @@ async function loadAll() {
   cache.customers = res[8].data || [];
   cache.attendance = res[9].data || [];
   cache.inventory = res[10].data || [];
+  cache.workdays = res[11].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -1205,6 +1207,7 @@ function openLedForm(row) {
     const o = document.createElement("option");
     o.value = st.name;
     o.textContent = st.name;
+    o.dataset.staffId = st.id;
     if (row && row.therapist === st.name) o.selected = true;
     sel.appendChild(o);
   });
@@ -1266,10 +1269,15 @@ function renderStaff() {
   const body = $("staffBody"); if (!body) return;
   $("staffSub").textContent = `${cache.staff.filter((s) => s.active).length} идэвхтэй ажилтан`;
   body.innerHTML = "";
-  if (!cache.staff.length) return void (body.innerHTML = '<tr><td colspan="6"><div class="empty">Ажилтан бүртгэгдээгүй байна.</div></td></tr>');
+  if (!cache.staff.length) return void (body.innerHTML = '<tr><td colspan="8"><div class="empty">Ажилтан бүртгэгдээгүй байна.</div></td></tr>');
   cache.staff.forEach((row) => {
     const tr = document.createElement("tr");
     [row.employee_code || "—", row.name, row.title || "—", row.phone || "—"].forEach((value, i) => tr.appendChild(cell(value, i === 1 ? "t-strong" : "")));
+    const names = [row.name, ...(row.aliases || [])].map((name) => String(name).toLowerCase());
+    const workedDays = [...cache.attendance, ...cache.workdays].filter((a) => a.staff_id === row.id || (!a.staff_id && names.includes(String(a.staff_name).toLowerCase()))).length;
+    const salesTotal = cache.sales.filter((s) => s.staff_id === row.id || (!s.staff_id && names.includes(String(s.therapist).toLowerCase()))).reduce((sum, sale) => sum + rowTotal(sale), 0);
+    tr.appendChild(cell(`${workedDays} өдөр`, "t-mono"));
+    tr.appendChild(cell(money(salesTotal), "t-mono t-strong"));
     tr.appendChild(cell(row.active ? "Идэвхтэй" : "Идэвхгүй", row.active ? "status-ok" : ""));
     const td = document.createElement("td"); const edit = document.createElement("button"); edit.className = "btn-sm ghost"; edit.textContent = "Засах"; edit.onclick = () => openStaffForm(row); td.appendChild(edit); tr.appendChild(td); body.appendChild(tr);
   });
@@ -1286,7 +1294,8 @@ async function clockAttendance(mode) {
   let result;
   if (mode === "in") {
     if (current) return alert("Өнөөдрийн ажил эхэлсэн цаг бүртгэгдсэн байна.");
-    result = await sb.from("attendance").insert({ work_date: today, staff_name: me.full_name || me.email, user_id: me.id, clock_in: new Date().toISOString() }).select().maybeSingle();
+    const priorDays = cache.attendance.filter((row) => row.user_id === me.id).length;
+    result = await sb.from("attendance").insert({ work_date: today, staff_name: me.full_name || me.email, user_id: me.id, workday_number: priorDays + 1, clock_in: new Date().toISOString() }).select().maybeSingle();
   } else {
     if (!current) return alert("Эхлээд ажил эхлэх товчийг дарна уу.");
     if (current.clock_out) return alert("Ажил дууссан цаг бүртгэгдсэн байна.");
@@ -1299,13 +1308,14 @@ async function clockAttendance(mode) {
 
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
-  $("attSub").textContent = `${cache.attendance.length} ирцийн бүртгэл`;
+  const attendanceRows = [...cache.attendance, ...cache.workdays].sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
+  $("attSub").textContent = `${attendanceRows.length} ирцийн бүртгэл`;
   body.innerHTML = "";
-  if (!cache.attendance.length) return void (body.innerHTML = '<tr><td colspan="6"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
-  cache.attendance.forEach((row) => {
+  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="7"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
+  attendanceRows.forEach((row) => {
     const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
     const hours = start && end ? ((end - start) / 3600000).toFixed(1) + " цаг" : "—";
-    const tr = document.createElement("tr"); [row.work_date, row.staff_name, start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—"].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : ""))); body.appendChild(tr);
+    const tr = document.createElement("tr"); [row.work_date, row.staff_name, row.workday_number ? `${row.workday_number} дахь өдөр` : "—", start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—"].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : i === 2 ? "t-mono" : ""))); body.appendChild(tr);
   });
 }
 
@@ -1345,6 +1355,7 @@ async function saveLedger() {
     note: $("f_note").value.trim() || null,
     is_internal: $("f_internal").checked,
     therapist: $("f_staff").value || null,
+    staff_id: Number($("f_staff").selectedOptions[0]?.dataset.staffId) || null,
     therapist_amount: v("f_staffamt"),
     gift_card: v("f_gift"),
     needs_review: false,
@@ -1671,7 +1682,8 @@ const impNorm = (v) => String(v || "").toLowerCase().replace(/\s+/g, " ").trim()
 
 function impNum(v) {
   if (v == null) return 0;
-  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+  const match = String(v).replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  const n = match ? Number(match[0]) : NaN;
   return isNaN(n) ? 0 : Math.round(n);
 }
 
@@ -1953,6 +1965,7 @@ function buildImportRows() {
     if (d) lastDate = d;
 
     const name = String(get(r, "customer_name") || "").trim();
+    if (/^Нэрс$/i.test(name) || /^Total:$/i.test(name)) return;
     const row = {
       sale_date: lastDate,
       customer_name: name || null,
@@ -2048,6 +2061,10 @@ async function runImport() {
   const clean = rows.map((r) => {
     const c = { ...r };
     delete c._total;
+    const employee = cache.staff.find((staff) =>
+      [staff.name, ...(staff.aliases || [])].some((name) => impNorm(name) === impNorm(c.therapist)),
+    );
+    c.staff_id = employee?.id || null;
     return c;
   });
 
