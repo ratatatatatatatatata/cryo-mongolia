@@ -43,7 +43,7 @@ const ROLE_MN = {
 };
 
 const ADMIN_ONLY_NAV = [
-  "navOverview", "navExpenses", "navBookings", "navMessages", "navServices",
+  "navOverview", "navCoverage", "navExpenses", "navBookings", "navMessages", "navServices",
   "navPackages", "navStaff", "navInventory", "navUsers",
 ];
 
@@ -173,8 +173,9 @@ async function route() {
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
 
-  $("navReports").lastChild.textContent = me.role === "staff" ? " Миний борлуулалт" : " Борлуулалт, тайлан";
-  $("repTitle").textContent = me.role === "staff" ? "Миний борлуулалтын тайлан" : "Тайлан";
+  $("navReports").lastChild.textContent = me.role === "staff" ? " Өнөөдрийн борлуулалт" : " Борлуулалт, тайлан";
+  $("repTitle").textContent = me.role === "staff" ? "Өнөөдрийн борлуулалт" : "Тайлан";
+  show($("repFiltersPanel"), isAdmin);
 
   if (!isAdmin) {
     switchView("reports");
@@ -996,6 +997,7 @@ let repSelectedYear = String(new Date().getFullYear());
 function rangeBounds(kind) {
   const now = new Date();
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (kind === "today") return [startOfDay(now), startOfDay(now)];
   if (kind === "month") {
     return [new Date(now.getFullYear(), now.getMonth(), 1), startOfDay(now)];
   }
@@ -1066,7 +1068,7 @@ function wireReports() {
 }
 
 function reportRows() {
-  const [from, to] = rangeBounds(repRange);
+  const [from, to] = rangeBounds(me?.role === "staff" ? "today" : repRange);
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
   return {
     from,
@@ -1085,6 +1087,7 @@ function renderReports() {
     repSelectedYear = availableYears()[0] || "all";
   }
   $("repYear").value = repRange === "all" ? "all" : repSelectedYear;
+  const isStaffReport = me?.role === "staff";
   const { from, to, rows } = reportRows();
 
   $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
@@ -1095,18 +1098,19 @@ function renderReports() {
   });
   const expenses = expenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const profit = revenue - expenses;
-  const isStaffReport = me?.role === "staff";
 
   $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
   const compareFrom = new Date(from); compareFrom.setFullYear(compareFrom.getFullYear() - 1);
   const compareTo = new Date(to); compareTo.setFullYear(compareTo.getFullYear() - 1);
-  const compareRows = repRange === "all" ? [] : cache.sales.filter((row) => {
+  const compareRows = isStaffReport || repRange === "all" ? [] : cache.sales.filter((row) => {
     const date = new Date(row.sale_date + "T00:00:00");
     return date >= compareFrom && date <= compareTo;
   });
   const compareRevenue = compareRows.reduce((sum, row) => sum + rowTotal(row), 0);
   const comparePct = compareRevenue ? ((revenue - compareRevenue) / compareRevenue) * 100 : null;
-  $("rRevenueNote").textContent = repRange === "all"
+  $("rRevenueNote").textContent = isStaffReport
+    ? `${rows.length} өнөөдрийн бүртгэл`
+    : repRange === "all"
     ? rows.length + " борлуулалтын бүртгэл"
     : `${rows.length} бүртгэл · өмнөх оны мөн үеэс ${comparePct === null ? "өгөгдөлгүй" : `${comparePct >= 0 ? "+" : ""}${comparePct.toFixed(1)}%`}`;
   $("rCount").textContent = rows.length.toLocaleString("en-US");
@@ -1490,8 +1494,6 @@ async function removeStaff(row) {
 let attendanceEditing = null;
 
 function wireAttendance() {
-  $("clockIn")?.addEventListener("click", () => clockAttendance("in"));
-  $("clockOut")?.addEventListener("click", () => clockAttendance("out"));
   $("attAdd")?.addEventListener("click", () => openAttendanceForm());
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
@@ -1530,18 +1532,27 @@ async function clockAttendance(mode) {
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
   syncAttendanceFilters();
+  const today = localDateKey(new Date());
   const attendanceRows = allAttendanceRows()
-    .filter((row) => attendanceYear === "all" || String(row.work_date || "").startsWith(attendanceYear + "-"))
-    .filter((row) => attendanceStaff === "all" || String(row.staff_id || "") === attendanceStaff)
+    .filter((row) => String(row.work_date || "").slice(0, 10) === today)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
-  $("attSub").textContent = `${attendanceRows.length} ээлж, ирцийн бүртгэл`;
+  $("attSub").textContent = `${fmtDate(today)} · ${attendanceRows.length} ажилтан`;
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="9"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
+  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="5"><div class="empty">Өнөөдрийн ээлжийн мэдээлэл алга байна.</div></td></tr>');
   attendanceRows.forEach((row) => {
     const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
-    const hours = start && end ? ((end - start) / 3600000).toFixed(1) + " цаг" : "—";
     const tr = document.createElement("tr");
-    [row.work_date, row.staff_name, row.workday_number ? `${row.workday_number} дахь өдөр` : "—", start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—", row.__source].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : i === 2 ? "t-mono" : "")));
+    tr.appendChild(cell(row.staff_name, "t-strong"));
+    const shift = `${start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"} — ${end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"}`;
+    tr.appendChild(cell(shift, "t-mono"));
+    const statusCell = document.createElement("td");
+    const status = attendanceStatus(row, end);
+    const pill = document.createElement("span");
+    pill.className = `pill ${status.className}`;
+    pill.textContent = status.label;
+    statusCell.appendChild(pill);
+    tr.appendChild(statusCell);
+    tr.appendChild(cell(row.note || "—"));
     const actions = document.createElement("td");
     if (isAdminUser()) {
       const edit = document.createElement("button");
@@ -1558,22 +1569,37 @@ function renderAttendance() {
   });
 }
 
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function attendanceStatus(row, end) {
+  const note = String(row.note || "").toLowerCase();
+  if (note.includes("шилжүүл")) return { label: "Өөр хүнд шилжүүлсэн", className: "st-transferred" };
+  if (note.includes("гарсан") || (end && end <= new Date())) return { label: "Гарсан", className: "st-done" };
+  return { label: "Ээлжтэй", className: "st-confirmed" };
+}
+
 function syncAttendanceFilters() {
   const rows = allAttendanceRows();
   const yearSelect = $("attYear");
-  const yearValue = attendanceYear;
-  const years = [...new Set(rows.map((row) => String(row.work_date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))].sort((a, b) => Number(b) - Number(a));
-  yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
-  years.forEach((year) => yearSelect.appendChild(new Option(year + " он", year)));
-  attendanceYear = years.includes(yearValue) || yearValue === "all" ? yearValue : "all";
-  yearSelect.value = attendanceYear;
+  if (yearSelect) {
+    const yearValue = attendanceYear;
+    const years = [...new Set(rows.map((row) => String(row.work_date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))].sort((a, b) => Number(b) - Number(a));
+    yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
+    years.forEach((year) => yearSelect.appendChild(new Option(year + " он", year)));
+    attendanceYear = years.includes(yearValue) || yearValue === "all" ? yearValue : "all";
+    yearSelect.value = attendanceYear;
+  }
 
   const staffFilter = $("attStaff");
-  const staffValue = attendanceStaff;
-  staffFilter.innerHTML = '<option value="all">Бүх ажилтан</option>';
-  cache.staff.forEach((staff) => staffFilter.appendChild(new Option(staff.name, String(staff.id))));
-  attendanceStaff = [...staffFilter.options].some((option) => option.value === staffValue) ? staffValue : "all";
-  staffFilter.value = attendanceStaff;
+  if (staffFilter) {
+    const staffValue = attendanceStaff;
+    staffFilter.innerHTML = '<option value="all">Бүх ажилтан</option>';
+    cache.staff.forEach((staff) => staffFilter.appendChild(new Option(staff.name, String(staff.id))));
+    attendanceStaff = [...staffFilter.options].some((option) => option.value === staffValue) ? staffValue : "all";
+    staffFilter.value = attendanceStaff;
+  }
 
   const formStaff = $("att_staff");
   const selected = formStaff.value;
