@@ -114,23 +114,29 @@
           <div class="page-title">Хяналтын самбар</div>
           <div class="page-sub" id="ovSub">Байгууллагын үзүүлэлт</div>
         </div>
-        <button class="btn-sm ghost" id="refreshBtn">↻ Шинэчлэх</button>
+        <div class="head-actions">
+          <div class="field inline-field">
+            <label for="ovYear">Тайлант жил</label>
+            <select class="ctl sm" id="ovYear" aria-label="Хяналтын самбарын тайлант жил"></select>
+          </div>
+          <button class="btn-sm ghost" id="refreshBtn">↻ Шинэчлэх</button>
+        </div>
       </div>
 
       <div class="kpis">
-        <div class="kpi"><div class="kpi-label">Нийт захиалга</div>
-          <div class="kpi-val" id="kTotal">0</div><div class="kpi-note" id="kTotalNote">—</div></div>
-        <div class="kpi"><div class="kpi-label">Энэ сарын орлого</div>
+        <div class="kpi"><div class="kpi-label">Нийт борлуулалт</div>
           <div class="kpi-val" id="kRevenue"><small>₮</small>0</div><div class="kpi-note" id="kRevenueNote">—</div></div>
-        <div class="kpi"><div class="kpi-label">Хүлээгдэж буй</div>
-          <div class="kpi-val" id="kPending">0</div><div class="kpi-note">Баталгаажаагүй захиалга</div></div>
-        <div class="kpi"><div class="kpi-label">Шинэ хүсэлт</div>
-          <div class="kpi-val" id="kMsg">0</div><div class="kpi-note">Хариу өгөөгүй</div></div>
+        <div class="kpi"><div class="kpi-label">Өмнөх жилийн борлуулалт</div>
+          <div class="kpi-val" id="kPrevRevenue"><small>₮</small>0</div><div class="kpi-note" id="kPrevRevenueNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Гүйлгээний тоо</div>
+          <div class="kpi-val" id="kTotal">0</div><div class="kpi-note" id="kTotalNote">—</div></div>
+        <div class="kpi"><div class="kpi-label">Ажилласан өдөр</div>
+          <div class="kpi-val" id="kAttendance">0</div><div class="kpi-note" id="kAttendanceNote">—</div></div>
       </div>
 
       <div class="panel">
         <div class="panel-head">
-          <div class="panel-title">Сүүлийн 12 сарын орлого</div>
+          <div class="panel-title" id="chartTitle">Сарын борлуулалт</div>
           <div class="page-sub" id="chartNote">—</div>
         </div>
         <svg class="chart" id="revChart" viewBox="0 0 720 210" preserveAspectRatio="none" role="img"
@@ -139,11 +145,22 @@
 
       <div class="panel">
         <div class="panel-head">
-          <div class="panel-title">Хамгийн эрэлттэй үйлчилгээ</div>
+          <div class="panel-title">Үйлчилгээний борлуулалт</div>
         </div>
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Үйлчилгээ / багц</th><th>Захиалга</th><th>Дүн</th></tr></thead>
+          <thead><tr><th>Үйлчилгээ / багц</th><th>Гүйлгээ</th><th>Дүн</th></tr></thead>
           <tbody id="topBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Ажилтны гүйцэтгэл</div>
+          <div class="page-sub" id="ovStaffNote">Борлуулалт ба ирц</div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Ажилтан</th><th>Гүйлгээ</th><th>Борлуулалт</th><th>Ажилласан өдөр</th></tr></thead>
+          <tbody id="ovStaffBody"></tbody>
         </table></div>
       </div>
     </section>
@@ -225,6 +242,10 @@
           <button class="chip-btn" data-range="year">Энэ жил</button>
           <button class="chip-btn" data-range="all">Бүх хугацаа</button>
           <span style="flex:1"></span>
+          <div class="field inline-field">
+            <label for="repYear">Жил</label>
+            <select class="ctl sm" id="repYear" aria-label="Тайлант жил"></select>
+          </div>
           <div class="field" style="flex-direction:row;align-items:center;gap:8px;">
             <label style="margin:0">Эхлэх</label>
             <input class="ctl sm" type="date" id="repFrom" style="width:auto"/>
@@ -265,6 +286,14 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Үйлчилгээ / багц</th><th>Тоо</th><th>Орлого</th><th>Эзлэх хувь</th></tr></thead>
           <tbody id="repSvcBody"></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Ажилтны борлуулалт, ирц</div></div>
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Ажилтан</th><th>Гүйлгээ</th><th>Борлуулалт</th><th>Эзлэх хувь</th><th>Ажилласан өдөр</th></tr></thead>
+          <tbody id="repStaffBody"></tbody>
         </table></div>
       </div>
 
@@ -440,8 +469,33 @@
 
     <!-- ── ATTENDANCE ── -->
     <section class="view" data-panel="attendance">
-      <div class="page-head"><div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Ажил эхэлсэн, дууссан цагийн бүртгэл</div></div><div class="form-actions"><button class="btn-sm primary" id="clockIn">▶ Ажил эхлэх</button><button class="btn-sm ghost" id="clockOut">■ Ажил дуусгах</button></div></div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Эхэлсэн</th><th>Дууссан</th><th>Нийт цаг</th><th>Тэмдэглэл</th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+      <div class="page-head">
+        <div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Ажил эхэлсэн, дууссан цагийн бүртгэл</div></div>
+        <div class="head-actions">
+          <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
+          <button class="btn-sm ghost" id="clockIn">▶ Ажил эхлэх</button>
+          <button class="btn-sm ghost" id="clockOut">■ Ажил дуусгах</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="filters">
+          <div class="field inline-field"><label for="attYear">Жил</label><select class="ctl sm" id="attYear"></select></div>
+          <div class="field inline-field"><label for="attStaff">Ажилтан</label><select class="ctl sm" id="attStaff"><option value="all">Бүх ажилтан</option></select></div>
+        </div>
+      </div>
+      <div class="panel" id="attForm" style="display:none">
+        <div class="panel-head"><div><div class="panel-title" id="attFormTitle">Ээлж, ирц нэмэх</div><div class="page-sub">Админ бүртгэлийг засах, шинээр нэмэх боломжтой</div></div><button class="btn-sm ghost" id="attCancel">✕ Хаах</button></div>
+        <div class="form-grid">
+          <div class="field"><label for="att_staff">Ажилтан *</label><select class="ctl" id="att_staff"></select></div>
+          <div class="field"><label for="att_date">Огноо *</label><input class="ctl" id="att_date" type="date"/></div>
+          <div class="field"><label for="att_day">Хэд дэх өдөр *</label><input class="ctl" id="att_day" type="number" min="1" step="1" required/></div>
+          <div class="field"><label for="att_in">Эхэлсэн цаг *</label><input class="ctl" id="att_in" type="time"/></div>
+          <div class="field"><label for="att_out">Дууссан цаг</label><input class="ctl" id="att_out" type="time"/></div>
+          <div class="field" style="grid-column:span 2"><label for="att_note">Тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500"/></div>
+        </div>
+        <div class="form-actions"><button class="btn-sm primary" id="attSave">Хадгалах</button><button class="btn-sm ghost" id="attFormCancel">Болих</button></div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Эхэлсэн</th><th>Дууссан</th><th>Нийт цаг</th><th>Тэмдэглэл</th><th>Эх үүсвэр</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
     <!-- ── INVENTORY ── -->

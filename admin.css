@@ -52,6 +52,10 @@ body{background:var(--void);min-height:100vh}
 .main{padding:34px 40px 60px;min-width:0}
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
   flex-wrap:wrap;margin-bottom:28px}
+.head-actions{display:flex;align-items:flex-end;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.inline-field{flex-direction:row;align-items:center;gap:8px}
+.inline-field label{margin:0;white-space:nowrap}
+.inline-field select{width:auto;min-width:128px}
 .page-title{font-size:27px;font-weight:800;letter-spacing:-.04em;color:var(--ice-50)}
 .page-sub{font-size:13px;color:var(--text-muted);margin-top:5px}
 .view{display:none}
@@ -134,8 +138,11 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
 .btn-sm.primary:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(88,198,255,.35)}
 .btn-sm.ghost{background:var(--glass);border:1px solid var(--border-mid);color:var(--text-secondary)}
 .btn-sm.ghost:hover{color:var(--ice-200);border-color:var(--border-strong)}
+.btn-sm.danger{background:rgba(255,110,110,.1);border:1px solid rgba(255,110,110,.3);color:#ffa3a3}
+.btn-sm.danger:hover{background:rgba(255,110,110,.18);border-color:rgba(255,110,110,.52)}
 .btn-sm:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .form-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.row-actions{display:flex;align-items:center;gap:7px;white-space:nowrap}
 .status-ok{color:#8ceec2!important;font-weight:700}
 .status-low{color:#ffcf95!important;font-weight:800}
 
@@ -164,6 +171,7 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
 @media(max-width:560px){
   .kpis{grid-template-columns:1fr}
   .page-title{font-size:22px}
+  .head-actions{width:100%;justify-content:flex-start}
 }
 
 
