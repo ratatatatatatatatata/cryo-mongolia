@@ -1,8 +1,7 @@
 /* ══════════════════════════════════════════════════════════════
    °CRYO Mongolia — customer accounts
    Register / sign in, book while signed in, review your own bookings.
-   Only `admin` and `owner` see the dashboard link; everyone else is
-   simply a customer.
+   Employees see their appropriate dashboard link; customers see bookings.
    ══════════════════════════════════════════════════════════════ */
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -33,6 +32,7 @@ window.cryoAuth = {
     return profile;
   },
   isAdmin: () => !!profile && (profile.role === "admin" || profile.role === "owner"),
+  isEmployee: () => !!profile && ["owner", "admin", "staff"].includes(profile.role),
   require(then) {
     if (!sb) {
       if (then) then();
@@ -133,12 +133,11 @@ function renderNav() {
     </div>`;
   box.querySelector(".acct-name").textContent = name;
   box.querySelector(".acct-mail").textContent = session.user.email;
-  box.querySelector(".acct-role").textContent = window.cryoAuth.isAdmin()
-    ? profile.role === "owner"
-      ? "Үндсэн админ"
-      : "Админ"
-    : "Үйлчлүүлэгч";
-  box.querySelector('[data-act="admin"]').style.display = window.cryoAuth.isAdmin() ? "" : "none";
+  const roleLabels = { owner: "Үндсэн админ", admin: "Админ", staff: "Ажилтан", customer: "Үйлчлүүлэгч" };
+  box.querySelector(".acct-role").textContent = roleLabels[profile?.role] || "Үйлчлүүлэгч";
+  const employeeLink = box.querySelector('[data-act="admin"]');
+  employeeLink.textContent = profile?.role === "staff" ? "Ажилтны самбар" : "Админ самбар";
+  employeeLink.style.display = window.cryoAuth.isEmployee() ? "" : "none";
 
   const trigger = box.querySelector(".acct-trigger");
   trigger.addEventListener("click", (e) => {
@@ -167,11 +166,11 @@ function renderNav() {
       openMine();
     });
     frag.appendChild(mine);
-    if (window.cryoAuth.isAdmin()) {
+    if (window.cryoAuth.isEmployee()) {
       const ad = document.createElement("a");
       ad.href = "admin.html";
       ad.className = "btn btn-outline";
-      ad.textContent = "Админ самбар";
+      ad.textContent = profile?.role === "staff" ? "Ажилтны самбар" : "Админ самбар";
       frag.appendChild(ad);
     }
     const out = document.createElement("a");
@@ -380,7 +379,7 @@ async function syncRole() {
     .eq("id", session.user.id)
     .maybeSingle();
   if (!p) return;
-  const changed = !profile || p.role !== profile.role || p.full_name !== profile.full_name;
+  const changed = !profile || p.role !== profile.role || p.full_name !== profile.full_name || p.email !== profile.email;
   profile = p;
   if (changed) {
     const wasOpen = !!document.querySelector(".nav-account.open");
@@ -421,6 +420,6 @@ async function refresh() {
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) syncRole();
   });
+  window.addEventListener("pageshow", () => syncRole());
   refresh();
 })();
-

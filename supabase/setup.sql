@@ -15,7 +15,7 @@
 --  1 · ACCOUNTS AND ROLES
 --
 --  customer — books online, sees only their own bookings (default)
---  staff    — no dashboard access
+--  staff    — sees own sales and attendance after email linking
 --  admin    — runs the centre
 --  owner    — admin, plus grants roles to everyone else
 -- ═══════════════════════════════════════════════════════════════
