@@ -42,11 +42,16 @@ const ROLE_MN = {
   customer: "Үйлчлүүлэгч",
 };
 
+const ADMIN_ONLY_NAV = [
+  "navOverview", "navReports", "navLedger", "navExpenses", "navBookings",
+  "navMessages", "navServices", "navPackages", "navUsers",
+];
+
 let sb = null;
 let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
-  sales: [], expenses: [], staff: [],
+  sales: [], expenses: [], staff: [], customers: [],
 };
 let bkFilter = "all";
 
@@ -84,6 +89,7 @@ function fmtDate(v) {
   wireLedger();
   wireImport();
   wireExpenses();
+  wireCustomers();
 
   /* the login screen always renders; it just explains itself when the
      project has no anon key yet, instead of vanishing behind a setup page */
@@ -132,7 +138,7 @@ async function route() {
 
   me = prof || { id: session.user.id, email: session.user.email, role: "staff" };
 
-  if (me.role !== "owner" && me.role !== "admin") {
+  if (me.role !== "owner" && me.role !== "admin" && me.role !== "staff") {
     show($("authGate"), false);
     show($("shell"), false);
     show($("denyGate"));
@@ -148,7 +154,14 @@ async function route() {
   const badge = $("meRole");
   badge.textContent = ROLE_MN[me.role] || me.role;
   badge.className = "side-role role-" + me.role;
-  show($("navUsers"), me.role === "owner");
+  const isAdmin = me.role === "owner" || me.role === "admin";
+  ADMIN_ONLY_NAV.forEach((id) => show($(id), isAdmin && (id !== "navUsers" || me.role === "owner")));
+  show($("navCustomers"), true);
+
+  if (!isAdmin) {
+    document.querySelectorAll(".nav-item[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === "customers"));
+    document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.dataset.panel === "customers"));
+  }
 
   await loadAll();
 }
@@ -245,6 +258,7 @@ async function loadAll() {
     sb.from("sales").select("*").order("sale_date", { ascending: false }).limit(5000),
     sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
     sb.from("staff").select("*").order("sort", { ascending: true }),
+    sb.from("customers").select("id,full_name,phone,email,created_at").order("updated_at", { ascending: false }).limit(1000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -260,6 +274,7 @@ async function loadAll() {
   cache.sales = res[5].data || [];
   cache.expenses = res[6].data || [];
   cache.staff = res[7].data || [];
+  cache.customers = res[8].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -276,6 +291,86 @@ async function loadAll() {
   renderServices();
   renderPackages();
   renderUsers();
+  renderCustomers();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CUSTOMERS — one searchable record instead of repeated workbook names
+   ══════════════════════════════════════════════════════════════ */
+
+function normalizePhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("976") && digits.length === 11) digits = digits.slice(3);
+  return digits;
+}
+
+function wireCustomers() {
+  if (!$("cusBody")) return;
+  $("cusSearch").addEventListener("input", renderCustomers);
+  $("cusAdd").addEventListener("click", () => {
+    $("cusForm").style.display = "";
+    $("cusName").focus();
+  });
+  $("cusCancel").addEventListener("click", () => {
+    $("cusForm").style.display = "none";
+  });
+  $("cusSave").addEventListener("click", saveCustomer);
+}
+
+async function saveCustomer() {
+  const fullName = $("cusName").value.trim().replace(/\s+/g, " ");
+  const phone = normalizePhone($("cusPhone").value);
+  const email = $("cusEmail").value.trim().toLowerCase();
+  const note = $("cusNote").value.trim();
+  if (!fullName) return alert("Үйлчлүүлэгчийн нэр оруулна уу.");
+  if (phone.length !== 8) return alert("Утасны дугаарыг 8 оронтой оруулна уу.");
+
+  const duplicate = cache.customers.find((c) => normalizePhone(c.phone) === phone);
+  if (duplicate) return alert("Энэ утасны дугаартай үйлчлүүлэгч бүртгэлтэй байна.");
+
+  const btn = $("cusSave");
+  btn.disabled = true;
+  const { data, error } = await sb.from("customers").insert({
+    full_name: fullName,
+    phone,
+    email: email || null,
+    notes: note || null,
+    source: "manual",
+  }).select("id,full_name,phone,email,created_at").single();
+  btn.disabled = false;
+  if (error) return alert("Хадгалж чадсангүй: " + error.message);
+
+  cache.customers.unshift(data);
+  ["cusName", "cusPhone", "cusEmail", "cusNote"].forEach((id) => ($(id).value = ""));
+  $("cusForm").style.display = "none";
+  renderCustomers();
+}
+
+function renderCustomers() {
+  const body = $("cusBody");
+  if (!body) return;
+  const query = $("cusSearch").value.trim().toLowerCase();
+  const digits = normalizePhone(query);
+  const rows = cache.customers.filter((c) => {
+    if (!query) return true;
+    return String(c.full_name || "").toLowerCase().includes(query) ||
+      (digits && normalizePhone(c.phone).includes(digits));
+  });
+
+  $("cusSub").textContent = `${rows.length} үйлчлүүлэгч · нэр, утсаар хайна`;
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="4"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
+    return;
+  }
+  rows.forEach((customer) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(customer.full_name, "t-strong"));
+    tr.appendChild(cell(customer.phone || "—", "t-mono"));
+    tr.appendChild(cell(customer.email || "—"));
+    tr.appendChild(cell(fmtDate(customer.created_at), "t-mono"));
+    body.appendChild(tr);
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════

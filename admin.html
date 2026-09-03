@@ -81,14 +81,15 @@
   <aside class="side">
     <a href="index.html" class="side-logo">°CRYO <span>Mongolia</span></a>
 
-    <button class="nav-item on" data-view="overview"><span class="ic">◈</span> Хяналтын самбар</button>
-    <button class="nav-item" data-view="reports"><span class="ic">▦</span> Тайлан</button>
-    <button class="nav-item" data-view="ledger"><span class="ic">₮</span> Борлуулалт</button>
-    <button class="nav-item" data-view="expenses"><span class="ic">▽</span> Зардал</button>
-    <button class="nav-item" data-view="bookings"><span class="ic">▤</span> Захиалга</button>
-    <button class="nav-item" data-view="messages"><span class="ic">✉</span> Хүсэлт</button>
-    <button class="nav-item" data-view="services"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
-    <button class="nav-item" data-view="packages"><span class="ic">◎</span> Багц</button>
+    <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
+    <button class="nav-item" data-view="customers" id="navCustomers"><span class="ic">♙</span> Үйлчлүүлэгчид</button>
+    <button class="nav-item" data-view="reports" id="navReports"><span class="ic">▦</span> Тайлан</button>
+    <button class="nav-item" data-view="ledger" id="navLedger"><span class="ic">₮</span> Борлуулалт</button>
+    <button class="nav-item" data-view="expenses" id="navExpenses"><span class="ic">▽</span> Зардал</button>
+    <button class="nav-item" data-view="bookings" id="navBookings"><span class="ic">▤</span> Захиалга</button>
+    <button class="nav-item" data-view="messages" id="navMessages"><span class="ic">✉</span> Хүсэлт</button>
+    <button class="nav-item" data-view="services" id="navServices"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
+    <button class="nav-item" data-view="packages" id="navPackages"><span class="ic">◎</span> Багц</button>
     <button class="nav-item" data-view="users" id="navUsers" style="display:none;"><span class="ic">◐</span> Хэрэглэгч, эрх</button>
 
     <div class="side-foot">
@@ -139,6 +140,49 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th>Үйлчилгээ / багц</th><th>Захиалга</th><th>Дүн</th></tr></thead>
           <tbody id="topBody"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── CUSTOMERS ── -->
+    <section class="view" data-panel="customers">
+      <div class="page-head">
+        <div>
+          <div class="page-title">Үйлчлүүлэгчид</div>
+          <div class="page-sub" id="cusSub">Нэр, утсаар хурдан хайх</div>
+        </div>
+        <button class="btn-sm primary" id="cusAdd">+ Үйлчлүүлэгч нэмэх</button>
+      </div>
+
+      <div class="panel">
+        <div class="filters">
+          <div class="field" style="flex:1;min-width:220px">
+            <label for="cusSearch">Хайх</label>
+            <input class="ctl sm" id="cusSearch" type="search" placeholder="Нэр эсвэл утас…" autocomplete="off"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="cusForm" style="display:none;">
+        <div class="panel-head">
+          <div class="panel-title">Шинэ үйлчлүүлэгч</div>
+          <button class="btn-sm ghost" id="cusCancel">✕ Хаах</button>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label for="cusName">Овог нэр *</label><input class="ctl" id="cusName" maxlength="160"/></div>
+          <div class="field"><label for="cusPhone">Утас *</label><input class="ctl" id="cusPhone" inputmode="tel" maxlength="24"/></div>
+          <div class="field"><label for="cusEmail">И-мэйл</label><input class="ctl" id="cusEmail" type="email" maxlength="254"/></div>
+          <div class="field"><label for="cusNote">Тэмдэглэл</label><input class="ctl" id="cusNote" maxlength="500"/></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:18px">
+          <button class="btn-sm primary" id="cusSave">Хадгалах</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th></tr></thead>
+          <tbody id="cusBody"></tbody>
         </table></div>
       </div>
     </section>
@@ -481,7 +525,7 @@
       <div class="notice warn">
         <b>owner</b> — бүх эрх, бусдад админ эрх олгоно ·
         <b>admin</b> — захиалга, үнэ, тайлан удирдана ·
-        <b>staff</b> — самбарт нэвтрэхгүй
+        <b>staff</b> — зөвхөн үйлчлүүлэгч хайх, шинээр бүртгэх эрхтэй
       </div>
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
