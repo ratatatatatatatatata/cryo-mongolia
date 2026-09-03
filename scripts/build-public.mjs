@@ -9,6 +9,7 @@ const publicFiles = [
   "index.html",
   "index.css",
   "index.js",
+  "logo.svg",
   "shared.css",
   "cryo3d.js",
   "data.js",
