@@ -47,7 +47,10 @@
       </div>
       <div class="field" style="margin-top:16px;">
         <label for="au_pass">Нууц үг</label>
-        <input class="ctl" type="password" id="au_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+        <div class="password-control">
+          <input class="ctl" type="password" id="au_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+          <button class="password-toggle" type="button" id="au_pass_toggle" aria-controls="au_pass" aria-pressed="false" aria-label="Нууц үг харуулах">Харах</button>
+        </div>
       </div>
       <button class="btn-sm primary" type="submit" id="authBtn"
               style="width:100%;margin-top:24px;padding:13px;">Нэвтрэх</button>

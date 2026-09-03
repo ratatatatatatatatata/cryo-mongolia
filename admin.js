@@ -189,6 +189,7 @@ async function route() {
    ══════════════════════════════════════════════════════════════ */
 function wireAuthForm() {
   let mode = "signin";
+  wirePasswordVisibility("au_pass", "au_pass_toggle");
   const tabs = document.querySelectorAll(".gate-tabs button");
   tabs.forEach((b) =>
     b.addEventListener("click", () => {
@@ -201,6 +202,7 @@ function wireAuthForm() {
         "autocomplete",
         mode === "signup" ? "new-password" : "current-password",
       );
+      resetPasswordVisibility("au_pass", "au_pass_toggle");
       $("authMsg").innerHTML = "";
     }),
   );
@@ -232,6 +234,30 @@ function wireAuthForm() {
     btn.disabled = false;
     if (error) notice($("authMsg"), "err", error.message);
   });
+}
+
+function wirePasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  button.addEventListener("click", () => {
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.textContent = show ? "Нуух" : "Харах";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харуулах");
+    input.focus({ preventScroll: true });
+  });
+}
+
+function resetPasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  input.type = "password";
+  button.textContent = "Харах";
+  button.setAttribute("aria-pressed", "false");
+  button.setAttribute("aria-label", "Нууц үг харуулах");
 }
 
 /* ══════════════════════════════════════════════════════════════
