@@ -114,6 +114,12 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
 .st-transferred{background:rgba(160,120,255,.14);color:#d6c7ff;border:1px solid rgba(160,120,255,.32)}
 .today-attendance{min-width:620px!important}
+.staff-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.staff-check{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:rgba(3,6,12,.42);color:var(--text-secondary);cursor:pointer;transition:all var(--ease)}
+.staff-check:hover{border-color:var(--border-strong);color:var(--ice-100)}
+.staff-check:has(input:checked){border-color:rgba(88,198,255,.5);background:rgba(88,198,255,.1);color:var(--ice-100)}
+.staff-check input{width:17px;height:17px;accent-color:#58c6ff;flex:0 0 auto}
+.staff-check span{font-size:13px;font-weight:700}
 
 /* ── controls ── */
 .field{display:flex;flex-direction:column;gap:7px}

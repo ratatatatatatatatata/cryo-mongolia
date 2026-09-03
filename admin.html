@@ -198,7 +198,7 @@
 
       <div class="panel" id="cusForm" style="display:none;">
         <div class="panel-head">
-          <div class="panel-title">Шинэ үйлчлүүлэгч</div>
+          <div class="panel-title" id="cusFormTitle">Шинэ үйлчлүүлэгч</div>
           <button class="btn-sm ghost" id="cusCancel">✕ Хаах</button>
         </div>
         <div class="form-grid">
@@ -214,7 +214,7 @@
 
       <div class="panel">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th></tr></thead>
+          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th><th></th></tr></thead>
           <tbody id="cusBody"></tbody>
         </table></div>
       </div>
@@ -477,6 +477,17 @@
         <div><div class="page-title">Өнөөдрийн ээлж</div><div class="page-sub" id="attSub">Өнөөдрийн ажилтны төлөв</div></div>
         <div class="head-actions">
           <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
+        </div>
+      </div>
+      <div class="panel" id="todayStatusPanel">
+        <div class="panel-head">
+          <div><div class="panel-title">Өнөөдөр гарсан ажилтан</div><div class="page-sub">Админы бүртгэсэн идэвхтэй ажилтнуудаас нэг эсвэл олныг сонгоно</div></div>
+          <button class="btn-sm ghost" id="attSelectAll">Бүгдийг сонгох</button>
+        </div>
+        <div class="staff-check-grid" id="attStaffChecks"></div>
+        <div class="form-actions">
+          <button class="btn-sm primary" id="attMarkLeft">Сонгосныг “Гарсан” болгох</button>
+          <span class="page-sub" id="attSelectionNote">Ажилтан сонгоогүй</span>
         </div>
       </div>
       <div class="panel" id="attForm" style="display:none">

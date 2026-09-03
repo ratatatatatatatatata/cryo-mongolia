@@ -51,7 +51,7 @@ let sb = null;
 let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
-  sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], inventory: [],
+  sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
 };
 let bkFilter = "all";
 let overviewYear = String(new Date().getFullYear());
@@ -282,10 +282,11 @@ async function loadAll() {
     sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).limit(5000),
     sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
     sb.from("staff").select("*").order("sort", { ascending: true }),
-    sb.from("customers").select("id,full_name,phone,email,created_at").order("updated_at", { ascending: false }).limit(1000),
+    sb.from("customers").select("id,full_name,phone,email,notes,source,created_at,updated_at").order("updated_at", { ascending: false }).limit(1000),
     sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
     sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).limit(2000),
+    sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).limit(1000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -305,6 +306,7 @@ async function loadAll() {
   cache.attendance = res[9].data || [];
   cache.inventory = res[10].data || [];
   cache.workdays = res[11].data || [];
+  cache.dailyStatus = res[12].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -371,14 +373,29 @@ function normalizePhone(value) {
 function wireCustomers() {
   if (!$("cusBody")) return;
   $("cusSearch").addEventListener("input", renderCustomers);
-  $("cusAdd").addEventListener("click", () => {
-    $("cusForm").style.display = "";
-    $("cusName").focus();
-  });
-  $("cusCancel").addEventListener("click", () => {
-    $("cusForm").style.display = "none";
-  });
+  $("cusAdd").addEventListener("click", () => openCustomerForm());
+  $("cusCancel").addEventListener("click", closeCustomerForm);
   $("cusSave").addEventListener("click", saveCustomer);
+}
+
+let customerEditing = null;
+
+function openCustomerForm(customer = null) {
+  customerEditing = customer;
+  $("cusFormTitle").textContent = customer ? "Үйлчлүүлэгчийн мэдээлэл засах" : "Шинэ үйлчлүүлэгч";
+  $("cusName").value = customer?.full_name || "";
+  $("cusPhone").value = customer?.phone || "";
+  $("cusEmail").value = customer?.email || "";
+  $("cusNote").value = customer?.notes || "";
+  $("cusForm").style.display = "";
+  $("cusName").focus();
+  $("cusForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeCustomerForm() {
+  customerEditing = null;
+  ["cusName", "cusPhone", "cusEmail", "cusNote"].forEach((id) => ($(id).value = ""));
+  $("cusForm").style.display = "none";
 }
 
 async function saveCustomer() {
@@ -389,24 +406,27 @@ async function saveCustomer() {
   if (!fullName) return alert("Үйлчлүүлэгчийн нэр оруулна уу.");
   if (phone.length !== 8) return alert("Утасны дугаарыг 8 оронтой оруулна уу.");
 
-  const duplicate = cache.customers.find((c) => normalizePhone(c.phone) === phone);
+  const duplicate = cache.customers.find((c) => normalizePhone(c.phone) === phone && Number(c.id) !== Number(customerEditing?.id));
   if (duplicate) return alert("Энэ утасны дугаартай үйлчлүүлэгч бүртгэлтэй байна.");
 
   const btn = $("cusSave");
   btn.disabled = true;
-  const { data, error } = await sb.from("customers").insert({
+  const payload = {
     full_name: fullName,
     phone,
     email: email || null,
     notes: note || null,
-    source: "manual",
-  }).select("id,full_name,phone,email,created_at").single();
+  };
+  const query = customerEditing
+    ? sb.from("customers").update(payload).eq("id", customerEditing.id)
+    : sb.from("customers").insert({ ...payload, source: "manual" });
+  const { data, error } = await query.select("id,full_name,phone,email,notes,source,created_at,updated_at").single();
   btn.disabled = false;
   if (error) return alert("Хадгалж чадсангүй: " + error.message);
 
-  cache.customers.unshift(data);
-  ["cusName", "cusPhone", "cusEmail", "cusNote"].forEach((id) => ($(id).value = ""));
-  $("cusForm").style.display = "none";
+  if (customerEditing) Object.assign(cache.customers.find((c) => Number(c.id) === Number(customerEditing.id)), data);
+  else cache.customers.unshift(data);
+  closeCustomerForm();
   renderCustomers();
 }
 
@@ -424,7 +444,7 @@ function renderCustomers() {
   $("cusSub").textContent = `${rows.length} үйлчлүүлэгч · нэр, утсаар хайна`;
   body.innerHTML = "";
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="4"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="5"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
     return;
   }
   rows.forEach((customer) => {
@@ -433,6 +453,13 @@ function renderCustomers() {
     tr.appendChild(cell(customer.phone || "—", "t-mono"));
     tr.appendChild(cell(customer.email || "—"));
     tr.appendChild(cell(fmtDate(customer.created_at), "t-mono"));
+    const actions = document.createElement("td");
+    const edit = document.createElement("button");
+    edit.className = "btn-sm ghost";
+    edit.textContent = "Засах";
+    edit.addEventListener("click", () => openCustomerForm(customer));
+    actions.appendChild(edit);
+    tr.appendChild(actions);
     body.appendChild(tr);
   });
 }
@@ -1498,6 +1525,8 @@ function wireAttendance() {
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
   $("attSave")?.addEventListener("click", saveAttendance);
+  $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
+  $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
   $("att_staff")?.addEventListener("change", (event) => {
     if (!attendanceEditing && event.target.value) $("att_day").value = nextWorkdayNumber(event.target.value);
   });
@@ -1533,9 +1562,18 @@ function renderAttendance() {
   const body = $("attBody"); if (!body) return;
   syncAttendanceFilters();
   const today = localDateKey(new Date());
-  const attendanceRows = allAttendanceRows()
+  renderAttendanceStaffChecks();
+  const baseRows = allAttendanceRows()
     .filter((row) => String(row.work_date || "").slice(0, 10) === today)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
+  const byStaff = new Map();
+  cache.staff.filter((staff) => staff.active).forEach((staff) => byStaff.set(String(staff.id), { staff_id: staff.id, staff_name: staff.name, work_date: today, __directory: true }));
+  baseRows.forEach((row) => byStaff.set(String(row.staff_id || row.staff_name), row));
+  cache.dailyStatus.filter((row) => row.work_date === today).forEach((status) => {
+    const key = String(status.staff_id);
+    byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: today, daily_status: status.status, daily_note: status.note });
+  });
+  const attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
   $("attSub").textContent = `${fmtDate(today)} · ${attendanceRows.length} ажилтан`;
   body.innerHTML = "";
   if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="5"><div class="empty">Өнөөдрийн ээлжийн мэдээлэл алга байна.</div></td></tr>');
@@ -1552,9 +1590,9 @@ function renderAttendance() {
     pill.textContent = status.label;
     statusCell.appendChild(pill);
     tr.appendChild(statusCell);
-    tr.appendChild(cell(row.note || "—"));
+    tr.appendChild(cell(row.daily_note || row.note || "—"));
     const actions = document.createElement("td");
-    if (isAdminUser()) {
+    if (isAdminUser() && !row.__directory && row.__table) {
       const edit = document.createElement("button");
       edit.className = "btn-sm ghost"; edit.textContent = "Засах";
       edit.addEventListener("click", () => openAttendanceForm(row));
@@ -1574,10 +1612,65 @@ function localDateKey(date) {
 }
 
 function attendanceStatus(row, end) {
+  if (row.daily_status === "left") return { label: "Гарсан", className: "st-done" };
   const note = String(row.note || "").toLowerCase();
   if (note.includes("шилжүүл")) return { label: "Өөр хүнд шилжүүлсэн", className: "st-transferred" };
   if (note.includes("гарсан") || (end && end <= new Date())) return { label: "Гарсан", className: "st-done" };
   return { label: "Ээлжтэй", className: "st-confirmed" };
+}
+
+function renderAttendanceStaffChecks() {
+  const host = $("attStaffChecks");
+  if (!host) return;
+  const selected = new Set([...host.querySelectorAll("input:checked")].map((input) => input.value));
+  host.innerHTML = "";
+  cache.staff.filter((staff) => staff.active).forEach((staff) => {
+    const label = document.createElement("label");
+    label.className = "staff-check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = String(staff.id);
+    input.checked = selected.has(input.value);
+    input.addEventListener("change", updateAttendanceSelectionNote);
+    const name = document.createElement("span");
+    name.textContent = staff.name;
+    label.append(input, name);
+    host.appendChild(label);
+  });
+  updateAttendanceSelectionNote();
+}
+
+function updateAttendanceSelectionNote() {
+  const count = $("attStaffChecks")?.querySelectorAll("input:checked").length || 0;
+  if ($("attSelectionNote")) $("attSelectionNote").textContent = count ? `${count} ажилтан сонгосон` : "Ажилтан сонгоогүй";
+}
+
+function toggleAllAttendanceStaff() {
+  const checks = [...$("attStaffChecks").querySelectorAll("input")];
+  const shouldCheck = checks.some((input) => !input.checked);
+  checks.forEach((input) => (input.checked = shouldCheck));
+  updateAttendanceSelectionNote();
+}
+
+async function markSelectedStaffLeft() {
+  const ids = [...$("attStaffChecks").querySelectorAll("input:checked")].map((input) => Number(input.value));
+  if (!ids.length) return alert("Гарсан ажилтнаас сонгоно уу.");
+  const today = localDateKey(new Date());
+  const rows = ids.map((id) => {
+    const staff = cache.staff.find((item) => Number(item.id) === id);
+    return { work_date: today, staff_id: id, staff_name: staff.name, status: "left", note: "Өнөөдөр гарсан", reported_by: me.id };
+  });
+  const button = $("attMarkLeft");
+  button.disabled = true;
+  const { data, error } = await sb.from("daily_staff_status").upsert(rows, { onConflict: "work_date,staff_id" }).select();
+  button.disabled = false;
+  if (error) return alert("Төлөв хадгалж чадсангүй: " + error.message);
+  (data || []).forEach((row) => {
+    const current = cache.dailyStatus.find((item) => item.work_date === row.work_date && Number(item.staff_id) === Number(row.staff_id));
+    if (current) Object.assign(current, row); else cache.dailyStatus.unshift(row);
+  });
+  $("attStaffChecks").querySelectorAll("input:checked").forEach((input) => (input.checked = false));
+  renderAttendance();
 }
 
 function syncAttendanceFilters() {
