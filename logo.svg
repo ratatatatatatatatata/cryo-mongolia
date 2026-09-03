@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 1200" role="img" aria-label="°CRYO Mongolia">
+  <title>°CRYO Mongolia</title>
+
+  <!-- six-point burst; stroked with its own colour so every corner reads rounded -->
+  <path
+    d="M 650.0,45.0 L 829.0,280.0 L 1122.0,317.5 L 1008.0,590.0 L 1122.0,862.5 L 829.0,900.0 L 650.0,1135.0 L 471.0,900.0 L 178.0,862.5 L 292.0,590.0 L 178.0,317.5 L 471.0,280.0 Z"
+    fill="#6BA5F7" stroke="#6BA5F7" stroke-width="92"
+    stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- the arrow is a bold outline: a closed path stroked, so the middle stays open -->
+  <path
+    d="M 150,640 L 1090,250 L 450,1010 L 360,700 Z"
+    fill="none" stroke="#0F62F0" stroke-width="150"
+    stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

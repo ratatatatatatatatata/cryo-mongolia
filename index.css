@@ -213,7 +213,13 @@ nav.scrolled{
   min-height:100svh;display:flex;align-items:center;position:relative;overflow:hidden;
   padding-top:76px;background:var(--void);
 }
-#cryoCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.hero-logo{
+  position:absolute;z-index:2;pointer-events:none;user-select:none;
+  right:calc(var(--shell) - 30px);top:50%;transform:translateY(-50%);
+  width:min(46vw,560px);height:auto;
+  filter:drop-shadow(0 34px 70px rgba(0,0,0,.6)) drop-shadow(0 0 80px rgba(88,198,255,.22));
+  opacity:0;animation:fadeIn 1.1s .45s forwards;
+}
 .hero::after{
   content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
   background:
@@ -334,6 +340,7 @@ nav.scrolled{
   animation:scrollDash 2.2s cubic-bezier(.7,0,.3,1) infinite}
 @keyframes scrollDash{0%{transform:translateX(-24px)}100%{transform:translateX(58px)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes logoSoft{from{opacity:0}to{opacity:.30}}
 
 /* ══════════ SECTION SHELL ══════════ */
 .section{padding:130px var(--shell);position:relative;z-index:2}
@@ -905,6 +912,7 @@ body.has-halo .cursor-halo{opacity:1}
 /* ══════════ RESPONSIVE ══════════ */
 @media(max-width:1240px){
   :root{--shell:44px}
+  .hero-logo{width:min(48vw,460px);right:calc(var(--shell) - 20px)}
   .treatment-grid{grid-template-columns:repeat(2,1fr)}
   .hero-temp-badge{right:24px;transform:translateY(-50%) scale(.82)}
   .about{gap:56px}
@@ -914,6 +922,9 @@ body.has-halo .cursor-halo{opacity:1}
   .hamburger{display:flex}
   .section{padding:88px var(--shell)}
   .hero-inner{padding:110px var(--shell) 90px}
+  /* behind the copy once the column goes full width */
+  .hero-logo{right:auto;left:50%;top:58%;width:min(78vw,420px);
+    transform:translate(-50%,-50%);opacity:0;animation:logoSoft 1.1s .45s forwards}
   .hero-temp-badge{display:none}
   .about{grid-template-columns:1fr}
   .about-visual{height:380px}
