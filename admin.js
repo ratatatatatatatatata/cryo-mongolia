@@ -43,15 +43,15 @@ const ROLE_MN = {
 };
 
 const ADMIN_ONLY_NAV = [
-  "navOverview", "navReports", "navLedger", "navExpenses", "navBookings",
-  "navMessages", "navServices", "navPackages", "navUsers",
+  "navOverview", "navExpenses", "navBookings", "navMessages", "navServices",
+  "navPackages", "navStaff", "navInventory", "navUsers",
 ];
 
 let sb = null;
 let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
-  sales: [], expenses: [], staff: [], customers: [],
+  sales: [], expenses: [], staff: [], customers: [], attendance: [], inventory: [],
 };
 let bkFilter = "all";
 
@@ -90,6 +90,9 @@ function fmtDate(v) {
   wireImport();
   wireExpenses();
   wireCustomers();
+  wireStaff();
+  wireAttendance();
+  wireInventory();
 
   /* the login screen always renders; it just explains itself when the
      project has no anon key yet, instead of vanishing behind a setup page */
@@ -157,10 +160,11 @@ async function route() {
   const isAdmin = me.role === "owner" || me.role === "admin";
   ADMIN_ONLY_NAV.forEach((id) => show($(id), isAdmin && (id !== "navUsers" || me.role === "owner")));
   show($("navCustomers"), true);
+  show($("navReports"), true);
+  show($("navAttendance"), true);
 
   if (!isAdmin) {
-    document.querySelectorAll(".nav-item[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === "customers"));
-    document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.dataset.panel === "customers"));
+    switchView("reports");
   }
 
   await loadAll();
@@ -232,6 +236,12 @@ function wireNav() {
   });
 }
 
+function switchView(view) {
+  document.querySelectorAll(".nav-item[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === (view === "ledger" ? "reports" : view)));
+  document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.dataset.panel === view));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function wireBookingFilters() {
   $("bkFilters").addEventListener("click", (e) => {
     const b = e.target.closest(".chip-btn");
@@ -259,6 +269,8 @@ async function loadAll() {
     sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
     sb.from("staff").select("*").order("sort", { ascending: true }),
     sb.from("customers").select("id,full_name,phone,email,created_at").order("updated_at", { ascending: false }).limit(1000),
+    sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
+    sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -275,6 +287,8 @@ async function loadAll() {
   cache.expenses = res[6].data || [];
   cache.staff = res[7].data || [];
   cache.customers = res[8].data || [];
+  cache.attendance = res[9].data || [];
+  cache.inventory = res[10].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -292,6 +306,9 @@ async function loadAll() {
   renderPackages();
   renderUsers();
   renderCustomers();
+  renderStaff();
+  renderAttendance();
+  renderInventory();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -869,6 +886,10 @@ function rangeBounds(kind) {
 }
 
 function wireReports() {
+  $("repSales")?.addEventListener("click", () => {
+    switchView("ledger");
+    openLedForm(null);
+  });
   const filters = $("repFilters");
   if (!filters) return;
 
@@ -903,8 +924,8 @@ function reportRows() {
   return {
     from,
     to: end,
-    rows: cache.bookings.filter((b) => {
-      const d = new Date(b.created_at);
+    rows: cache.sales.filter((b) => {
+      const d = new Date(b.sale_date + "T00:00:00");
       return d >= from && d <= end;
     }),
   };
@@ -916,21 +937,23 @@ function renderReports() {
 
   $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
 
-  const paid = rows.filter((b) => b.status === "confirmed" || b.status === "done");
-  const revenue = paid.reduce((s, b) => s + (b.amount || 0), 0);
-  const done = rows.filter((b) => b.status === "done").length;
-  const rate = rows.length ? Math.round((done / rows.length) * 100) : 0;
+  const revenue = rows.reduce((sum, row) => sum + rowTotal(row), 0);
+  const expenseRows = cache.expenses.filter((row) => {
+    const d = new Date(row.spend_date + "T00:00:00"); return d >= from && d <= to;
+  });
+  const expenses = expenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const profit = revenue - expenses;
 
   $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
-  $("rRevenueNote").textContent = paid.length + " баталгаажсан захиалга";
+  $("rRevenueNote").textContent = rows.length + " борлуулалтын бүртгэл";
   $("rCount").textContent = rows.length.toLocaleString("en-US");
   $("rCountNote").textContent =
-    "Хүлээгдэж буй " + rows.filter((b) => b.status === "pending").length;
+    "Ажилтны оруулсан бодит гүйлгээ";
   $("rAvg").innerHTML =
     '<small>₮</small>' +
-    (paid.length ? Math.round(revenue / paid.length) : 0).toLocaleString("en-US");
-  $("rRate").innerHTML = rate + '<small style="margin:0 0 0 2px">%</small>';
-  $("rRateNote").textContent = done + " / " + rows.length + " биелсэн";
+    (rows.length ? Math.round(revenue / rows.length) : 0).toLocaleString("en-US");
+  $("rRate").innerHTML = '<small>₮</small>' + profit.toLocaleString("en-US");
+  $("rRateNote").textContent = "Зардал " + money(expenses);
 
   /* daily (or monthly for long ranges) trend */
   const spanDays = Math.round((to - from) / 86400000);
@@ -940,9 +963,7 @@ function renderReports() {
     const cur = new Date(from.getFullYear(), from.getMonth(), 1);
     while (cur <= to) {
       const key = cur.getFullYear() + "-" + String(cur.getMonth() + 1).padStart(2, "0");
-      const v = paid
-        .filter((b) => String(b.created_at).slice(0, 7) === key)
-        .reduce((s, b) => s + (b.amount || 0), 0);
+      const v = rows.filter((b) => String(b.sale_date).slice(0, 7) === key).reduce((s, b) => s + rowTotal(b), 0);
       buckets.push({ label: cur.getMonth() + 1 + "-р", value: v });
       cur.setMonth(cur.getMonth() + 1);
     }
@@ -953,9 +974,7 @@ function renderReports() {
         cur.getFullYear() +
         "-" + String(cur.getMonth() + 1).padStart(2, "0") +
         "-" + String(cur.getDate()).padStart(2, "0");
-      const v = paid
-        .filter((b) => String(b.created_at).slice(0, 10) === key)
-        .reduce((s, b) => s + (b.amount || 0), 0);
+      const v = rows.filter((b) => String(b.sale_date).slice(0, 10) === key).reduce((s, b) => s + rowTotal(b), 0);
       buckets.push({ label: String(cur.getDate()), value: v });
       cur.setDate(cur.getDate() + 1);
     }
@@ -967,17 +986,17 @@ function renderReports() {
   /* service / package breakdown */
   const agg = {};
   rows.forEach((b) => {
-    const key = b.package || b.service || "Тодорхойгүй";
+    const key = b.services || "Тодорхойгүй";
     agg[key] = agg[key] || { n: 0, sum: 0 };
     agg[key].n++;
-    if (b.status === "confirmed" || b.status === "done") agg[key].sum += b.amount || 0;
+    agg[key].sum += rowTotal(b);
   });
   const svcBody = $("repSvcBody");
   svcBody.innerHTML = "";
   const entries = Object.entries(agg).sort((a, b) => b[1].sum - a[1].sum);
   if (!entries.length) {
     svcBody.innerHTML =
-      '<tr><td colspan="4"><div class="empty">Энэ хугацаанд захиалга алга.</div></td></tr>';
+      '<tr><td colspan="4"><div class="empty">Энэ хугацаанд борлуулалт алга.</div></td></tr>';
   } else {
     entries.forEach(([name, v]) => {
       const tr = document.createElement("tr");
@@ -992,14 +1011,14 @@ function renderReports() {
   /* status breakdown */
   const stBody = $("repStatusBody");
   stBody.innerHTML = "";
-  Object.keys(STATUS_MN).forEach((k) => {
-    const list = rows.filter((b) => b.status === k);
-    const sum = list.reduce((s, b) => s + (b.amount || 0), 0);
+  PAYS.forEach(([k, label]) => {
+    const list = rows.filter((b) => Number(b[k] || 0) > 0);
+    const sum = list.reduce((s, b) => s + Number(b[k] || 0), 0);
     const tr = document.createElement("tr");
     const td = document.createElement("td");
     const pill = document.createElement("span");
-    pill.className = "pill st-" + k;
-    pill.textContent = STATUS_MN[k];
+    pill.className = "pay-chip " + k;
+    pill.textContent = label;
     td.appendChild(pill);
     tr.appendChild(td);
     tr.appendChild(cell(list.length, "t-mono"));
@@ -1033,17 +1052,16 @@ function shareCell(pct) {
 function exportCsv() {
   const { from, to, rows } = reportRows();
   const head = [
-    "Дугаар", "Үйлчлүүлэгч", "Утас", "Үйлчилгээ", "Багц",
-    "Огноо", "Цаг", "Дүн", "Урьдчилгаа", "Банк", "Төлөв", "Үүссэн",
+    "Огноо", "Үйлчлүүлэгч", "Үйлчилгээ", "Ажилтан", "Голомт", "Хаан",
+    "Бэлэн", "Нэхэмжлэх", "Barter", "Буцаалт", "Нийт", "Тэмдэглэл",
   ];
   const q = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
   const lines = [head.map(q).join(",")];
   rows.forEach((b) => {
     lines.push(
       [
-        b.ref, b.customer_name, b.phone, b.service, b.package,
-        b.booked_date, b.booked_time, b.amount, b.deposit, b.bank,
-        STATUS_MN[b.status] || b.status, b.created_at,
+        b.sale_date, b.customer_name, b.services, b.therapist, b.golomt, b.khan,
+        b.cash, b.invoice, b.barter, b.refund, rowTotal(b), b.note,
       ].map(q).join(","),
     );
   });
@@ -1097,6 +1115,7 @@ function ledRows() {
 
 function wireLedger() {
   if (!$("ledBody")) return;
+  $("ledReport")?.addEventListener("click", () => switchView("reports"));
   $("ledMonth").addEventListener("change", () => {
     ledMonth = $("ledMonth").value;
     ledLimit = 100;
@@ -1158,10 +1177,131 @@ function openLedForm(row) {
     if (row && row.therapist === st.name) o.selected = true;
     sel.appendChild(o);
   });
+  if (me.role === "staff" && !row) {
+    const ownName = me.full_name || me.email;
+    if (![...sel.options].some((option) => option.value === ownName)) {
+      const option = document.createElement("option");
+      option.value = ownName;
+      option.textContent = ownName;
+      sel.appendChild(option);
+    }
+    sel.value = ownName;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+  }
 
   updateFormTotal();
   $("ledForm").style.display = "";
   $("ledForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SERVICE OPERATIONS — staff, attendance, inventory
+   ══════════════════════════════════════════════════════════════ */
+let staffEditing = null;
+
+function wireStaff() {
+  $("staffAdd")?.addEventListener("click", () => openStaffForm());
+  $("staffCancel")?.addEventListener("click", () => show($("staffForm"), false));
+  $("staffSave")?.addEventListener("click", saveStaff);
+}
+
+function openStaffForm(row = null) {
+  staffEditing = row;
+  $("st_name").value = row?.name || "";
+  $("st_title").value = row?.title || "";
+  $("st_phone").value = row?.phone || "";
+  $("st_code").value = row?.employee_code || "";
+  show($("staffForm"));
+}
+
+async function saveStaff() {
+  const patch = {
+    name: $("st_name").value.trim(), title: $("st_title").value.trim() || null,
+    phone: $("st_phone").value.trim() || null, employee_code: $("st_code").value.trim() || null,
+  };
+  if (!patch.name) return alert("Ажилтны нэрийг оруулна уу.");
+  const query = staffEditing
+    ? sb.from("staff").update(patch).eq("id", staffEditing.id)
+    : sb.from("staff").insert({ ...patch, sort: cache.staff.length + 1 });
+  const { data, error } = await query.select().maybeSingle();
+  if (error) return alert("Хадгалж чадсангүй: " + error.message);
+  if (staffEditing) Object.assign(staffEditing, data || patch); else if (data) cache.staff.push(data);
+  show($("staffForm"), false); staffEditing = null; renderStaff();
+}
+
+function renderStaff() {
+  const body = $("staffBody"); if (!body) return;
+  $("staffSub").textContent = `${cache.staff.filter((s) => s.active).length} идэвхтэй ажилтан`;
+  body.innerHTML = "";
+  if (!cache.staff.length) return void (body.innerHTML = '<tr><td colspan="6"><div class="empty">Ажилтан бүртгэгдээгүй байна.</div></td></tr>');
+  cache.staff.forEach((row) => {
+    const tr = document.createElement("tr");
+    [row.employee_code || "—", row.name, row.title || "—", row.phone || "—"].forEach((value, i) => tr.appendChild(cell(value, i === 1 ? "t-strong" : "")));
+    tr.appendChild(cell(row.active ? "Идэвхтэй" : "Идэвхгүй", row.active ? "status-ok" : ""));
+    const td = document.createElement("td"); const edit = document.createElement("button"); edit.className = "btn-sm ghost"; edit.textContent = "Засах"; edit.onclick = () => openStaffForm(row); td.appendChild(edit); tr.appendChild(td); body.appendChild(tr);
+  });
+}
+
+function wireAttendance() {
+  $("clockIn")?.addEventListener("click", () => clockAttendance("in"));
+  $("clockOut")?.addEventListener("click", () => clockAttendance("out"));
+}
+
+async function clockAttendance(mode) {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = cache.attendance.find((r) => r.work_date === today && r.user_id === me.id);
+  let result;
+  if (mode === "in") {
+    if (current) return alert("Өнөөдрийн ажил эхэлсэн цаг бүртгэгдсэн байна.");
+    result = await sb.from("attendance").insert({ work_date: today, staff_name: me.full_name || me.email, user_id: me.id, clock_in: new Date().toISOString() }).select().maybeSingle();
+  } else {
+    if (!current) return alert("Эхлээд ажил эхлэх товчийг дарна уу.");
+    if (current.clock_out) return alert("Ажил дууссан цаг бүртгэгдсэн байна.");
+    result = await sb.from("attendance").update({ clock_out: new Date().toISOString() }).eq("id", current.id).select().maybeSingle();
+  }
+  if (result.error) return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
+  if (mode === "in" && result.data) cache.attendance.unshift(result.data); else if (result.data) Object.assign(current, result.data);
+  renderAttendance();
+}
+
+function renderAttendance() {
+  const body = $("attBody"); if (!body) return;
+  $("attSub").textContent = `${cache.attendance.length} ирцийн бүртгэл`;
+  body.innerHTML = "";
+  if (!cache.attendance.length) return void (body.innerHTML = '<tr><td colspan="6"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
+  cache.attendance.forEach((row) => {
+    const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
+    const hours = start && end ? ((end - start) / 3600000).toFixed(1) + " цаг" : "—";
+    const tr = document.createElement("tr"); [row.work_date, row.staff_name, start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—"].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : ""))); body.appendChild(tr);
+  });
+}
+
+function wireInventory() {
+  $("invAdd")?.addEventListener("click", () => show($("invForm")));
+  $("invCancel")?.addEventListener("click", () => show($("invForm"), false));
+  $("invSave")?.addEventListener("click", saveInventory);
+}
+
+async function saveInventory() {
+  const patch = { name: $("i_name").value.trim(), category: $("i_category").value.trim() || null, unit: $("i_unit").value.trim() || "ш", quantity: Number($("i_qty").value) || 0, min_quantity: Number($("i_min").value) || 0, unit_cost: Number($("i_cost").value) || 0 };
+  if (!patch.name) return alert("Материалын нэрийг оруулна уу.");
+  const { data, error } = await sb.from("inventory_items").insert(patch).select().maybeSingle();
+  if (error) return alert("Хадгалж чадсангүй: " + error.message);
+  if (data) cache.inventory.push(data); show($("invForm"), false); renderInventory();
+}
+
+function renderInventory() {
+  const body = $("invBody"); if (!body) return;
+  const low = cache.inventory.filter((r) => Number(r.quantity) <= Number(r.min_quantity)).length;
+  $("invSub").textContent = `${cache.inventory.length} нэр төрөл${low ? ` · ${low} нөхөх шаардлагатай` : ""}`;
+  body.innerHTML = "";
+  if (!cache.inventory.length) return void (body.innerHTML = '<tr><td colspan="6"><div class="empty">Материал бүртгэгдээгүй байна.</div></td></tr>');
+  cache.inventory.forEach((row) => {
+    const isLow = Number(row.quantity) <= Number(row.min_quantity); const tr = document.createElement("tr");
+    [row.name, row.category || "—", `${row.quantity} ${row.unit}`, `${row.min_quantity} ${row.unit}`, money(row.unit_cost), isLow ? "Нөхөх" : "Хэвийн"].forEach((v, i) => tr.appendChild(cell(v, i === 0 ? "t-strong" : isLow && i === 5 ? "status-low" : ""))); body.appendChild(tr);
+  });
 }
 
 async function saveLedger() {

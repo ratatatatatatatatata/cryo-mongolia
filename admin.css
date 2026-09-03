@@ -135,6 +135,9 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
 .btn-sm.ghost{background:var(--glass);border:1px solid var(--border-mid);color:var(--text-secondary)}
 .btn-sm.ghost:hover{color:var(--ice-200);border-color:var(--border-strong)}
 .btn-sm:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.form-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.status-ok{color:#8ceec2!important;font-weight:700}
+.status-low{color:#ffcf95!important;font-weight:800}
 
 /* ── notices ── */
 .notice{padding:14px 18px;border-radius:var(--r-md);font-size:13px;line-height:1.65;margin-bottom:18px}
