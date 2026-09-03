@@ -83,13 +83,16 @@
 
     <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="customers" id="navCustomers"><span class="ic">♙</span> Үйлчлүүлэгчид</button>
-    <button class="nav-item" data-view="reports" id="navReports"><span class="ic">▦</span> Тайлан</button>
-    <button class="nav-item" data-view="ledger" id="navLedger"><span class="ic">₮</span> Борлуулалт</button>
+    <button class="nav-item" data-view="reports" id="navReports"><span class="ic">₮</span> Борлуулалт, тайлан</button>
+    <button class="nav-item" data-view="ledger" id="navLedger" style="display:none"><span class="ic">₮</span> Борлуулалтын бүртгэл</button>
     <button class="nav-item" data-view="expenses" id="navExpenses"><span class="ic">▽</span> Зардал</button>
     <button class="nav-item" data-view="bookings" id="navBookings"><span class="ic">▤</span> Захиалга</button>
     <button class="nav-item" data-view="messages" id="navMessages"><span class="ic">✉</span> Хүсэлт</button>
     <button class="nav-item" data-view="services" id="navServices"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
     <button class="nav-item" data-view="packages" id="navPackages"><span class="ic">◎</span> Багц</button>
+    <button class="nav-item" data-view="staff" id="navStaff"><span class="ic">♙</span> Ажилтнууд</button>
+    <button class="nav-item" data-view="attendance" id="navAttendance"><span class="ic">◷</span> Ээлж, ирц</button>
+    <button class="nav-item" data-view="inventory" id="navInventory"><span class="ic">□</span> Бараа материал</button>
     <button class="nav-item" data-view="users" id="navUsers" style="display:none;"><span class="ic">◐</span> Хэрэглэгч, эрх</button>
 
     <div class="side-foot">
@@ -195,6 +198,7 @@
           <div class="page-sub" id="repRange">—</div>
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn-sm primary" id="repSales">+ Борлуулалт бүртгэх</button>
           <button class="btn-sm ghost" id="repCsv">↓ CSV татах</button>
           <button class="btn-sm ghost" id="repPrint">⎙ Хэвлэх</button>
         </div>
@@ -223,13 +227,13 @@
         <div class="kpi"><div class="kpi-label">Нийт орлого</div>
           <div class="kpi-val" id="rRevenue"><small>₮</small>0</div>
           <div class="kpi-note" id="rRevenueNote">—</div></div>
-        <div class="kpi"><div class="kpi-label">Захиалгын тоо</div>
+        <div class="kpi"><div class="kpi-label">Гүйлгээний тоо</div>
           <div class="kpi-val" id="rCount">0</div>
           <div class="kpi-note" id="rCountNote">—</div></div>
         <div class="kpi"><div class="kpi-label">Дундаж дүн</div>
           <div class="kpi-val" id="rAvg"><small>₮</small>0</div>
           <div class="kpi-note">Нэг захиалгад</div></div>
-        <div class="kpi"><div class="kpi-label">Биелэлт</div>
+        <div class="kpi"><div class="kpi-label">Цэвэр ашиг</div>
           <div class="kpi-val" id="rRate">0<small style="margin:0 0 0 2px">%</small></div>
           <div class="kpi-note" id="rRateNote">—</div></div>
       </div>
@@ -252,9 +256,9 @@
       </div>
 
       <div class="panel">
-        <div class="panel-head"><div class="panel-title">Төлөвийн задаргаа</div></div>
+        <div class="panel-head"><div class="panel-title">Төлбөрийн хэлбэрийн задаргаа</div></div>
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Төлөв</th><th>Тоо</th><th>Дүн</th><th>Эзлэх хувь</th></tr></thead>
+          <thead><tr><th>Төлбөрийн хэлбэр</th><th>Гүйлгээ</th><th>Дүн</th><th>Эзлэх хувь</th></tr></thead>
           <tbody id="repStatusBody"></tbody>
         </table></div>
       </div>
@@ -264,10 +268,11 @@
     <section class="view" data-panel="ledger">
       <div class="page-head">
         <div>
-          <div class="page-title">Борлуулалт</div>
+          <div class="page-title">Борлуулалт, тайлан</div>
           <div class="page-sub" id="ledSub">Өдөр тутмын борлуулалтын бүртгэл</div>
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
+          <button class="btn-sm ghost" id="ledReport">▦ Тайлан харах</button>
           <button class="btn-sm primary" id="ledAdd">+ Шинэ борлуулалт</button>
           <button class="btn-sm ghost" id="ledImport">⇪ Файлаас импортлох</button>
           <button class="btn-sm ghost" id="ledCsv">↓ CSV</button>
@@ -406,6 +411,38 @@
         </table></div>
       </div>
       <div class="page-sub" id="ledMore" style="margin-top:14px;text-align:center"></div>
+    </section>
+
+    <!-- ── STAFF ── -->
+    <section class="view" data-panel="staff">
+      <div class="page-head"><div><div class="page-title">Ажилтнууд</div><div class="page-sub" id="staffSub">Албан тушаал, идэвхтэй төлөв</div></div><button class="btn-sm primary" id="staffAdd">+ Ажилтан нэмэх</button></div>
+      <div class="panel" id="staffForm" style="display:none"><div class="form-grid">
+        <div class="field"><label>Нэр *</label><input class="ctl" id="st_name" maxlength="120"/></div>
+        <div class="field"><label>Албан тушаал</label><input class="ctl" id="st_title" maxlength="120" placeholder="Терапист, ресепшн…"/></div>
+        <div class="field"><label>Утас</label><input class="ctl" id="st_phone" inputmode="tel" maxlength="24"/></div>
+        <div class="field"><label>Ажилтны код</label><input class="ctl" id="st_code" maxlength="32" placeholder="EMP-001"/></div>
+      </div><div class="form-actions"><button class="btn-sm primary" id="staffSave">Хадгалах</button><button class="btn-sm ghost" id="staffCancel">Болих</button></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Код</th><th>Нэр</th><th>Албан тушаал</th><th>Утас</th><th>Төлөв</th><th></th></tr></thead><tbody id="staffBody"></tbody></table></div></div>
+    </section>
+
+    <!-- ── ATTENDANCE ── -->
+    <section class="view" data-panel="attendance">
+      <div class="page-head"><div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Ажил эхэлсэн, дууссан цагийн бүртгэл</div></div><div class="form-actions"><button class="btn-sm primary" id="clockIn">▶ Ажил эхлэх</button><button class="btn-sm ghost" id="clockOut">■ Ажил дуусгах</button></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Эхэлсэн</th><th>Дууссан</th><th>Нийт цаг</th><th>Тэмдэглэл</th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+    </section>
+
+    <!-- ── INVENTORY ── -->
+    <section class="view" data-panel="inventory">
+      <div class="page-head"><div><div class="page-title">Бараа материал</div><div class="page-sub" id="invSub">Үлдэгдэл болон дахин захиалах түвшин</div></div><button class="btn-sm primary" id="invAdd">+ Материал нэмэх</button></div>
+      <div class="panel" id="invForm" style="display:none"><div class="form-grid">
+        <div class="field"><label>Материалын нэр *</label><input class="ctl" id="i_name" maxlength="160"/></div>
+        <div class="field"><label>Ангилал</label><input class="ctl" id="i_category" maxlength="80" placeholder="Хэрэглээний материал"/></div>
+        <div class="field"><label>Нэгж</label><input class="ctl" id="i_unit" maxlength="24" value="ш"/></div>
+        <div class="field"><label>Одоогийн үлдэгдэл</label><input class="ctl" id="i_qty" type="number" min="0" step="0.01" value="0"/></div>
+        <div class="field"><label>Доод үлдэгдэл</label><input class="ctl" id="i_min" type="number" min="0" step="0.01" value="0"/></div>
+        <div class="field"><label>Өртөг (₮)</label><input class="ctl" id="i_cost" type="number" min="0" step="100" value="0"/></div>
+      </div><div class="form-actions"><button class="btn-sm primary" id="invSave">Хадгалах</button><button class="btn-sm ghost" id="invCancel">Болих</button></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Материал</th><th>Ангилал</th><th>Үлдэгдэл</th><th>Доод хэмжээ</th><th>Өртөг</th><th>Төлөв</th></tr></thead><tbody id="invBody"></tbody></table></div></div>
     </section>
 
     <!-- ── EXPENSES ── -->
