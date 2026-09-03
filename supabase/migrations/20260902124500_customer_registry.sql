@@ -13,6 +13,7 @@ create table if not exists public.customers (
 
 create unique index if not exists customers_phone_unique on public.customers (phone);
 create index if not exists customers_name_search_idx on public.customers (lower(full_name));
+create index if not exists customers_created_by_idx on public.customers (created_by);
 
 alter table public.customers enable row level security;
 
