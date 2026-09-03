@@ -1309,7 +1309,6 @@ body{
 .nav-logo>span{display:grid;line-height:1;gap:4px}
 .nav-logo b{display:block;white-space:nowrap;font-size:15px;font-weight:740;letter-spacing:.015em;color:var(--ice-50)}
 .nav-logo b em{font-style:normal;color:var(--ice-400)}
-.nav-logo b em::before{content:' ';white-space:pre}
 .nav-logo small{font-size:7px;font-weight:650;letter-spacing:.18em;color:var(--ice-300);white-space:nowrap}
 .hero-inner{
   width:min(47vw,760px);max-width:none;padding:96px 0;
