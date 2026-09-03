@@ -112,6 +112,8 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .st-confirmed{background:rgba(88,198,255,.14);color:var(--ice-200);border:1px solid rgba(88,198,255,.32)}
 .st-done     {background:rgba(80,220,160,.14);color:#8ceec2;border:1px solid rgba(80,220,160,.3)}
 .st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
+.st-transferred{background:rgba(160,120,255,.14);color:#d6c7ff;border:1px solid rgba(160,120,255,.32)}
+.today-attendance{min-width:620px!important}
 
 /* ── controls ── */
 .field{display:flex;flex-direction:column;gap:7px}
