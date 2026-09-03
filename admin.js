@@ -54,10 +54,16 @@ let cache = {
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], inventory: [],
 };
 let bkFilter = "all";
+let overviewYear = String(new Date().getFullYear());
+let attendanceYear = "all";
+let attendanceStaff = "all";
 
 /* ── tiny DOM helpers ─────────────────────────────────────────── */
 function show(el, on = true) {
   if (el) el.style.display = on ? "" : "none";
+}
+function isAdminUser() {
+  return me?.role === "owner" || me?.role === "admin";
 }
 function cell(text, cls) {
   const td = document.createElement("td");
@@ -84,6 +90,7 @@ function fmtDate(v) {
    ══════════════════════════════════════════════════════════════ */
 (async function boot() {
   wireNav();
+  wireOverview();
   wireBookingFilters();
   wireReports();
   wireLedger();
@@ -162,6 +169,7 @@ async function route() {
   show($("navCustomers"), true);
   show($("navReports"), true);
   show($("navAttendance"), true);
+  show($("attAdd"), isAdmin);
 
   if (!isAdmin) {
     switchView("reports");
@@ -426,30 +434,77 @@ function renderCustomers() {
 /* ══════════════════════════════════════════════════════════════
    OVERVIEW
    ══════════════════════════════════════════════════════════════ */
+function availableYears() {
+  return [...new Set(cache.sales.map((row) => String(row.sale_date || "").slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))]
+    .sort((a, b) => Number(b) - Number(a));
+}
+
+function salesInYear(year) {
+  return year === "all" ? cache.sales : cache.sales.filter((row) => String(row.sale_date || "").startsWith(year + "-"));
+}
+
+function allAttendanceRows() {
+  return [
+    ...cache.attendance.map((row) => ({ ...row, __table: "attendance", __source: "ERP" })),
+    ...cache.workdays.map((row) => ({ ...row, __table: "staff_workdays", __source: "Excel" })),
+  ];
+}
+
+function fillYearSelect(select, includeAll = true) {
+  if (!select) return;
+  const current = select.value;
+  const years = availableYears();
+  select.innerHTML = includeAll ? '<option value="all">Бүх хугацаа</option>' : "";
+  years.forEach((year) => {
+    const option = document.createElement("option");
+    option.value = year;
+    option.textContent = year + " он";
+    select.appendChild(option);
+  });
+  if ([...(select.options || [])].some((option) => option.value === current)) select.value = current;
+}
+
+function wireOverview() {
+  $("ovYear")?.addEventListener("change", (event) => {
+    overviewYear = event.target.value;
+    renderOverview();
+  });
+}
+
 function renderOverview() {
-  const bk = cache.bookings;
-  const now = new Date();
-  const thisMonth = (d) => {
-    const x = new Date(d);
-    return x.getFullYear() === now.getFullYear() && x.getMonth() === now.getMonth();
-  };
+  fillYearSelect($("ovYear"));
+  if (![...$("ovYear").options].some((option) => option.value === overviewYear)) {
+    overviewYear = availableYears()[0] || "all";
+  }
+  $("ovYear").value = overviewYear;
 
-  const paid = bk.filter((b) => b.status === "confirmed" || b.status === "done");
-  const revMonth = paid.filter((b) => thisMonth(b.created_at)).reduce((s, b) => s + (b.amount || 0), 0);
-  const bkMonth = bk.filter((b) => thisMonth(b.created_at)).length;
-  const pending = bk.filter((b) => b.status === "pending").length;
-  const newMsg = cache.messages.filter((m) => !m.handled).length;
+  const rows = salesInYear(overviewYear);
+  const revenue = rows.reduce((sum, row) => sum + rowTotal(row), 0);
+  const previousYear = overviewYear === "all" ? null : String(Number(overviewYear) - 1);
+  let previousRows = previousYear ? salesInYear(previousYear) : [];
+  if (overviewYear === String(new Date().getFullYear())) {
+    const cutoff = `${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+    previousRows = previousRows.filter((row) => String(row.sale_date || "").slice(5, 10) <= cutoff);
+  }
+  const previousRevenue = previousRows.reduce((sum, row) => sum + rowTotal(row), 0);
+  const change = previousRevenue ? ((revenue - previousRevenue) / previousRevenue) * 100 : null;
+  const attendanceRows = allAttendanceRows().filter((row) => overviewYear === "all" || String(row.work_date || "").startsWith(overviewYear + "-"));
 
-  $("kTotal").textContent = bk.length.toLocaleString("en-US");
-  $("kTotalNote").textContent = `Энэ сард ${bkMonth}`;
-  $("kRevenue").innerHTML = `<small>₮</small>${revMonth.toLocaleString("en-US")}`;
-  $("kRevenueNote").textContent = `Баталгаажсан ${paid.filter((b) => thisMonth(b.created_at)).length} захиалга`;
-  $("kPending").textContent = String(pending);
-  $("kMsg").textContent = String(newMsg);
-  $("ovSub").textContent = `${now.getFullYear()} оны ${now.getMonth() + 1}-р сар`;
+  $("kRevenue").innerHTML = `<small>₮</small>${revenue.toLocaleString("en-US")}`;
+  $("kRevenueNote").textContent = overviewYear === "all" ? "Бүх идэвхтэй борлуулалт" : `${overviewYear} оны борлуулалт`;
+  $("kPrevRevenue").innerHTML = `<small>₮</small>${previousRevenue.toLocaleString("en-US")}`;
+  $("kPrevRevenueNote").textContent = previousYear
+    ? `${previousYear} он${change === null ? " · харьцуулах өгөгдөлгүй" : ` · ${change >= 0 ? "+" : ""}${change.toFixed(1)}%`}`
+    : "Бүх хугацаанд харьцуулалт хамаарахгүй";
+  $("kTotal").textContent = rows.length.toLocaleString("en-US");
+  $("kTotalNote").textContent = rows.length ? `Дундаж ${money(Math.round(revenue / rows.length))}` : "Борлуулалт алга";
+  $("kAttendance").textContent = attendanceRows.length.toLocaleString("en-US");
+  $("kAttendanceNote").textContent = `${new Set(attendanceRows.map((row) => row.staff_id || row.staff_name)).size} ажилтан`;
+  $("ovSub").textContent = overviewYear === "all" ? "Бүх хугацааны нэгдсэн үзүүлэлт" : `${overviewYear} оны борлуулалт, ирцийн үзүүлэлт`;
 
-  drawChart();
-  renderTop();
+  drawChart(rows);
+  renderTop(rows);
+  renderOverviewStaff(rows, attendanceRows);
 }
 
 function drawBars(svg, buckets) {
@@ -504,43 +559,82 @@ function drawBars(svg, buckets) {
   });
 }
 
-function drawChart() {
+function drawChart(rows) {
   const svg = $("revChart");
-  const now = new Date();
   const buckets = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const row = cache.months.find((m) => String(m.month).slice(0, 7) === key);
-    buckets.push({ label: d.getMonth() + 1 + "-р", value: row ? Number(row.revenue) : 0 });
+  if (overviewYear === "all") {
+    availableYears().slice().reverse().forEach((year) => {
+      const value = salesInYear(year).reduce((sum, row) => sum + rowTotal(row), 0);
+      buckets.push({ label: year, value });
+    });
+    $("chartTitle").textContent = "Жилийн борлуулалт";
+  } else {
+    for (let month = 0; month < 12; month++) {
+      const key = `${overviewYear}-${String(month + 1).padStart(2, "0")}`;
+      const value = rows.filter((row) => String(row.sale_date || "").slice(0, 7) === key)
+        .reduce((sum, row) => sum + rowTotal(row), 0);
+      buckets.push({ label: month + 1 + "-р", value });
+    }
+    $("chartTitle").textContent = `${overviewYear} оны сарын борлуулалт`;
   }
 
   drawBars(svg, buckets);
   const total = buckets.reduce((s, b) => s + b.value, 0);
-  $("chartNote").textContent = `12 сарын нийт: ${money(total)}`;
+  $("chartNote").textContent = `Нийт: ${money(total)}`;
 }
 
-function renderTop() {
+function renderTop(rows) {
   const body = $("topBody");
   body.innerHTML = "";
   const agg = {};
-  cache.bookings.forEach((b) => {
-    const key = b.package || b.service || "—";
+  rows.forEach((b) => {
+    const key = b.services || "Тодорхойгүй";
     agg[key] = agg[key] || { n: 0, sum: 0 };
     agg[key].n++;
-    if (b.status === "confirmed" || b.status === "done") agg[key].sum += b.amount || 0;
+    agg[key].sum += rowTotal(b);
   });
-  const rows = Object.entries(agg).sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+  const entries = Object.entries(agg).sort((a, b) => b[1].sum - a[1].sum).slice(0, 8);
 
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="3"><div class="empty">Захиалга алга байна.</div></td></tr>';
+  if (!entries.length) {
+    body.innerHTML = '<tr><td colspan="3"><div class="empty">Борлуулалт алга байна.</div></td></tr>';
     return;
   }
-  rows.forEach(([name, v]) => {
+  entries.forEach(([name, v]) => {
     const tr = document.createElement("tr");
     tr.appendChild(cell(name, "t-strong"));
     tr.appendChild(cell(v.n, "t-mono"));
     tr.appendChild(cell(money(v.sum), "t-mono"));
+    body.appendChild(tr);
+  });
+}
+
+function renderOverviewStaff(salesRows, attendanceRows) {
+  const body = $("ovStaffBody");
+  if (!body) return;
+  const entries = cache.staff.map((staff) => {
+    const names = [staff.name, ...(staff.aliases || [])].map((name) => String(name || "").trim().toLowerCase()).filter(Boolean);
+    const staffSales = salesRows.filter((sale) => Number(sale.staff_id) === Number(staff.id) || (!sale.staff_id && names.includes(String(sale.therapist || "").trim().toLowerCase())));
+    const staffAttendance = attendanceRows.filter((row) => Number(row.staff_id) === Number(staff.id) || (!row.staff_id && names.includes(String(row.staff_name || "").trim().toLowerCase())));
+    return {
+      name: staff.name,
+      count: staffSales.length,
+      revenue: staffSales.reduce((sum, sale) => sum + rowTotal(sale), 0),
+      days: staffAttendance.length,
+    };
+  }).filter((row) => row.count || row.days).sort((a, b) => b.revenue - a.revenue);
+
+  body.innerHTML = "";
+  $("ovStaffNote").textContent = `${entries.length} ажилтны үзүүлэлт`;
+  if (!entries.length) {
+    body.innerHTML = '<tr><td colspan="4"><div class="empty">Энэ хугацаанд ажилтны үзүүлэлт алга.</div></td></tr>';
+    return;
+  }
+  entries.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(row.name, "t-strong"));
+    tr.appendChild(cell(row.count, "t-mono"));
+    tr.appendChild(cell(money(row.revenue), "t-mono t-strong"));
+    tr.appendChild(cell(`${row.days} өдөр`, "t-mono"));
     body.appendChild(tr);
   });
 }
@@ -892,6 +986,7 @@ function renderUsers() {
    ══════════════════════════════════════════════════════════════ */
 
 let repRange = "month";
+let repSelectedYear = String(new Date().getFullYear());
 
 function rangeBounds(kind) {
   const now = new Date();
@@ -911,11 +1006,16 @@ function rangeBounds(kind) {
   if (kind === "year") {
     return [new Date(now.getFullYear(), 0, 1), startOfDay(now)];
   }
+  if (kind === "selectedYear") {
+    const year = Number(repSelectedYear);
+    return [new Date(year, 0, 1), year === now.getFullYear() ? startOfDay(now) : new Date(year, 11, 31)];
+  }
   if (kind === "custom") {
     const f = $("repFrom").value, t = $("repTo").value;
     return [f ? new Date(f) : new Date(2000, 0, 1), t ? new Date(t) : new Date()];
   }
-  return [new Date(2000, 0, 1), startOfDay(now)]; // all
+  const firstSale = cache.sales.map((row) => row.sale_date).filter(Boolean).sort()[0];
+  return [firstSale ? new Date(firstSale + "T00:00:00") : new Date(now.getFullYear(), 0, 1), startOfDay(now)]; // all
 }
 
 function wireReports() {
@@ -926,12 +1026,21 @@ function wireReports() {
   const filters = $("repFilters");
   if (!filters) return;
 
+  $("repYear")?.addEventListener("change", (event) => {
+    repSelectedYear = event.target.value;
+    filters.querySelectorAll(".chip-btn").forEach((x) => x.classList.remove("on"));
+    repRange = repSelectedYear === "all" ? "all" : "selectedYear";
+    renderReports();
+  });
+
   filters.addEventListener("click", (e) => {
     const b = e.target.closest(".chip-btn");
     if (!b) return;
     filters.querySelectorAll(".chip-btn").forEach((x) => x.classList.remove("on"));
     b.classList.add("on");
     repRange = b.dataset.range;
+    if (repRange === "all") repSelectedYear = "all";
+    else if (repRange === "year") repSelectedYear = String(new Date().getFullYear());
     renderReports();
   });
 
@@ -966,6 +1075,11 @@ function reportRows() {
 
 function renderReports() {
   if (!$("repRange")) return;
+  fillYearSelect($("repYear"));
+  if (![...$("repYear").options].some((option) => option.value === repSelectedYear)) {
+    repSelectedYear = availableYears()[0] || "all";
+  }
+  $("repYear").value = repRange === "all" ? "all" : repSelectedYear;
   const { from, to, rows } = reportRows();
 
   $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
@@ -978,7 +1092,17 @@ function renderReports() {
   const profit = revenue - expenses;
 
   $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
-  $("rRevenueNote").textContent = rows.length + " борлуулалтын бүртгэл";
+  const compareFrom = new Date(from); compareFrom.setFullYear(compareFrom.getFullYear() - 1);
+  const compareTo = new Date(to); compareTo.setFullYear(compareTo.getFullYear() - 1);
+  const compareRows = repRange === "all" ? [] : cache.sales.filter((row) => {
+    const date = new Date(row.sale_date + "T00:00:00");
+    return date >= compareFrom && date <= compareTo;
+  });
+  const compareRevenue = compareRows.reduce((sum, row) => sum + rowTotal(row), 0);
+  const comparePct = compareRevenue ? ((revenue - compareRevenue) / compareRevenue) * 100 : null;
+  $("rRevenueNote").textContent = repRange === "all"
+    ? rows.length + " борлуулалтын бүртгэл"
+    : `${rows.length} бүртгэл · өмнөх оны мөн үеэс ${comparePct === null ? "өгөгдөлгүй" : `${comparePct >= 0 ? "+" : ""}${comparePct.toFixed(1)}%`}`;
   $("rCount").textContent = rows.length.toLocaleString("en-US");
   $("rCountNote").textContent =
     "Ажилтны оруулсан бодит гүйлгээ";
@@ -1038,6 +1162,43 @@ function renderReports() {
       tr.appendChild(cell(money(v.sum), "t-mono"));
       tr.appendChild(shareCell(revenue ? (v.sum / revenue) * 100 : 0));
       svcBody.appendChild(tr);
+    });
+  }
+
+  /* employee sales and attendance */
+  const repStaffBody = $("repStaffBody");
+  repStaffBody.innerHTML = "";
+  const periodAttendance = allAttendanceRows().filter((row) => {
+    const date = new Date(row.work_date + "T00:00:00");
+    return date >= from && date <= to;
+  });
+  const assignedSaleIds = new Set();
+  const staffEntries = cache.staff.map((staff) => {
+    const names = [staff.name, ...(staff.aliases || [])].map((name) => String(name || "").trim().toLowerCase()).filter(Boolean);
+    const staffSales = rows.filter((sale) => {
+      const matches = Number(sale.staff_id) === Number(staff.id) || (!sale.staff_id && names.includes(String(sale.therapist || "").trim().toLowerCase()));
+      if (matches) assignedSaleIds.add(sale.id);
+      return matches;
+    });
+    const days = periodAttendance.filter((row) => Number(row.staff_id) === Number(staff.id) || (!row.staff_id && names.includes(String(row.staff_name || "").trim().toLowerCase()))).length;
+    return { name: staff.name, count: staffSales.length, revenue: staffSales.reduce((sum, sale) => sum + rowTotal(sale), 0), days };
+  }).filter((row) => row.count || row.days);
+  const unassigned = rows.filter((sale) => !assignedSaleIds.has(sale.id));
+  if (unassigned.length) {
+    staffEntries.push({ name: "Ажилтан тодорхойгүй", count: unassigned.length, revenue: unassigned.reduce((sum, sale) => sum + rowTotal(sale), 0), days: 0 });
+  }
+  staffEntries.sort((a, b) => b.revenue - a.revenue);
+  if (!staffEntries.length) {
+    repStaffBody.innerHTML = '<tr><td colspan="5"><div class="empty">Энэ хугацаанд ажилтны үзүүлэлт алга.</div></td></tr>';
+  } else {
+    staffEntries.forEach((staff) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(cell(staff.name, "t-strong"));
+      tr.appendChild(cell(staff.count, "t-mono"));
+      tr.appendChild(cell(money(staff.revenue), "t-mono"));
+      tr.appendChild(shareCell(revenue ? (staff.revenue / revenue) * 100 : 0));
+      tr.appendChild(cell(`${staff.days} өдөр`, "t-mono"));
+      repStaffBody.appendChild(tr);
     });
   }
 
@@ -1131,7 +1292,8 @@ let ledEditing = null;
 let ledLimit = 100;
 
 const rowTotal = (r) =>
-  (r.golomt || 0) + (r.khan || 0) + (r.cash || 0) + (r.invoice || 0) + (r.barter || 0) - (r.refund || 0);
+  Number(r.golomt || 0) + Number(r.khan || 0) + Number(r.cash || 0) +
+  Number(r.invoice || 0) + Number(r.barter || 0) - Number(r.refund || 0);
 
 function ledRows() {
   return cache.sales.filter((r) => {
@@ -1283,9 +1445,26 @@ function renderStaff() {
   });
 }
 
+let attendanceEditing = null;
+
 function wireAttendance() {
   $("clockIn")?.addEventListener("click", () => clockAttendance("in"));
   $("clockOut")?.addEventListener("click", () => clockAttendance("out"));
+  $("attAdd")?.addEventListener("click", () => openAttendanceForm());
+  $("attCancel")?.addEventListener("click", closeAttendanceForm);
+  $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
+  $("attSave")?.addEventListener("click", saveAttendance);
+  $("att_staff")?.addEventListener("change", (event) => {
+    if (!attendanceEditing && event.target.value) $("att_day").value = nextWorkdayNumber(event.target.value);
+  });
+  $("attYear")?.addEventListener("change", (event) => {
+    attendanceYear = event.target.value;
+    renderAttendance();
+  });
+  $("attStaff")?.addEventListener("change", (event) => {
+    attendanceStaff = event.target.value;
+    renderAttendance();
+  });
 }
 
 async function clockAttendance(mode) {
@@ -1308,15 +1487,150 @@ async function clockAttendance(mode) {
 
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
-  const attendanceRows = [...cache.attendance, ...cache.workdays].sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
-  $("attSub").textContent = `${attendanceRows.length} ирцийн бүртгэл`;
+  syncAttendanceFilters();
+  const attendanceRows = allAttendanceRows()
+    .filter((row) => attendanceYear === "all" || String(row.work_date || "").startsWith(attendanceYear + "-"))
+    .filter((row) => attendanceStaff === "all" || String(row.staff_id || "") === attendanceStaff)
+    .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
+  $("attSub").textContent = `${attendanceRows.length} ээлж, ирцийн бүртгэл`;
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="7"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
+  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="9"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
   attendanceRows.forEach((row) => {
     const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
     const hours = start && end ? ((end - start) / 3600000).toFixed(1) + " цаг" : "—";
-    const tr = document.createElement("tr"); [row.work_date, row.staff_name, row.workday_number ? `${row.workday_number} дахь өдөр` : "—", start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—"].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : i === 2 ? "t-mono" : ""))); body.appendChild(tr);
+    const tr = document.createElement("tr");
+    [row.work_date, row.staff_name, row.workday_number ? `${row.workday_number} дахь өдөр` : "—", start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—", row.__source].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : i === 2 ? "t-mono" : "")));
+    const actions = document.createElement("td");
+    if (isAdminUser()) {
+      const edit = document.createElement("button");
+      edit.className = "btn-sm ghost"; edit.textContent = "Засах";
+      edit.addEventListener("click", () => openAttendanceForm(row));
+      const remove = document.createElement("button");
+      remove.className = "btn-sm danger"; remove.textContent = "Устгах";
+      remove.addEventListener("click", () => deleteAttendance(row));
+      actions.className = "row-actions";
+      actions.append(edit, remove);
+    }
+    tr.appendChild(actions);
+    body.appendChild(tr);
   });
+}
+
+function syncAttendanceFilters() {
+  const rows = allAttendanceRows();
+  const yearSelect = $("attYear");
+  const yearValue = attendanceYear;
+  const years = [...new Set(rows.map((row) => String(row.work_date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))].sort((a, b) => Number(b) - Number(a));
+  yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
+  years.forEach((year) => yearSelect.appendChild(new Option(year + " он", year)));
+  attendanceYear = years.includes(yearValue) || yearValue === "all" ? yearValue : "all";
+  yearSelect.value = attendanceYear;
+
+  const staffFilter = $("attStaff");
+  const staffValue = attendanceStaff;
+  staffFilter.innerHTML = '<option value="all">Бүх ажилтан</option>';
+  cache.staff.forEach((staff) => staffFilter.appendChild(new Option(staff.name, String(staff.id))));
+  attendanceStaff = [...staffFilter.options].some((option) => option.value === staffValue) ? staffValue : "all";
+  staffFilter.value = attendanceStaff;
+
+  const formStaff = $("att_staff");
+  const selected = formStaff.value;
+  formStaff.innerHTML = '<option value="">Ажилтан сонгох</option>';
+  cache.staff.filter((staff) => staff.active).forEach((staff) => formStaff.appendChild(new Option(staff.name, String(staff.id))));
+  if ([...formStaff.options].some((option) => option.value === selected)) formStaff.value = selected;
+}
+
+function timeInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function closeAttendanceForm() {
+  attendanceEditing = null;
+  show($("attForm"), false);
+}
+
+function nextWorkdayNumber(staffId) {
+  const numbers = allAttendanceRows()
+    .filter((row) => Number(row.staff_id) === Number(staffId))
+    .map((row) => Number(row.workday_number || 0));
+  return Math.max(0, ...numbers) + 1;
+}
+
+function openAttendanceForm(row = null) {
+  if (!isAdminUser()) return;
+  syncAttendanceFilters();
+  attendanceEditing = row;
+  $("attFormTitle").textContent = row ? "Ээлж, ирц засах" : "Ээлж, ирц нэмэх";
+  $("att_staff").value = row?.staff_id ? String(row.staff_id) : "";
+  $("att_date").value = row?.work_date || new Date().toISOString().slice(0, 10);
+  $("att_day").value = row?.workday_number || "";
+  $("att_in").value = timeInputValue(row?.clock_in) || "09:00";
+  $("att_out").value = timeInputValue(row?.clock_out);
+  $("att_note").value = row?.note || "";
+  show($("attForm"));
+  $("attForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function attendanceTimestamp(date, time) {
+  return time ? new Date(`${date}T${time}:00`).toISOString() : null;
+}
+
+async function saveAttendance() {
+  if (!isAdminUser()) return alert("Зөвхөн админ ээлж, ирц засах эрхтэй.");
+  const staff = cache.staff.find((item) => String(item.id) === $("att_staff").value);
+  const workDate = $("att_date").value;
+  const workdayNumber = Number($("att_day").value);
+  const clockIn = attendanceTimestamp(workDate, $("att_in").value);
+  const clockOut = attendanceTimestamp(workDate, $("att_out").value);
+  if (!staff || !workDate || !clockIn || workdayNumber < 1) return alert("Ажилтан, огноо, хэд дэх өдөр, эхэлсэн цагийг бөглөнө үү.");
+  if (clockOut && new Date(clockOut) < new Date(clockIn)) return alert("Дууссан цаг эхэлсэн цагаас өмнө байж болохгүй.");
+
+  const duplicate = allAttendanceRows().find((row) => Number(row.staff_id) === Number(staff.id) && row.work_date === workDate && (!attendanceEditing || row.__table !== attendanceEditing.__table || Number(row.id) !== Number(attendanceEditing.id)));
+  if (duplicate) return alert("Энэ ажилтны тухайн өдрийн ирц бүртгэгдсэн байна. Одоо байгаа мөрийг засна уу.");
+
+  const patch = {
+    staff_id: staff.id,
+    staff_name: staff.name,
+    work_date: workDate,
+    workday_number: workdayNumber,
+    clock_in: clockIn,
+    clock_out: clockOut,
+    note: $("att_note").value.trim() || null,
+  };
+  const button = $("attSave"); button.disabled = true;
+  let result;
+  if (attendanceEditing) {
+    result = await sb.from(attendanceEditing.__table).update(patch).eq("id", attendanceEditing.id).select().maybeSingle();
+  } else {
+    result = await sb.from("attendance").insert({ ...patch, user_id: null }).select().maybeSingle();
+  }
+  button.disabled = false;
+  if (result.error) return alert("Ирц хадгалж чадсангүй: " + result.error.message);
+
+  if (attendanceEditing) {
+    const bucket = attendanceEditing.__table === "staff_workdays" ? cache.workdays : cache.attendance;
+    const current = bucket.find((row) => Number(row.id) === Number(attendanceEditing.id));
+    if (current) Object.assign(current, result.data || patch);
+  } else if (result.data) {
+    cache.attendance.unshift(result.data);
+  }
+  closeAttendanceForm();
+  renderAttendance();
+  renderOverview();
+}
+
+async function deleteAttendance(row) {
+  if (!isAdminUser()) return alert("Зөвхөн админ ирц устгах эрхтэй.");
+  if (!confirm(`${row.work_date} өдрийн ${row.staff_name} ажилтны ирцийг устгах уу? Энэ үйлдлийг буцаах боломжгүй.`)) return;
+  const { error } = await sb.from(row.__table).delete().eq("id", row.id);
+  if (error) return alert("Ирц устгаж чадсангүй: " + error.message);
+  if (row.__table === "staff_workdays") cache.workdays = cache.workdays.filter((item) => Number(item.id) !== Number(row.id));
+  else cache.attendance = cache.attendance.filter((item) => Number(item.id) !== Number(row.id));
+  renderAttendance();
+  renderOverview();
 }
 
 function wireInventory() {
