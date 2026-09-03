@@ -11,14 +11,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="admin.css"/>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+<link rel="icon" type="image/svg+xml" href="logo.svg"/>
 </head>
 <body>
 
 <!-- ══════════ LOGIN ══════════ -->
 <div class="gate" id="authGate">
   <div class="gate-card">
-    <a href="index.html" class="gate-logo">CRYO <span>Mongolia</span></a>
+    <a href="index.html" class="gate-logo admin-brand" aria-label="CRYO Mongolia — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
     <p class="gate-sub">Удирдлагын самбарт нэвтрэх</p>
 
     <!-- shown only while Supabase is not connected yet -->
@@ -66,7 +66,7 @@
 <!-- ══════════ NO PERMISSION ══════════ -->
 <div class="gate" id="denyGate" style="display:none;">
   <div class="gate-card">
-    <div class="gate-logo">CRYO <span>Mongolia</span></div>
+    <div class="gate-logo admin-brand"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></div>
     <p class="gate-sub" id="denyWho"></p>
     <div class="notice warn">
       Энэ бүртгэл удирдлагын самбарт нэвтрэх эрхгүй байна. Цаг захиалах, захиалгаа
@@ -82,7 +82,7 @@
 <!-- ══════════ DASHBOARD ══════════ -->
 <div class="shell" id="shell" style="display:none;">
   <aside class="side">
-    <a href="index.html" class="side-logo">CRYO <span>Mongolia</span></a>
+    <a href="index.html" class="side-logo admin-brand" aria-label="CRYO Mongolia — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
 
     <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="coverage" id="navCoverage"><span class="ic">✓</span> Excel шилжилт</button>

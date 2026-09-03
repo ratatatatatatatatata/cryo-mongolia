@@ -11,9 +11,13 @@ body{background:var(--void);min-height:100vh}
 .gate-card{width:100%;max-width:420px;padding:44px 40px;border-radius:var(--r-2xl);
   background:linear-gradient(165deg,rgba(20,38,62,.8),rgba(8,16,28,.94));
   border:1px solid var(--border-mid);box-shadow:var(--lift-3), var(--hairline)}
-.gate-logo{font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);margin-bottom:6px}
-.gate-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-logo{margin-bottom:10px}
+.admin-brand{display:inline-flex;align-items:center;gap:10px;color:var(--ice-50);text-decoration:none}
+.admin-brand img{width:31px;height:31px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 11px rgba(0,105,234,.4))}
+.admin-brand>span{display:grid;gap:3px;line-height:1}
+.admin-brand b{font-family:var(--ff-display);font-size:13.5px;font-weight:800;letter-spacing:.012em;white-space:nowrap}
+.admin-brand b em{font-style:normal;color:var(--ice-400)}
+.admin-brand small{font-size:6px;font-weight:700;letter-spacing:.16em;color:var(--ice-300);white-space:nowrap}
 .gate-sub{font-size:12.5px;color:var(--text-muted);margin-bottom:28px}
 .gate-card .field{margin-bottom:16px}
 .gate-tabs{display:flex;gap:6px;margin-bottom:22px}
@@ -34,10 +38,8 @@ body{background:var(--void);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
   background:linear-gradient(180deg,rgba(10,18,32,.95),rgba(3,6,12,.98));
   border-right:1px solid var(--border)}
-.side-logo{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);
-  padding:0 12px 22px;text-decoration:none;display:block}
-.side-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+.side-logo{padding:0 12px 22px}
+.side-logo.admin-brand{display:inline-flex}
 .side a.nav-item,.side button.nav-item{
   display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:12px;
   font-family:var(--ff-body);font-size:13.5px;font-weight:600;color:var(--text-secondary);
