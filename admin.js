@@ -297,6 +297,7 @@ async function loadAll() {
   }
 
   renderOverview();
+  renderCoverage();
   renderLedger();
   renderExpenses();
   renderReports();
@@ -309,6 +310,36 @@ async function loadAll() {
   renderStaff();
   renderAttendance();
   renderInventory();
+}
+
+function renderCoverage() {
+  const body = $("coverageBody");
+  if (!body) return;
+  const rows = [
+    ["2026 борлуулалт", 1031, cache.sales.length, "imported"],
+    ["2025 борлуулалт", "review", 0, "missing"],
+    ["Зардал", 330, cache.expenses.length, "partial"],
+    ["Үйлчлүүлэгч", 115, cache.customers.length, "partial"],
+    ["Үйлчилгээний нэр", 35, cache.services.filter((x) => x.category === "legacy-import").length, "partial"],
+    ["Үйлчилгээний session", 2829, 0, "missing"],
+    ["Хэрэглэгчийн багц", 245, 0, "missing"],
+    ["Ирц", 320, cache.attendance.length, "partial"],
+    ["Азот / бараа материал", 69, cache.inventory.length, "partial"],
+    ["Цалин", 254, 0, "missing"],
+  ];
+  body.innerHTML = "";
+  const labels = { imported: "Баталгаатай орсон", partial: "Хэсэгчилсэн", missing: "Ороогүй" };
+  rows.forEach(([name, expected, actual, state]) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(name, "t-strong"));
+    tr.appendChild(cell(String(expected)));
+    tr.appendChild(cell(String(actual)));
+    const status = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "pill " + (state === "imported" ? "st-confirmed" : state === "partial" ? "st-pending" : "st-cancelled");
+    pill.textContent = labels[state];
+    status.appendChild(pill); tr.appendChild(status); body.appendChild(tr);
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════
