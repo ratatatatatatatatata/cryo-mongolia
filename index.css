@@ -1344,7 +1344,7 @@ body{
 .brand-orbit{display:none}
 .orbit-one{inset:3%;animation:brandOrbit 12s linear infinite}
 .orbit-two{inset:15%;animation:brandOrbit 9s linear infinite reverse;border-color:rgba(0,105,234,.18)}
-.brand-caption{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);display:flex;align-items:center;gap:9px;white-space:nowrap;color:rgba(183,222,244,.56);font-family:var(--ff-display);font-size:15px;font-weight:650;letter-spacing:.1em}
+.brand-caption{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);display:flex;align-items:center;gap:9px;white-space:nowrap;color:rgba(183,222,244,.56);font-family:var(--ff-display);font-size:20px;font-weight:650;letter-spacing:.08em}
 .brand-caption i{display:block;width:3px;height:3px;border-radius:50%;background:#0069ea;box-shadow:0 0 8px #0069ea}
 @keyframes brandReveal{from{opacity:0;transform:scale(.84) rotate(-7deg);filter:blur(8px)}to{opacity:1;transform:scale(1) rotate(0);filter:drop-shadow(0 30px 50px rgba(0,20,50,.55)) drop-shadow(0 0 45px rgba(0,105,234,.22))}}
 @keyframes brandFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-10px) rotate(1.5deg)}}
