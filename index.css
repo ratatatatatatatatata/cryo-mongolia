@@ -1243,6 +1243,12 @@ body.has-halo .cursor-halo{opacity:1}
 .auth-modal{max-width:440px}
 .auth-modal h3{font-size:26px;font-weight:800;letter-spacing:-.04em;color:var(--ice-50);margin-bottom:8px}
 .auth-lead{font-size:13px;color:var(--text-muted);line-height:1.65;margin-bottom:22px}
+.password-control{position:relative}
+.password-control input{width:100%;padding-right:76px}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);min-width:58px;padding:7px 9px;
+  border:1px solid var(--border);border-radius:9px;background:rgba(8,16,28,.92);color:var(--ice-200);
+  font:700 11.5px/1 var(--ff-body);cursor:pointer;transition:color var(--ease),border-color var(--ease),background var(--ease)}
+.password-toggle:hover,.password-toggle:focus-visible{color:var(--ice-50);border-color:var(--border-strong);background:var(--glass-2);outline:none}
 .auth-tabs{display:flex;gap:6px;margin-bottom:22px}
 .auth-tabs button{flex:1;padding:10px;border-radius:99px;border:1px solid var(--border);
   background:var(--glass);color:var(--text-secondary);font-family:var(--ff-body);

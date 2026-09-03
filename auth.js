@@ -78,7 +78,10 @@ function injectMarkup() {
       </div>
       <div class="form-group">
         <label for="c_pass">Нууц үг</label>
-        <input type="password" id="c_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+        <div class="password-control">
+          <input type="password" id="c_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+          <button class="password-toggle" type="button" id="c_pass_toggle" aria-controls="c_pass" aria-pressed="false" aria-label="Нууц үг харуулах">Харах</button>
+        </div>
       </div>
       <button type="submit" class="btn btn-primary" id="cAuthBtn" style="width:100%;margin-top:8px;">Нэвтрэх</button>
     </form>
@@ -216,6 +219,7 @@ function setMode(m) {
   $("authTitle").textContent = m === "signup" ? "Бүртгүүлэх" : "Нэвтрэх";
   $("cAuthBtn").textContent = m === "signup" ? "Бүртгүүлэх" : "Нэвтрэх";
   $("c_pass").setAttribute("autocomplete", m === "signup" ? "new-password" : "current-password");
+  resetPasswordVisibility("c_pass", "c_pass_toggle");
 }
 function note(kind, text) {
   $("authNote").innerHTML = "";
@@ -226,6 +230,7 @@ function note(kind, text) {
 }
 
 function wireAuth() {
+  wirePasswordVisibility("c_pass", "c_pass_toggle");
   $("authOverlay").addEventListener("click", (e) => {
     if (e.target.id === "authOverlay" || e.target.hasAttribute("data-close-auth")) closeAuth();
   });
@@ -284,6 +289,30 @@ function wireAuth() {
       openAuth("signin");
     });
   });
+}
+
+function wirePasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  button.addEventListener("click", () => {
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.textContent = show ? "Нуух" : "Харах";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харуулах");
+    input.focus({ preventScroll: true });
+  });
+}
+
+function resetPasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  input.type = "password";
+  button.textContent = "Харах";
+  button.setAttribute("aria-pressed", "false");
+  button.setAttribute("aria-label", "Нууц үг харуулах");
 }
 
 /* ══════════════════════════════════════════════════════════════
