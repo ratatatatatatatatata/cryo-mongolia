@@ -1304,12 +1304,16 @@ body{
     radial-gradient(ellipse at 74% 6%,rgba(0,105,234,.08),transparent 34%),
     var(--void);
 }
-.nav-logo{display:inline-flex;align-items:center;gap:11px;font-family:var(--ff-display);text-decoration:none}
-.nav-logo img{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(0,105,234,.38))}
-.nav-logo>span{display:grid;line-height:.9;gap:4px}
-.nav-logo b{font-size:15px;font-weight:740;letter-spacing:.025em;color:var(--ice-50)}
-.nav-logo small{font-size:7px;font-weight:620;letter-spacing:.22em;color:var(--ice-300)}
-.hero-inner{max-width:min(760px,53vw)}
+.nav-logo{display:inline-flex;align-items:center;gap:12px;font-family:var(--ff-display);text-decoration:none}
+.nav-logo img{width:32px;height:32px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(0,105,234,.38))}
+.nav-logo>span{display:grid;line-height:1;gap:4px}
+.nav-logo b{display:block;white-space:nowrap;font-size:15px;font-weight:740;letter-spacing:.015em;color:var(--ice-50)}
+.nav-logo b em{font-style:normal;color:var(--ice-400)}
+.nav-logo small{font-size:7px;font-weight:650;letter-spacing:.18em;color:var(--ice-300);white-space:nowrap}
+.hero-inner{
+  width:min(47vw,760px);max-width:none;padding:96px 0;
+  margin-left:var(--shell)
+}
 .hero-title{
   font-family:var(--ff-display);
   font-size:clamp(58px,7.35vw,112px);
@@ -1323,13 +1327,13 @@ body{
   background:linear-gradient(102deg,#d6f2ff 0%,#69adff 35%,#0069ea 100%);
   -webkit-background-clip:text;background-clip:text;
 }
-.hero-sub{font-family:var(--ff-body);font-weight:400;line-height:1.72;max-width:520px}
+.hero-sub{font-family:var(--ff-body);font-weight:400;line-height:1.72;max-width:580px}
 .section-title,.rates-title,.io-name,.pack-name,.price-name,.cta-bar h3{
   font-family:var(--ff-display);font-variation-settings:"slnt" -2;letter-spacing:-.045em
 }
 .hero-brand-mark{
-  position:absolute;z-index:2;right:clamp(5vw,9vw,12vw);top:46%;
-  width:clamp(390px,36vw,650px);aspect-ratio:1;
+  position:absolute;z-index:2;right:var(--shell);top:46%;
+  width:clamp(390px,34vw,620px);aspect-ratio:1;
   transform:translateY(-48%);display:grid;place-items:center;pointer-events:none;
   isolation:isolate;
 }
@@ -1350,16 +1354,17 @@ body{
 @keyframes brandFloat{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-10px) rotate(1.5deg)}}
 @keyframes brandOrbit{to{transform:rotateX(68deg) rotateZ(348deg)}}
 @media(max-width:1180px){
-  .hero-brand-mark{right:-7vw;width:clamp(360px,46vw,540px);opacity:.88}
-  .hero-inner{max-width:62vw}
+  .hero-brand-mark{right:2vw;width:clamp(360px,44vw,520px);opacity:.88}
+  .hero-inner{width:min(55vw,650px);margin-left:var(--shell)}
 }
 @media(max-width:900px){
-  .hero-inner{max-width:100%;width:100%}
+  .hero-inner{width:calc(100% - (var(--shell) * 2));margin-inline:var(--shell);padding:100px 0 84px}
   .hero-brand-mark{right:-29vw;top:39%;width:min(88vw,520px);opacity:.28}
   .hero-title{font-size:clamp(50px,12vw,86px)}
 }
 @media(max-width:680px){
-  .nav-logo img{width:27px;height:27px}.nav-logo b{font-size:13px}.nav-logo small{font-size:6px}
+  .nav-logo{gap:8px}.nav-logo img{width:27px;height:27px}.nav-logo b{font-size:12px}.nav-logo small{font-size:5.5px;letter-spacing:.13em}
+  .hero-inner{padding:74px 0 62px}
   .hero-brand-mark{right:-43vw;top:32%;width:108vw;opacity:.22}
   .hero-title{font-size:clamp(43px,12.8vw,64px);line-height:.92}
   .brand-caption{display:none}
