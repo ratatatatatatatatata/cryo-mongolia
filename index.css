@@ -268,7 +268,7 @@ nav.scrolled{
 }
 
 /* per-word rise (JS splits) */
-.tw{display:inline-block;overflow:hidden;vertical-align:bottom;padding-bottom:.06em}
+.tw{display:inline-block;overflow:hidden;vertical-align:bottom;padding:0 .12em .06em .035em;margin-inline:-.035em -.12em}
 .tw>i{display:inline-block;font-style:inherit;transform:translateY(108%);
   animation:wordRise 1.05s cubic-bezier(.19,1,.22,1) forwards}
 @keyframes wordRise{to{transform:translateY(0)}}
@@ -1309,6 +1309,7 @@ body{
 .nav-logo>span{display:grid;line-height:1;gap:4px}
 .nav-logo b{display:block;white-space:nowrap;font-size:15px;font-weight:740;letter-spacing:.015em;color:var(--ice-50)}
 .nav-logo b em{font-style:normal;color:var(--ice-400)}
+.nav-logo b em::before{content:' ';white-space:pre}
 .nav-logo small{font-size:7px;font-weight:650;letter-spacing:.18em;color:var(--ice-300);white-space:nowrap}
 .hero-inner{
   width:min(47vw,760px);max-width:none;padding:96px 0;
