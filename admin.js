@@ -52,7 +52,7 @@ let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
-  contracts: [], redemptions: [], payroll: [],
+  contracts: [], redemptions: [], payroll: [], saleDeletionRequests: [],
 };
 let bkFilter = "all";
 let cpkSearch = "";
@@ -340,6 +340,7 @@ async function loadAll() {
     () => sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("package_redemptions").select("contract_id,used_on,units").order("id", { ascending: true }),
     () => sb.from("payroll").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("sale_deletion_requests").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -363,6 +364,7 @@ async function loadAll() {
   cache.contracts = res[13].data || [];
   cache.redemptions = res[14].data || [];
   cache.payroll = res[15].data || [];
+  cache.saleDeletionRequests = res[16].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -373,6 +375,7 @@ async function loadAll() {
   renderOverview();
   renderCoverage();
   renderLedger();
+  renderSaleDeletionRequests();
   renderExpenses();
   renderReports();
   renderBookings();
@@ -1909,6 +1912,108 @@ function wireLedger() {
   );
 }
 
+function pendingDeletionFor(saleId) {
+  return cache.saleDeletionRequests.find(
+    (request) => Number(request.sale_id) === Number(saleId) && request.status === "pending",
+  );
+}
+
+async function requestSaleDeletion(row) {
+  if (pendingDeletionFor(row.id)) return alert("Энэ борлуулалтын хүсэлт админы шийдвэрийг хүлээж байна.");
+  const reason = prompt("Устгах шалтгаанаа бичнэ үү (заавал биш):", "");
+  if (reason === null) return;
+
+  const { data, error } = await sb
+    .from("sale_deletion_requests")
+    .insert({ sale_id: row.id, reason: reason.trim() || null })
+    .select()
+    .maybeSingle();
+  if (error) return alert("Устгах хүсэлт илгээж чадсангүй: " + error.message);
+
+  if (data) cache.saleDeletionRequests.unshift(data);
+  renderLedger();
+  renderSaleDeletionRequests();
+  alert("Устгах хүсэлт админд илгээгдлээ. Зөвшөөрөгдөх хүртэл борлуулалт хэвээр байна.");
+}
+
+async function archiveSale(row) {
+  if (!isAdminUser()) return;
+  if (!confirm(`${row.customer_name || "Энэ"} борлуулалтыг устгах уу? Тайлангаас архивлагдана.`)) return;
+  const { error } = await sb.from("sales").update({ archived_at: new Date().toISOString() }).eq("id", row.id);
+  if (error) return alert("Устгаж чадсангүй: " + error.message);
+  cache.sales = cache.sales.filter((sale) => Number(sale.id) !== Number(row.id));
+  renderLedger();
+  renderReports();
+}
+
+async function reviewSaleDeletion(request, status) {
+  if (!isAdminUser()) return;
+  const sale = cache.sales.find((row) => Number(row.id) === Number(request.sale_id));
+  const verb = status === "approved" ? "зөвшөөрч борлуулалтыг устгах" : "татгалзах";
+  if (!confirm(`${sale?.customer_name || "Энэ борлуулалтын"} хүсэлтийг ${verb} уу?`)) return;
+
+  const { data, error } = await sb
+    .from("sale_deletion_requests")
+    .update({ status })
+    .eq("id", request.id)
+    .eq("status", "pending")
+    .select()
+    .maybeSingle();
+  if (error) return alert("Хүсэлтийг шийдвэрлэж чадсангүй: " + error.message);
+  if (!data) return alert("Хүсэлт өмнө нь шийдвэрлэгдсэн байна.");
+
+  Object.assign(request, data);
+  if (status === "approved") {
+    cache.sales = cache.sales.filter((row) => Number(row.id) !== Number(request.sale_id));
+  }
+  renderSaleDeletionRequests();
+  renderLedger();
+  renderReports();
+}
+
+function renderSaleDeletionRequests() {
+  const panel = $("saleDeletionPanel");
+  const body = $("saleDeletionBody");
+  if (!panel || !body) return;
+  show(panel, isAdminUser());
+  if (!isAdminUser()) return;
+
+  const pending = cache.saleDeletionRequests.filter((request) => request.status === "pending");
+  $("saleDeletionCount").textContent = pending.length
+    ? `${pending.length} хүсэлт шийдвэр хүлээж байна`
+    : "Шийдвэр хүлээсэн хүсэлт алга";
+  body.innerHTML = "";
+  if (!pending.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty">Устгах хүсэлт алга байна.</div></td></tr>';
+    return;
+  }
+
+  pending.forEach((request) => {
+    const sale = cache.sales.find((row) => Number(row.id) === Number(request.sale_id));
+    const staff = cache.staff.find((row) => Number(row.id) === Number(sale?.staff_id));
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(sale?.sale_date || "—", "t-mono"));
+    tr.appendChild(cell(sale?.customer_name || "—", "t-strong"));
+    tr.appendChild(cell(sale?.services || "—"));
+    tr.appendChild(cell(staff?.name || sale?.therapist || "—"));
+    tr.appendChild(cell(request.reason || "Шалтгаан бичээгүй"));
+    tr.appendChild(cell(fmtDate(request.created_at), "t-mono"));
+    const actions = document.createElement("td");
+    actions.style.cssText = "display:flex;gap:7px;flex-wrap:wrap";
+    const approve = document.createElement("button");
+    approve.className = "btn-sm primary";
+    approve.textContent = "Зөвшөөрөх";
+    approve.addEventListener("click", () => reviewSaleDeletion(request, "approved"));
+    const reject = document.createElement("button");
+    reject.className = "btn-sm ghost";
+    reject.textContent = "Татгалзах";
+    reject.addEventListener("click", () => reviewSaleDeletion(request, "rejected"));
+    actions.append(approve, reject);
+    tr.appendChild(actions);
+    body.appendChild(tr);
+  });
+}
+
 function updateFormTotal() {
   const v = (id) => Number($(id).value) || 0;
   const t =
@@ -2489,12 +2594,28 @@ function renderLedger() {
     tr.appendChild(cell(money(rowTotal(r)), "t-mono t-strong"));
 
     const act = document.createElement("td");
+    act.style.cssText = "display:flex;gap:7px;flex-wrap:wrap";
     if (isAdminUser() || r.created_by === me?.id) {
       const ed = document.createElement("button");
       ed.className = "btn-sm ghost";
       ed.textContent = "Засах";
       ed.addEventListener("click", () => openLedForm(r));
       act.appendChild(ed);
+    }
+    if (isAdminUser()) {
+      const remove = document.createElement("button");
+      remove.className = "btn-sm danger";
+      remove.textContent = "Устгах";
+      remove.addEventListener("click", () => archiveSale(r));
+      act.appendChild(remove);
+    } else if (r.created_by === me?.id || cache.staff.some((staff) => Number(staff.id) === Number(r.staff_id) && staff.user_id === me?.id)) {
+      const request = pendingDeletionFor(r.id);
+      const remove = document.createElement("button");
+      remove.className = "btn-sm ghost";
+      remove.textContent = request ? "Хүсэлт хүлээгдэж байна" : "Устгах хүсэлт";
+      remove.disabled = !!request;
+      if (!request) remove.addEventListener("click", () => requestSaleDeletion(r));
+      act.appendChild(remove);
     }
     tr.appendChild(act);
 
