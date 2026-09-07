@@ -43,7 +43,7 @@ const ROLE_MN = {
 };
 
 const ADMIN_ONLY_NAV = [
-  "navOverview", "navExpenses", "navBookings", "navMessages", "navServices",
+  "navOverview", "navCoverage", "navExpenses", "navBookings", "navMessages", "navServices",
   "navPackages", "navStaff", "navInventory", "navUsers",
 ];
 
@@ -51,7 +51,7 @@ let sb = null;
 let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
-  sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], inventory: [],
+  sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
   contracts: [], redemptions: [],
 };
 let bkFilter = "all";
@@ -178,8 +178,9 @@ async function route() {
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
 
-  $("navReports").lastChild.textContent = me.role === "staff" ? " Миний борлуулалт" : " Борлуулалт, тайлан";
-  $("repTitle").textContent = me.role === "staff" ? "Миний борлуулалтын тайлан" : "Тайлан";
+  $("navReports").lastChild.textContent = me.role === "staff" ? " Өнөөдрийн борлуулалт" : " Борлуулалт, тайлан";
+  $("repTitle").textContent = me.role === "staff" ? "Өнөөдрийн борлуулалт" : "Тайлан";
+  show($("repFiltersPanel"), isAdmin);
 
   if (!isAdmin) {
     switchView("reports");
@@ -193,6 +194,7 @@ async function route() {
    ══════════════════════════════════════════════════════════════ */
 function wireAuthForm() {
   let mode = "signin";
+  wirePasswordVisibility("au_pass", "au_pass_toggle");
   const tabs = document.querySelectorAll(".gate-tabs button");
   tabs.forEach((b) =>
     b.addEventListener("click", () => {
@@ -205,6 +207,7 @@ function wireAuthForm() {
         "autocomplete",
         mode === "signup" ? "new-password" : "current-password",
       );
+      resetPasswordVisibility("au_pass", "au_pass_toggle");
       $("authMsg").innerHTML = "";
     }),
   );
@@ -236,6 +239,30 @@ function wireAuthForm() {
     btn.disabled = false;
     if (error) notice($("authMsg"), "err", error.message);
   });
+}
+
+function wirePasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  button.addEventListener("click", () => {
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.textContent = show ? "Нуух" : "Харах";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харуулах");
+    input.focus({ preventScroll: true });
+  });
+}
+
+function resetPasswordVisibility(inputId, buttonId) {
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  input.type = "password";
+  button.textContent = "Харах";
+  button.setAttribute("aria-pressed", "false");
+  button.setAttribute("aria-label", "Нууц үг харуулах");
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -286,10 +313,11 @@ async function loadAll() {
     sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).limit(5000),
     sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
     sb.from("staff").select("*").order("sort", { ascending: true }),
-    sb.from("customers").select("id,full_name,phone,email,created_at").order("updated_at", { ascending: false }).limit(1000),
+    sb.from("customers").select("id,full_name,phone,email,notes,source,created_at,updated_at").order("updated_at", { ascending: false }).limit(1000),
     sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
     sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).limit(2000),
+    sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).limit(3000),
     sb.from("package_redemptions").select("contract_id,used_on,units").limit(20000),
   ];
@@ -311,8 +339,9 @@ async function loadAll() {
   cache.attendance = res[9].data || [];
   cache.inventory = res[10].data || [];
   cache.workdays = res[11].data || [];
-  cache.contracts = res[12].data || [];
-  cache.redemptions = res[13].data || [];
+  cache.dailyStatus = res[12].data || [];
+  cache.contracts = res[13].data || [];
+  cache.redemptions = res[14].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -380,14 +409,29 @@ function normalizePhone(value) {
 function wireCustomers() {
   if (!$("cusBody")) return;
   $("cusSearch").addEventListener("input", renderCustomers);
-  $("cusAdd").addEventListener("click", () => {
-    $("cusForm").style.display = "";
-    $("cusName").focus();
-  });
-  $("cusCancel").addEventListener("click", () => {
-    $("cusForm").style.display = "none";
-  });
+  $("cusAdd").addEventListener("click", () => openCustomerForm());
+  $("cusCancel").addEventListener("click", closeCustomerForm);
   $("cusSave").addEventListener("click", saveCustomer);
+}
+
+let customerEditing = null;
+
+function openCustomerForm(customer = null) {
+  customerEditing = customer;
+  $("cusFormTitle").textContent = customer ? "Үйлчлүүлэгчийн мэдээлэл засах" : "Шинэ үйлчлүүлэгч";
+  $("cusName").value = customer?.full_name || "";
+  $("cusPhone").value = customer?.phone || "";
+  $("cusEmail").value = customer?.email || "";
+  $("cusNote").value = customer?.notes || "";
+  $("cusForm").style.display = "";
+  $("cusName").focus();
+  $("cusForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeCustomerForm() {
+  customerEditing = null;
+  ["cusName", "cusPhone", "cusEmail", "cusNote"].forEach((id) => ($(id).value = ""));
+  $("cusForm").style.display = "none";
 }
 
 async function saveCustomer() {
@@ -398,24 +442,27 @@ async function saveCustomer() {
   if (!fullName) return alert("Үйлчлүүлэгчийн нэр оруулна уу.");
   if (phone.length !== 8) return alert("Утасны дугаарыг 8 оронтой оруулна уу.");
 
-  const duplicate = cache.customers.find((c) => normalizePhone(c.phone) === phone);
+  const duplicate = cache.customers.find((c) => normalizePhone(c.phone) === phone && Number(c.id) !== Number(customerEditing?.id));
   if (duplicate) return alert("Энэ утасны дугаартай үйлчлүүлэгч бүртгэлтэй байна.");
 
   const btn = $("cusSave");
   btn.disabled = true;
-  const { data, error } = await sb.from("customers").insert({
+  const payload = {
     full_name: fullName,
     phone,
     email: email || null,
     notes: note || null,
-    source: "manual",
-  }).select("id,full_name,phone,email,created_at").single();
+  };
+  const query = customerEditing
+    ? sb.from("customers").update(payload).eq("id", customerEditing.id)
+    : sb.from("customers").insert({ ...payload, source: "manual" });
+  const { data, error } = await query.select("id,full_name,phone,email,notes,source,created_at,updated_at").single();
   btn.disabled = false;
   if (error) return alert("Хадгалж чадсангүй: " + error.message);
 
-  cache.customers.unshift(data);
-  ["cusName", "cusPhone", "cusEmail", "cusNote"].forEach((id) => ($(id).value = ""));
-  $("cusForm").style.display = "none";
+  if (customerEditing) Object.assign(cache.customers.find((c) => Number(c.id) === Number(customerEditing.id)), data);
+  else cache.customers.unshift(data);
+  closeCustomerForm();
   renderCustomers();
 }
 
@@ -433,7 +480,7 @@ function renderCustomers() {
   $("cusSub").textContent = `${rows.length} үйлчлүүлэгч · нэр, утсаар хайна`;
   body.innerHTML = "";
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="4"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="5"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
     return;
   }
   rows.forEach((customer) => {
@@ -442,6 +489,13 @@ function renderCustomers() {
     tr.appendChild(cell(customer.phone || "—", "t-mono"));
     tr.appendChild(cell(customer.email || "—"));
     tr.appendChild(cell(fmtDate(customer.created_at), "t-mono"));
+    const actions = document.createElement("td");
+    const edit = document.createElement("button");
+    edit.className = "btn-sm ghost";
+    edit.textContent = "Засах";
+    edit.addEventListener("click", () => openCustomerForm(customer));
+    actions.appendChild(edit);
+    tr.appendChild(actions);
     body.appendChild(tr);
   });
 }
@@ -1164,6 +1218,7 @@ let repSelectedYear = String(new Date().getFullYear());
 function rangeBounds(kind) {
   const now = new Date();
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (kind === "today") return [startOfDay(now), startOfDay(now)];
   if (kind === "month") {
     return [new Date(now.getFullYear(), now.getMonth(), 1), startOfDay(now)];
   }
@@ -1234,7 +1289,7 @@ function wireReports() {
 }
 
 function reportRows() {
-  const [from, to] = rangeBounds(repRange);
+  const [from, to] = rangeBounds(me?.role === "staff" ? "today" : repRange);
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
   return {
     from,
@@ -1253,6 +1308,7 @@ function renderReports() {
     repSelectedYear = availableYears()[0] || "all";
   }
   $("repYear").value = repRange === "all" ? "all" : repSelectedYear;
+  const isStaffReport = me?.role === "staff";
   const { from, to, rows } = reportRows();
 
   $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
@@ -1263,18 +1319,19 @@ function renderReports() {
   });
   const expenses = expenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const profit = revenue - expenses;
-  const isStaffReport = me?.role === "staff";
 
   $("rRevenue").innerHTML = '<small>₮</small>' + revenue.toLocaleString("en-US");
   const compareFrom = new Date(from); compareFrom.setFullYear(compareFrom.getFullYear() - 1);
   const compareTo = new Date(to); compareTo.setFullYear(compareTo.getFullYear() - 1);
-  const compareRows = repRange === "all" ? [] : cache.sales.filter((row) => {
+  const compareRows = isStaffReport || repRange === "all" ? [] : cache.sales.filter((row) => {
     const date = new Date(row.sale_date + "T00:00:00");
     return date >= compareFrom && date <= compareTo;
   });
   const compareRevenue = compareRows.reduce((sum, row) => sum + rowTotal(row), 0);
   const comparePct = compareRevenue ? ((revenue - compareRevenue) / compareRevenue) * 100 : null;
-  $("rRevenueNote").textContent = repRange === "all"
+  $("rRevenueNote").textContent = isStaffReport
+    ? `${rows.length} өнөөдрийн бүртгэл`
+    : repRange === "all"
     ? rows.length + " борлуулалтын бүртгэл"
     : `${rows.length} бүртгэл · өмнөх оны мөн үеэс ${comparePct === null ? "өгөгдөлгүй" : `${comparePct >= 0 ? "+" : ""}${comparePct.toFixed(1)}%`}`;
   $("rCount").textContent = rows.length.toLocaleString("en-US");
@@ -1658,12 +1715,12 @@ async function removeStaff(row) {
 let attendanceEditing = null;
 
 function wireAttendance() {
-  $("clockIn")?.addEventListener("click", () => clockAttendance("in"));
-  $("clockOut")?.addEventListener("click", () => clockAttendance("out"));
   $("attAdd")?.addEventListener("click", () => openAttendanceForm());
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
   $("attSave")?.addEventListener("click", saveAttendance);
+  $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
+  $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
   $("att_staff")?.addEventListener("change", (event) => {
     if (!attendanceEditing && event.target.value) $("att_day").value = nextWorkdayNumber(event.target.value);
   });
@@ -1698,20 +1755,38 @@ async function clockAttendance(mode) {
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
   syncAttendanceFilters();
-  const attendanceRows = allAttendanceRows()
-    .filter((row) => attendanceYear === "all" || String(row.work_date || "").startsWith(attendanceYear + "-"))
-    .filter((row) => attendanceStaff === "all" || String(row.staff_id || "") === attendanceStaff)
+  const today = localDateKey(new Date());
+  renderAttendanceStaffChecks();
+  const baseRows = allAttendanceRows()
+    .filter((row) => String(row.work_date || "").slice(0, 10) === today)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
-  $("attSub").textContent = `${attendanceRows.length} ээлж, ирцийн бүртгэл`;
+  const byStaff = new Map();
+  cache.staff.filter((staff) => staff.active).forEach((staff) => byStaff.set(String(staff.id), { staff_id: staff.id, staff_name: staff.name, work_date: today, __directory: true }));
+  baseRows.forEach((row) => byStaff.set(String(row.staff_id || row.staff_name), row));
+  cache.dailyStatus.filter((row) => row.work_date === today).forEach((status) => {
+    const key = String(status.staff_id);
+    byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: today, daily_status: status.status, daily_note: status.note });
+  });
+  const attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
+  $("attSub").textContent = `${fmtDate(today)} · ${attendanceRows.length} ажилтан`;
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="9"><div class="empty">Ирцийн бүртгэл алга байна.</div></td></tr>');
+  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="5"><div class="empty">Өнөөдрийн ээлжийн мэдээлэл алга байна.</div></td></tr>');
   attendanceRows.forEach((row) => {
     const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
-    const hours = start && end ? ((end - start) / 3600000).toFixed(1) + " цаг" : "—";
     const tr = document.createElement("tr");
-    [row.work_date, row.staff_name, row.workday_number ? `${row.workday_number} дахь өдөр` : "—", start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—", end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "Ажиллаж байна", hours, row.note || "—", row.__source].forEach((v, i) => tr.appendChild(cell(v, i === 1 ? "t-strong" : i === 2 ? "t-mono" : "")));
+    tr.appendChild(cell(row.staff_name, "t-strong"));
+    const shift = `${start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"} — ${end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"}`;
+    tr.appendChild(cell(shift, "t-mono"));
+    const statusCell = document.createElement("td");
+    const status = attendanceStatus(row, end);
+    const pill = document.createElement("span");
+    pill.className = `pill ${status.className}`;
+    pill.textContent = status.label;
+    statusCell.appendChild(pill);
+    tr.appendChild(statusCell);
+    tr.appendChild(cell(row.daily_note || row.note || "—"));
     const actions = document.createElement("td");
-    if (isAdminUser()) {
+    if (isAdminUser() && !row.__directory && row.__table) {
       const edit = document.createElement("button");
       edit.className = "btn-sm ghost"; edit.textContent = "Засах";
       edit.addEventListener("click", () => openAttendanceForm(row));
@@ -1726,22 +1801,92 @@ function renderAttendance() {
   });
 }
 
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function attendanceStatus(row, end) {
+  if (row.daily_status === "left") return { label: "Гарсан", className: "st-done" };
+  const note = String(row.note || "").toLowerCase();
+  if (note.includes("шилжүүл")) return { label: "Өөр хүнд шилжүүлсэн", className: "st-transferred" };
+  if (note.includes("гарсан") || (end && end <= new Date())) return { label: "Гарсан", className: "st-done" };
+  return { label: "Ээлжтэй", className: "st-confirmed" };
+}
+
+function renderAttendanceStaffChecks() {
+  const host = $("attStaffChecks");
+  if (!host) return;
+  const selected = new Set([...host.querySelectorAll("input:checked")].map((input) => input.value));
+  host.innerHTML = "";
+  cache.staff.filter((staff) => staff.active).forEach((staff) => {
+    const label = document.createElement("label");
+    label.className = "staff-check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = String(staff.id);
+    input.checked = selected.has(input.value);
+    input.addEventListener("change", updateAttendanceSelectionNote);
+    const name = document.createElement("span");
+    name.textContent = staff.name;
+    label.append(input, name);
+    host.appendChild(label);
+  });
+  updateAttendanceSelectionNote();
+}
+
+function updateAttendanceSelectionNote() {
+  const count = $("attStaffChecks")?.querySelectorAll("input:checked").length || 0;
+  if ($("attSelectionNote")) $("attSelectionNote").textContent = count ? `${count} ажилтан сонгосон` : "Ажилтан сонгоогүй";
+}
+
+function toggleAllAttendanceStaff() {
+  const checks = [...$("attStaffChecks").querySelectorAll("input")];
+  const shouldCheck = checks.some((input) => !input.checked);
+  checks.forEach((input) => (input.checked = shouldCheck));
+  updateAttendanceSelectionNote();
+}
+
+async function markSelectedStaffLeft() {
+  const ids = [...$("attStaffChecks").querySelectorAll("input:checked")].map((input) => Number(input.value));
+  if (!ids.length) return alert("Гарсан ажилтнаас сонгоно уу.");
+  const today = localDateKey(new Date());
+  const rows = ids.map((id) => {
+    const staff = cache.staff.find((item) => Number(item.id) === id);
+    return { work_date: today, staff_id: id, staff_name: staff.name, status: "left", note: "Өнөөдөр гарсан", reported_by: me.id };
+  });
+  const button = $("attMarkLeft");
+  button.disabled = true;
+  const { data, error } = await sb.from("daily_staff_status").upsert(rows, { onConflict: "work_date,staff_id" }).select();
+  button.disabled = false;
+  if (error) return alert("Төлөв хадгалж чадсангүй: " + error.message);
+  (data || []).forEach((row) => {
+    const current = cache.dailyStatus.find((item) => item.work_date === row.work_date && Number(item.staff_id) === Number(row.staff_id));
+    if (current) Object.assign(current, row); else cache.dailyStatus.unshift(row);
+  });
+  $("attStaffChecks").querySelectorAll("input:checked").forEach((input) => (input.checked = false));
+  renderAttendance();
+}
+
 function syncAttendanceFilters() {
   const rows = allAttendanceRows();
   const yearSelect = $("attYear");
-  const yearValue = attendanceYear;
-  const years = [...new Set(rows.map((row) => String(row.work_date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))].sort((a, b) => Number(b) - Number(a));
-  yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
-  years.forEach((year) => yearSelect.appendChild(new Option(year + " он", year)));
-  attendanceYear = years.includes(yearValue) || yearValue === "all" ? yearValue : "all";
-  yearSelect.value = attendanceYear;
+  if (yearSelect) {
+    const yearValue = attendanceYear;
+    const years = [...new Set(rows.map((row) => String(row.work_date || "").slice(0, 4)).filter((year) => /^\d{4}$/.test(year)))].sort((a, b) => Number(b) - Number(a));
+    yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
+    years.forEach((year) => yearSelect.appendChild(new Option(year + " он", year)));
+    attendanceYear = years.includes(yearValue) || yearValue === "all" ? yearValue : "all";
+    yearSelect.value = attendanceYear;
+  }
 
   const staffFilter = $("attStaff");
-  const staffValue = attendanceStaff;
-  staffFilter.innerHTML = '<option value="all">Бүх ажилтан</option>';
-  cache.staff.forEach((staff) => staffFilter.appendChild(new Option(staff.name, String(staff.id))));
-  attendanceStaff = [...staffFilter.options].some((option) => option.value === staffValue) ? staffValue : "all";
-  staffFilter.value = attendanceStaff;
+  if (staffFilter) {
+    const staffValue = attendanceStaff;
+    staffFilter.innerHTML = '<option value="all">Бүх ажилтан</option>';
+    cache.staff.forEach((staff) => staffFilter.appendChild(new Option(staff.name, String(staff.id))));
+    attendanceStaff = [...staffFilter.options].some((option) => option.value === staffValue) ? staffValue : "all";
+    staffFilter.value = attendanceStaff;
+  }
 
   const formStaff = $("att_staff");
   const selected = formStaff.value;

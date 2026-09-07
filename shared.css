@@ -69,10 +69,12 @@ body.has-halo .cursor-halo{opacity:1}
   text-decoration:none;letter-spacing:.02em;transition:color var(--ease),gap var(--ease);position:relative;z-index:10;cursor:pointer}
 .back-btn:hover{color:var(--ice-300);gap:12px}
 .back-btn::before{content:'←';font-size:15px}
-.nav-logo{font-family:var(--ff-display);font-size:18px;font-weight:600;letter-spacing:-.02em;
-  color:var(--text-primary);text-decoration:none}
-.nav-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
-  -webkit-background-clip:text;background-clip:text;color:transparent;font-weight:400}
+.nav-logo{display:inline-flex;align-items:center;gap:10px;color:var(--text-primary);text-decoration:none}
+.nav-logo img{width:29px;height:29px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(0,105,234,.34))}
+.nav-logo>span{display:grid;gap:3px;line-height:1}
+.nav-logo b{font-family:var(--ff-display);font-size:13px;font-weight:800;letter-spacing:.015em;white-space:nowrap}
+.nav-logo b em{font-style:normal;color:var(--ice-400)}
+.nav-logo small{font-size:5.8px;font-weight:700;letter-spacing:.16em;color:var(--ice-300);white-space:nowrap}
 
 /* ══════════ DEVICE HERO ══════════ */
 .dev-hero{

@@ -11,9 +11,13 @@ body{background:var(--void);min-height:100vh}
 .gate-card{width:100%;max-width:420px;padding:44px 40px;border-radius:var(--r-2xl);
   background:linear-gradient(165deg,rgba(20,38,62,.8),rgba(8,16,28,.94));
   border:1px solid var(--border-mid);box-shadow:var(--lift-3), var(--hairline)}
-.gate-logo{font-size:20px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);margin-bottom:6px}
-.gate-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-logo{margin-bottom:10px}
+.admin-brand{display:inline-flex;align-items:center;gap:10px;color:var(--ice-50);text-decoration:none}
+.admin-brand img{width:31px;height:31px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 11px rgba(0,105,234,.4))}
+.admin-brand>span{display:grid;gap:3px;line-height:1}
+.admin-brand b{font-family:var(--ff-display);font-size:13.5px;font-weight:800;letter-spacing:.012em;white-space:nowrap}
+.admin-brand b em{font-style:normal;color:var(--ice-400)}
+.admin-brand small{font-size:6px;font-weight:700;letter-spacing:.16em;color:var(--ice-300);white-space:nowrap}
 .gate-sub{font-size:12.5px;color:var(--text-muted);margin-bottom:28px}
 .gate-card .field{margin-bottom:16px}
 .gate-tabs{display:flex;gap:6px;margin-bottom:22px}
@@ -22,16 +26,20 @@ body{background:var(--void);min-height:100vh}
   font-size:12.5px;font-weight:700;cursor:pointer;transition:all var(--ease)}
 .gate-tabs button.on{color:#03131f;border-color:transparent;
   background:linear-gradient(135deg,var(--ice-100),var(--ice-400))}
+.password-control{position:relative}
+.password-control .ctl{width:100%;padding-right:76px}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);min-width:58px;padding:7px 9px;
+  border:1px solid var(--border);border-radius:9px;background:rgba(8,16,28,.9);color:var(--ice-200);
+  font:700 11.5px/1 var(--ff-body);cursor:pointer;transition:color var(--ease),border-color var(--ease),background var(--ease)}
+.password-toggle:hover,.password-toggle:focus-visible{color:var(--ice-50);border-color:var(--border-strong);background:var(--glass-2);outline:none}
 
 /* ── shell ── */
 .shell{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
 .side{position:sticky;top:0;height:100vh;padding:26px 18px;display:flex;flex-direction:column;gap:4px;
   background:linear-gradient(180deg,rgba(10,18,32,.95),rgba(3,6,12,.98));
   border-right:1px solid var(--border)}
-.side-logo{font-size:17px;font-weight:800;letter-spacing:-.03em;color:var(--ice-50);
-  padding:0 12px 22px;text-decoration:none;display:block}
-.side-logo span{background:linear-gradient(100deg,var(--ice-300),var(--ice-500));
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+.side-logo{padding:0 12px 22px}
+.side-logo.admin-brand{display:inline-flex}
 .side a.nav-item,.side button.nav-item{
   display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:12px;
   font-family:var(--ff-body);font-size:13.5px;font-weight:600;color:var(--text-secondary);
@@ -112,6 +120,14 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .st-confirmed{background:rgba(88,198,255,.14);color:var(--ice-200);border:1px solid rgba(88,198,255,.32)}
 .st-done     {background:rgba(80,220,160,.14);color:#8ceec2;border:1px solid rgba(80,220,160,.3)}
 .st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
+.st-transferred{background:rgba(160,120,255,.14);color:#d6c7ff;border:1px solid rgba(160,120,255,.32)}
+.today-attendance{min-width:620px!important}
+.staff-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.staff-check{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:rgba(3,6,12,.42);color:var(--text-secondary);cursor:pointer;transition:all var(--ease)}
+.staff-check:hover{border-color:var(--border-strong);color:var(--ice-100)}
+.staff-check:has(input:checked){border-color:rgba(88,198,255,.5);background:rgba(88,198,255,.1);color:var(--ice-100)}
+.staff-check input{width:17px;height:17px;accent-color:#58c6ff;flex:0 0 auto}
+.staff-check span{font-size:13px;font-weight:700}
 
 /* ── controls ── */
 .field{display:flex;flex-direction:column;gap:7px}

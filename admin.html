@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="robots" content="noindex,nofollow"/>
 <meta name="theme-color" content="#03060c"/>
-<title>Админ — °CRYO Mongolia</title>
+<title>Админ — CRYO Mongolia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="shared.css"/>
 <link rel="stylesheet" href="admin.css"/>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%23071018%27/%3E%3Cg stroke=%27%2358c6ff%27 stroke-width=%272.4%27 stroke-linecap=%27round%27%3E%3Cpath d=%27M16 5v22M6.5 10.5l19 11M25.5 10.5l-19 11%27/%3E%3C/g%3E%3C/svg%3E"/>
+<link rel="icon" type="image/svg+xml" href="logo.svg"/>
 </head>
 <body>
 
 <!-- ══════════ LOGIN ══════════ -->
 <div class="gate" id="authGate">
   <div class="gate-card">
-    <a href="index.html" class="gate-logo">°CRYO <span>Mongolia</span></a>
+    <a href="index.html" class="gate-logo admin-brand" aria-label="CRYO Mongolia — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
     <p class="gate-sub">Удирдлагын самбарт нэвтрэх</p>
 
     <!-- shown only while Supabase is not connected yet -->
@@ -47,7 +47,10 @@
       </div>
       <div class="field" style="margin-top:16px;">
         <label for="au_pass">Нууц үг</label>
-        <input class="ctl" type="password" id="au_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+        <div class="password-control">
+          <input class="ctl" type="password" id="au_pass" autocomplete="current-password" required minlength="6" placeholder="••••••••"/>
+          <button class="password-toggle" type="button" id="au_pass_toggle" aria-controls="au_pass" aria-pressed="false" aria-label="Нууц үг харуулах">Харах</button>
+        </div>
       </div>
       <button class="btn-sm primary" type="submit" id="authBtn"
               style="width:100%;margin-top:24px;padding:13px;">Нэвтрэх</button>
@@ -63,7 +66,7 @@
 <!-- ══════════ NO PERMISSION ══════════ -->
 <div class="gate" id="denyGate" style="display:none;">
   <div class="gate-card">
-    <div class="gate-logo">°CRYO <span>Mongolia</span></div>
+    <div class="gate-logo admin-brand"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></div>
     <p class="gate-sub" id="denyWho"></p>
     <div class="notice warn">
       Энэ бүртгэл удирдлагын самбарт нэвтрэх эрхгүй байна. Цаг захиалах, захиалгаа
@@ -79,7 +82,7 @@
 <!-- ══════════ DASHBOARD ══════════ -->
 <div class="shell" id="shell" style="display:none;">
   <aside class="side">
-    <a href="index.html" class="side-logo">°CRYO <span>Mongolia</span></a>
+    <a href="index.html" class="side-logo admin-brand" aria-label="CRYO Mongolia — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
 
     <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="coverage" id="navCoverage"><span class="ic">✓</span> Excel шилжилт</button>
@@ -198,7 +201,7 @@
 
       <div class="panel" id="cusForm" style="display:none;">
         <div class="panel-head">
-          <div class="panel-title">Шинэ үйлчлүүлэгч</div>
+          <div class="panel-title" id="cusFormTitle">Шинэ үйлчлүүлэгч</div>
           <button class="btn-sm ghost" id="cusCancel">✕ Хаах</button>
         </div>
         <div class="form-grid">
@@ -214,7 +217,7 @@
 
       <div class="panel">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th></tr></thead>
+          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th><th></th></tr></thead>
           <tbody id="cusBody"></tbody>
         </table></div>
       </div>
@@ -234,7 +237,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="repFiltersPanel">
         <div class="filters" id="repFilters">
           <button class="chip-btn on" data-range="month">Энэ сар</button>
           <button class="chip-btn" data-range="prev">Өнгөрсөн сар</button>
@@ -474,17 +477,20 @@
     <!-- ── ATTENDANCE ── -->
     <section class="view" data-panel="attendance">
       <div class="page-head">
-        <div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Ажил эхэлсэн, дууссан цагийн бүртгэл</div></div>
+        <div><div class="page-title">Өнөөдрийн ээлж</div><div class="page-sub" id="attSub">Өнөөдрийн ажилтны төлөв</div></div>
         <div class="head-actions">
           <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
-          <button class="btn-sm ghost" id="clockIn">▶ Ажил эхлэх</button>
-          <button class="btn-sm ghost" id="clockOut">■ Ажил дуусгах</button>
         </div>
       </div>
-      <div class="panel">
-        <div class="filters">
-          <div class="field inline-field"><label for="attYear">Жил</label><select class="ctl sm" id="attYear"></select></div>
-          <div class="field inline-field"><label for="attStaff">Ажилтан</label><select class="ctl sm" id="attStaff"><option value="all">Бүх ажилтан</option></select></div>
+      <div class="panel" id="todayStatusPanel">
+        <div class="panel-head">
+          <div><div class="panel-title">Өнөөдөр гарсан ажилтан</div><div class="page-sub">Админы бүртгэсэн идэвхтэй ажилтнуудаас нэг эсвэл олныг сонгоно</div></div>
+          <button class="btn-sm ghost" id="attSelectAll">Бүгдийг сонгох</button>
+        </div>
+        <div class="staff-check-grid" id="attStaffChecks"></div>
+        <div class="form-actions">
+          <button class="btn-sm primary" id="attMarkLeft">Сонгосныг “Гарсан” болгох</button>
+          <span class="page-sub" id="attSelectionNote">Ажилтан сонгоогүй</span>
         </div>
       </div>
       <div class="panel" id="attForm" style="display:none">
@@ -495,11 +501,11 @@
           <div class="field"><label for="att_day">Хэд дэх өдөр *</label><input class="ctl" id="att_day" type="number" min="1" step="1" required/></div>
           <div class="field"><label for="att_in">Эхэлсэн цаг *</label><input class="ctl" id="att_in" type="time"/></div>
           <div class="field"><label for="att_out">Дууссан цаг</label><input class="ctl" id="att_out" type="time"/></div>
-          <div class="field" style="grid-column:span 2"><label for="att_note">Тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500"/></div>
+          <div class="field" style="grid-column:span 2"><label for="att_note">Төлөв, тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500" placeholder="Жишээ: Гарсан, Өөр хүнд шилжүүлсэн"/></div>
         </div>
         <div class="form-actions"><button class="btn-sm primary" id="attSave">Хадгалах</button><button class="btn-sm ghost" id="attFormCancel">Болих</button></div>
       </div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Эхэлсэн</th><th>Дууссан</th><th>Нийт цаг</th><th>Тэмдэглэл</th><th>Эх үүсвэр</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Ажилтан</th><th>Ээлжийн цаг</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
     <!-- ── INVENTORY ── -->
