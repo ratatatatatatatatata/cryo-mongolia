@@ -44,7 +44,7 @@ const ROLE_MN = {
 
 const ADMIN_ONLY_NAV = [
   "navOverview", "navCoverage", "navExpenses", "navBookings", "navMessages", "navServices",
-  "navPackages", "navStaff", "navInventory", "navUsers",
+  "navPackages", "navStaff", "navInventory", "navPayroll", "navUsers",
 ];
 
 let sb = null;
@@ -52,7 +52,7 @@ let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
-  contracts: [], redemptions: [],
+  contracts: [], redemptions: [], payroll: [],
 };
 let bkFilter = "all";
 let cpkSearch = "";
@@ -105,6 +105,7 @@ function fmtDate(v) {
   wireAttendance();
   wireInventory();
   wireContracts();
+  wirePayroll();
 
   /* the login screen always renders; it just explains itself when the
      project has no anon key yet, instead of vanishing behind a setup page */
@@ -320,6 +321,7 @@ async function loadAll() {
     sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).limit(3000),
     sb.from("package_redemptions").select("contract_id,used_on,units").limit(20000),
+    sb.from("payroll").select("*").order("work_date", { ascending: false }).limit(5000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -342,6 +344,7 @@ async function loadAll() {
   cache.dailyStatus = res[12].data || [];
   cache.contracts = res[13].data || [];
   cache.redemptions = res[14].data || [];
+  cache.payroll = res[15].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -359,6 +362,7 @@ async function loadAll() {
   renderServices();
   renderPackages();
   renderContracts();
+  renderPayroll();
   renderUsers();
   renderCustomers();
   renderStaff();
@@ -386,7 +390,7 @@ function renderCoverage() {
     ["Хэрэглэгчийн багц", 808, cache.contracts.length],
     ["Ирц", 526, cache.workdays.length + cache.attendance.length],
     ["Азот / бараа материал", 69, cache.inventory.length],
-    ["Цалин", 254, 0],
+    ["Цалин", 648, cache.payroll.length],
   ];
   body.innerHTML = "";
   const labels = { imported: "Баталгаатай орсон", partial: "Хэсэгчилсэн", missing: "Ороогүй" };
@@ -1096,6 +1100,21 @@ function renderContracts() {
     st.appendChild(pill);
     tr.appendChild(st);
 
+    const actions = document.createElement("td");
+    if (isAdminUser()) {
+      const edit = document.createElement("button");
+      edit.className = "btn-sm ghost";
+      edit.textContent = "Засах";
+      edit.addEventListener("click", () => openContractForm(r));
+      const remove = document.createElement("button");
+      remove.className = "btn-sm danger";
+      remove.textContent = "Устгах";
+      remove.addEventListener("click", () => deleteContract(r));
+      actions.className = "row-actions";
+      actions.append(edit, remove);
+    }
+    tr.appendChild(actions);
+
     body.appendChild(tr);
   });
 }
@@ -1132,6 +1151,288 @@ function wireContracts() {
       renderContracts();
     });
   }
+  $("cpkAdd")?.addEventListener("click", () => openContractForm());
+  $("cpkClose")?.addEventListener("click", closeContractForm);
+  $("cpkCancel")?.addEventListener("click", closeContractForm);
+  $("cpkSave")?.addEventListener("click", saveContract);
+}
+
+/* ── customer packages: add and edit by hand ──────────────────── */
+let contractEditing = null;
+
+function openContractForm(row = null) {
+  contractEditing = row;
+  $("cpkFormTitle").textContent = row ? "Багц засах" : "Багц нэмэх";
+  $("cpk_customer").value = row?.customer_label || "";
+  $("cpk_package").value = row?.package_label || "";
+  $("cpk_start").value = row?.purchased_on || "";
+  $("cpk_expires").value = row?.expires_on || "";
+  $("cpk_total").value = row?.total_units ?? "";
+  $("cpk_state").value = row?.status || "active";
+  $("cpk_notes").value = row?.notes || "";
+  show($("cpkForm"));
+  $("cpk_customer").focus();
+  $("cpkForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeContractForm() {
+  contractEditing = null;
+  show($("cpkForm"), false);
+}
+
+async function saveContract() {
+  if (!isAdminUser()) return alert("Зөвхөн админ багц засах эрхтэй.");
+  const patch = {
+    customer_label: $("cpk_customer").value.trim(),
+    package_label: $("cpk_package").value.trim(),
+    purchased_on: $("cpk_start").value || null,
+    expires_on: $("cpk_expires").value || null,
+    total_units: $("cpk_total").value === "" ? null : Number($("cpk_total").value),
+    status: $("cpk_state").value,
+    notes: $("cpk_notes").value.trim() || null,
+  };
+  if (!patch.customer_label || !patch.package_label)
+    return alert("Үйлчлүүлэгч болон багцын нэрийг оруулна уу.");
+  if (patch.expires_on && patch.purchased_on && patch.expires_on < patch.purchased_on)
+    return alert("Дуусах огноо эхэлсэн огнооноос өмнө байж болохгүй.");
+
+  const button = $("cpkSave");
+  button.disabled = true;
+  const { data, error } = contractEditing
+    ? await sb.from("customer_package_contracts").update(patch).eq("id", contractEditing.id).select().maybeSingle()
+    : await sb.from("customer_package_contracts").insert(patch).select().maybeSingle();
+  button.disabled = false;
+  if (error) return alert("Багц хадгалж чадсангүй: " + error.message);
+
+  if (contractEditing) {
+    const current = cache.contracts.find((c) => Number(c.id) === Number(contractEditing.id));
+    if (current) Object.assign(current, data || patch);
+  } else if (data) {
+    cache.contracts.unshift(data);
+  }
+  closeContractForm();
+  renderContracts();
+  renderCoverage();
+}
+
+async function deleteContract(row) {
+  if (!isAdminUser()) return alert("Зөвхөн админ багц устгах эрхтэй.");
+  const used = cache.redemptions.filter((r) => Number(r.contract_id) === Number(row.id)).length;
+  const warning = used
+    ? `\n\nЭнэ багцад ${used} ирсэн бүртгэл холбоотой бөгөөд тэдгээр нь хамт устана.`
+    : "";
+  if (!confirm(`${row.customer_label} — ${row.package_label} багцыг устгах уу?${warning}`)) return;
+
+  /* the redemptions point at the contract and block its delete, so they go first */
+  if (used) {
+    const { error } = await sb.from("package_redemptions").delete().eq("contract_id", row.id);
+    if (error) return alert("Ирсэн бүртгэлийг устгаж чадсангүй: " + error.message);
+    cache.redemptions = cache.redemptions.filter((r) => Number(r.contract_id) !== Number(row.id));
+  }
+  const { error } = await sb.from("customer_package_contracts").delete().eq("id", row.id);
+  if (error) return alert("Багц устгаж чадсангүй: " + error.message);
+  cache.contracts = cache.contracts.filter((c) => Number(c.id) !== Number(row.id));
+  renderContracts();
+  renderCoverage();
+}
+
+/* ── payroll ──────────────────────────────────────────────────── */
+let payrollEditing = null;
+let payYear = "all";
+let payStaff = "all";
+let paySearch = "";
+
+function renderPayroll() {
+  const body = $("payBody");
+  if (!body) return;
+  syncPayrollFilters();
+
+  const needle = paySearch.trim().toLowerCase();
+  const rows = cache.payroll
+    .filter((r) => payYear === "all" || String(r.work_date || r.period_start || "").startsWith(payYear))
+    .filter((r) => payStaff === "all" || r.staff_name === payStaff)
+    .filter(
+      (r) =>
+        !needle ||
+        String(r.customer_label || "").toLowerCase().includes(needle) ||
+        String(r.period_label || "").toLowerCase().includes(needle),
+    )
+    .sort((a, b) =>
+      String(b.work_date || b.period_start || "").localeCompare(String(a.work_date || a.period_start || "")),
+    );
+
+  const sum = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
+  const periods = new Set(rows.map((r) => r.period_label).filter(Boolean)).size;
+  const people = new Set(rows.map((r) => r.staff_name)).size;
+
+  $("payKpis").innerHTML = [
+    ["Нийт дүн", "<small>₮</small>" + sum.toLocaleString("en-US"), rows.length + " мөр"],
+    ["Цалингийн үе", periods.toLocaleString("en-US"), "бүртгэгдсэн"],
+    ["Ажилтан", people.toLocaleString("en-US"), "орлоготой"],
+    [
+      "Дундаж мөр",
+      "<small>₮</small>" + (rows.length ? Math.round(sum / rows.length).toLocaleString("en-US") : "0"),
+      "нэг үйлчилгээнд",
+    ],
+  ]
+    .map(
+      ([l, v, n]) =>
+        '<div class="kpi"><div class="kpi-label">' + l + '</div><div class="kpi-val">' + v +
+        '</div><div class="kpi-note">' + n + "</div></div>",
+    )
+    .join("");
+
+  $("paySub").textContent = `${rows.length} мөр · ₮${sum.toLocaleString("en-US")}`;
+
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML =
+      '<tr><td colspan="8"><div class="empty">Цалингийн бүртгэл алга байна.</div></td></tr>';
+    return;
+  }
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(row.work_date || "—", "t-mono"));
+    tr.appendChild(cell(row.staff_name, "t-strong"));
+    tr.appendChild(cell(row.customer_label || "—"));
+    tr.appendChild(cell("₮" + Number(row.amount || 0).toLocaleString("en-US"), "t-mono"));
+    tr.appendChild(cell(row.period_label || "—"));
+    tr.appendChild(cell(row.note || "—"));
+    tr.appendChild(cell(row.source === "workbook" ? "Excel" : "Гараар"));
+
+    const actions = document.createElement("td");
+    if (isAdminUser()) {
+      const edit = document.createElement("button");
+      edit.className = "btn-sm ghost";
+      edit.textContent = "Засах";
+      edit.addEventListener("click", () => openPayrollForm(row));
+      const remove = document.createElement("button");
+      remove.className = "btn-sm danger";
+      remove.textContent = "Устгах";
+      remove.addEventListener("click", () => deletePayroll(row));
+      actions.className = "row-actions";
+      actions.append(edit, remove);
+    }
+    tr.appendChild(actions);
+    body.appendChild(tr);
+  });
+}
+
+function syncPayrollFilters() {
+  const yearSelect = $("payYear");
+  if (!yearSelect) return;
+  const years = [
+    ...new Set(
+      cache.payroll
+        .map((r) => String(r.work_date || r.period_start || "").slice(0, 4))
+        .filter((y) => /^\d{4}$/.test(y)),
+    ),
+  ].sort((a, b) => Number(b) - Number(a));
+  yearSelect.innerHTML = '<option value="all">Бүх хугацаа</option>';
+  years.forEach((y) => yearSelect.appendChild(new Option(y + " он", y)));
+  payYear = years.includes(payYear) ? payYear : "all";
+  yearSelect.value = payYear;
+
+  const staffSelect = $("payStaff");
+  const names = [...new Set(cache.payroll.map((r) => r.staff_name).filter(Boolean))].sort();
+  staffSelect.innerHTML = '<option value="all">Бүх ажилтан</option>';
+  names.forEach((n) => staffSelect.appendChild(new Option(n, n)));
+  payStaff = names.includes(payStaff) ? payStaff : "all";
+  staffSelect.value = payStaff;
+
+  const formStaff = $("pay_staff");
+  const chosen = formStaff.value;
+  formStaff.innerHTML = '<option value="">Ажилтан сонгох</option>';
+  cache.staff.forEach((s) => formStaff.appendChild(new Option(s.name, s.name)));
+  names.forEach((n) => {
+    if (!cache.staff.some((s) => s.name === n)) formStaff.appendChild(new Option(n, n));
+  });
+  formStaff.value = chosen;
+}
+
+function openPayrollForm(row = null) {
+  payrollEditing = row;
+  $("payFormTitle").textContent = row ? "Цалингийн мөр засах" : "Цалингийн мөр нэмэх";
+  syncPayrollFilters();
+  $("pay_staff").value = row?.staff_name || "";
+  $("pay_date").value = row?.work_date || "";
+  $("pay_customer").value = row?.customer_label || "";
+  $("pay_amount").value = row?.amount ?? "";
+  $("pay_start").value = row?.period_start || "";
+  $("pay_end").value = row?.period_end || "";
+  $("pay_label").value = row?.period_label || "";
+  $("pay_note").value = row?.note || "";
+  show($("payForm"));
+  $("pay_staff").focus();
+  $("payForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closePayrollForm() {
+  payrollEditing = null;
+  show($("payForm"), false);
+}
+
+async function savePayroll() {
+  if (!isAdminUser()) return alert("Зөвхөн админ цалин засах эрхтэй.");
+  const staffName = $("pay_staff").value.trim();
+  const amount = Number($("pay_amount").value);
+  if (!staffName) return alert("Ажилтныг сонгоно уу.");
+  if (!(amount >= 0)) return alert("Дүнг зөв оруулна уу.");
+
+  const patch = {
+    staff_id: cache.staff.find((s) => s.name === staffName)?.id ?? null,
+    staff_name: staffName,
+    work_date: $("pay_date").value || null,
+    customer_label: $("pay_customer").value.trim() || null,
+    amount,
+    period_start: $("pay_start").value || null,
+    period_end: $("pay_end").value || null,
+    period_label: $("pay_label").value.trim() || null,
+    note: $("pay_note").value.trim() || null,
+  };
+  if (patch.period_end && patch.period_start && patch.period_end < patch.period_start)
+    return alert("Үеийн дуусах огноо эхлэхээсээ өмнө байж болохгүй.");
+
+  const button = $("paySave");
+  button.disabled = true;
+  const { data, error } = payrollEditing
+    ? await sb.from("payroll").update(patch).eq("id", payrollEditing.id).select().maybeSingle()
+    : await sb.from("payroll").insert(patch).select().maybeSingle();
+  button.disabled = false;
+  if (error) return alert("Цалин хадгалж чадсангүй: " + error.message);
+
+  if (payrollEditing) {
+    const current = cache.payroll.find((r) => Number(r.id) === Number(payrollEditing.id));
+    if (current) Object.assign(current, data || patch);
+  } else if (data) {
+    cache.payroll.unshift(data);
+  }
+  closePayrollForm();
+  renderPayroll();
+  renderCoverage();
+}
+
+async function deletePayroll(row) {
+  if (!isAdminUser()) return alert("Зөвхөн админ цалин устгах эрхтэй.");
+  if (!confirm(`${row.staff_name} · ₮${Number(row.amount || 0).toLocaleString("en-US")} мөрийг устгах уу?`))
+    return;
+  const { error } = await sb.from("payroll").delete().eq("id", row.id);
+  if (error) return alert("Устгаж чадсангүй: " + error.message);
+  cache.payroll = cache.payroll.filter((r) => Number(r.id) !== Number(row.id));
+  renderPayroll();
+  renderCoverage();
+}
+
+function wirePayroll() {
+  if (!$("payBody")) return;
+  $("payAdd").addEventListener("click", () => openPayrollForm());
+  $("payClose").addEventListener("click", closePayrollForm);
+  $("payCancel").addEventListener("click", closePayrollForm);
+  $("paySave").addEventListener("click", savePayroll);
+  $("payYear").addEventListener("change", () => { payYear = $("payYear").value; renderPayroll(); });
+  $("payStaff").addEventListener("change", () => { payStaff = $("payStaff").value; renderPayroll(); });
+  $("paySearch").addEventListener("input", () => { paySearch = $("paySearch").value; renderPayroll(); });
 }
 
 function saveCell(run) {

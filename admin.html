@@ -96,6 +96,7 @@
     <button class="nav-item" data-view="packages" id="navPackages"><span class="ic">◎</span> Багц</button>
     <button class="nav-item" data-view="staff" id="navStaff"><span class="ic">♙</span> Ажилтнууд</button>
     <button class="nav-item" data-view="attendance" id="navAttendance"><span class="ic">◷</span> Ээлж, ирц</button>
+    <button class="nav-item" data-view="payroll" id="navPayroll"><span class="ic">₮</span> Цалин</button>
     <button class="nav-item" data-view="inventory" id="navInventory"><span class="ic">□</span> Бараа материал</button>
     <button class="nav-item" data-view="users" id="navUsers" style="display:none;"><span class="ic">◐</span> Хэрэглэгч, эрх</button>
 
@@ -508,6 +509,40 @@
       <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Ажилтан</th><th>Ээлжийн цаг</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
+    <!-- ── PAYROLL ── -->
+    <section class="view" data-panel="payroll">
+      <div class="page-head">
+        <div><div class="page-title">Цалин</div><div class="page-sub" id="paySub">Ажилтан бүрийн орлого, цалингийн үе тус бүрээр</div></div>
+        <button class="btn-sm primary" id="payAdd">+ Цалингийн мөр нэмэх</button>
+      </div>
+      <div class="kpis" id="payKpis"></div>
+      <div class="panel">
+        <div class="filters">
+          <div class="field inline-field"><label for="payYear">Жил</label><select class="ctl sm" id="payYear"></select></div>
+          <div class="field inline-field"><label for="payStaff">Ажилтан</label><select class="ctl sm" id="payStaff"><option value="all">Бүх ажилтан</option></select></div>
+          <div class="field inline-field"><label for="paySearch">Хайх</label><input class="ctl sm" id="paySearch" placeholder="Үйлчлүүлэгч эсвэл үе"/></div>
+        </div>
+      </div>
+      <div class="panel" id="payForm" style="display:none">
+        <div class="panel-head"><div><div class="panel-title" id="payFormTitle">Цалингийн мөр нэмэх</div><div class="page-sub">Нэг мөр = нэг үйлчилгээний орлого</div></div><button class="btn-sm ghost" id="payClose">✕ Хаах</button></div>
+        <div class="form-grid">
+          <div class="field"><label for="pay_staff">Ажилтан *</label><select class="ctl" id="pay_staff"></select></div>
+          <div class="field"><label for="pay_date">Огноо</label><input class="ctl" id="pay_date" type="date"/></div>
+          <div class="field"><label for="pay_customer">Үйлчлүүлэгч</label><input class="ctl" id="pay_customer" maxlength="160"/></div>
+          <div class="field"><label for="pay_amount">Дүн (₮) *</label><input class="ctl" id="pay_amount" type="number" min="0" step="1000"/></div>
+          <div class="field"><label for="pay_start">Үе эхэлсэн</label><input class="ctl" id="pay_start" type="date"/></div>
+          <div class="field"><label for="pay_end">Үе дууссан</label><input class="ctl" id="pay_end" type="date"/></div>
+          <div class="field"><label for="pay_label">Үеийн нэр</label><input class="ctl" id="pay_label" maxlength="120" placeholder="Denis 5/2- 5/7"/></div>
+          <div class="field"><label for="pay_note">Тэмдэглэл</label><input class="ctl" id="pay_note" maxlength="500"/></div>
+        </div>
+        <div class="form-actions"><button class="btn-sm primary" id="paySave">Хадгалах</button><button class="btn-sm ghost" id="payCancel">Болих</button></div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Огноо</th><th>Ажилтан</th><th>Үйлчлүүлэгч</th><th>Дүн</th><th>Цалингийн үе</th><th>Тэмдэглэл</th><th>Эх үүсвэр</th><th></th></tr></thead>
+        <tbody id="payBody"></tbody>
+      </table></div></div>
+    </section>
+
     <!-- ── INVENTORY ── -->
     <section class="view" data-panel="inventory">
       <div class="page-head"><div><div class="page-title">Бараа материал</div><div class="page-sub" id="invSub">Үлдэгдэл болон дахин захиалах түвшин</div></div><button class="btn-sm primary" id="invAdd">+ Материал нэмэх</button></div>
@@ -632,8 +667,28 @@
           <div class="page-title">Үйлчлүүлэгчийн багц</div>
           <div class="page-sub" id="cpkSub">Хэн ямар багц авсан, хэдийг ашигласан, хэд үлдсэн</div>
         </div>
+        <button class="btn-sm primary" id="cpkAdd">+ Багц нэмэх</button>
       </div>
       <div class="kpis" id="cpkKpis"></div>
+      <div class="panel" id="cpkForm" style="display:none">
+        <div class="panel-head"><div><div class="panel-title" id="cpkFormTitle">Багц нэмэх</div><div class="page-sub">Ашигласан тоог ирсэн бүртгэлээс тооцно</div></div><button class="btn-sm ghost" id="cpkClose">✕ Хаах</button></div>
+        <div class="form-grid">
+          <div class="field"><label for="cpk_customer">Үйлчлүүлэгч *</label><input class="ctl" id="cpk_customer" maxlength="160"/></div>
+          <div class="field"><label for="cpk_package">Багц *</label><input class="ctl" id="cpk_package" maxlength="160" placeholder="Cryo Cabin 10"/></div>
+          <div class="field"><label for="cpk_start">Эхэлсэн огноо</label><input class="ctl" id="cpk_start" type="date"/></div>
+          <div class="field"><label for="cpk_expires">Дуусах огноо</label><input class="ctl" id="cpk_expires" type="date"/></div>
+          <div class="field"><label for="cpk_total">Нийт эрх</label><input class="ctl" id="cpk_total" type="number" min="0" step="1"/></div>
+          <div class="field"><label for="cpk_state">Төлөв *</label><select class="ctl" id="cpk_state">
+            <option value="active">Идэвхтэй</option>
+            <option value="completed">Дууссан</option>
+            <option value="expired">Хугацаа дууссан</option>
+            <option value="cancelled">Цуцалсан</option>
+            <option value="needs_review">Шалгах</option>
+          </select></div>
+          <div class="field" style="grid-column:span 2"><label for="cpk_notes">Тэмдэглэл</label><input class="ctl" id="cpk_notes" maxlength="1000"/></div>
+        </div>
+        <div class="form-actions"><button class="btn-sm primary" id="cpkSave">Хадгалах</button><button class="btn-sm ghost" id="cpkCancel">Болих</button></div>
+      </div>
       <div class="panel">
         <div class="filters">
           <div class="field inline-field"><label for="cpkSearch">Хайх</label><input class="ctl sm" id="cpkSearch" placeholder="Үйлчлүүлэгч эсвэл багц"/></div>
@@ -650,7 +705,7 @@
       </div>
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Үйлчлүүлэгч</th><th>Багц</th><th>Эхэлсэн</th><th>Ашигласан</th><th>Нийт</th><th>Үлдэгдэл</th><th>Сүүлд ирсэн</th><th>Төлөв</th></tr></thead>
+          <thead><tr><th>Үйлчлүүлэгч</th><th>Багц</th><th>Эхэлсэн</th><th>Ашигласан</th><th>Нийт</th><th>Үлдэгдэл</th><th>Сүүлд ирсэн</th><th>Төлөв</th><th></th></tr></thead>
           <tbody id="cpkBody"></tbody>
         </table></div>
       </div>

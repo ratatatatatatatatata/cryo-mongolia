@@ -220,6 +220,144 @@ function readPackages(sheet, year) {
   return { contracts, redemptions };
 }
 
+/* ══════════════ ЦАЛИН ══════════════
+   "Denis salary" is a commission ledger, not a table: a block per pay
+   period, three runs of blocks side by side, and the columns inside a
+   block are in no fixed order — one block writes date, name, amount, the
+   next writes name, date, amount. So each block is profiled by what its
+   own cells look like before anything is read out of it.            */
+
+const MONEY_MIN = 10000;
+const isMoney = (v) => {
+  const s = String(v ?? "").replace(/[,\s₮]/g, "");
+  return /^\d+$/.test(s) && +s >= MONEY_MIN;
+};
+const money = (v) => {
+  const s = String(v ?? "").replace(/[,\s₮]/g, "");
+  return /^\d+$/.test(s) ? +s : 0;
+};
+
+function periodDates(title, year) {
+  /* "Denis 5/2- 5/7niig duustal", "Denis 2025/12/29-2026/01/07 duustal" */
+  const full = [...title.matchAll(/(\d{4})[./](\d{1,2})[./](\d{1,2})/g)].map((m) =>
+    ymd(+m[1], +m[2], +m[3]),
+  );
+  if (full.length >= 2) return { start: full[0], end: full[1] };
+
+  const short = [...title.matchAll(/(\d{1,2})\s*\/\s*(\d{1,2})/g)].map((m) =>
+    pair(+m[1], +m[2], year),
+  );
+  if (short.length >= 2) return { start: short[0], end: short[1] };
+  if (short.length === 1) return { start: short[0], end: null };
+  return { start: null, end: null };
+}
+
+function readPayroll(sheet) {
+  if (!wb.Sheets[sheet]) return { rows: [], blocks: 0, unpriced: 0 };
+  const rows = grid(sheet);
+
+  const titles = [];
+  rows.forEach((row, i) => {
+    if (!row) return;
+    row.forEach((cell, j) => {
+      const s = clean(cell);
+      if (/duustal/i.test(s) || /^[A-Za-zА-Яа-яӨҮөү]+\s*\d{1,2}\/\d{1,2}/.test(s)) {
+        titles.push({ i, j, s });
+      }
+    });
+  });
+
+  /* the runs of blocks stack down a column, so a block ends where the next
+     title in that same column begins */
+  const byColumn = new Map();
+  titles.forEach((t) => {
+    if (!byColumn.has(t.j)) byColumn.set(t.j, []);
+    byColumn.get(t.j).push(t);
+  });
+
+  const out = [];
+  let unpriced = 0, blocks = 0;
+
+  byColumn.forEach((list, col) => {
+    list.sort((a, b) => a.i - b.i);
+
+    /* Only one run names its year outright, and it does so on a title that
+       straddles new year — "Denis 2025/12/29-2026/01/07". The run that
+       follows is the later year, so take the highest one stated; the runs
+       that state none are the earlier year the workbook covers. */
+    const stated = list
+      .flatMap((t) => [...t.s.matchAll(/(\d{4})/g)].map((m) => +m[1]))
+      .filter((y) => y >= 2000 && y <= 2100);
+    const year = stated.length ? Math.max(...stated) : 2025;
+
+    list.forEach((title, k) => {
+      const stop = k + 1 < list.length ? list[k + 1].i : rows.length;
+      const width = 6;
+
+      /* collect the block's rows first, then work out what its columns are */
+      const raw = [];
+      let quiet = 0;
+      for (let i = title.i + 1; i < stop; i++) {
+        const seg = (rows[i] || []).slice(col, col + width).map((x) => clean(x));
+        if (seg.every((x) => !x)) {
+          if (++quiet >= 10) break;
+          continue;
+        }
+        quiet = 0;
+        if (seg.some((x) => /^total:?$/i.test(x) || /gart olgoh/i.test(x))) continue;
+        raw.push({ seg, row: i + 1 });
+      }
+      if (!raw.length) return;
+      blocks++;
+
+      const profile = [];
+      for (let c = 1; c < width; c++) {
+        let dates = 0, cash = 0, text = 0;
+        raw.forEach(({ seg }) => {
+          const v = seg[c];
+          if (!v) return;
+          if (isMoney(v)) cash++;
+          else if (toDate(v, year)) dates++;
+          else text++;
+        });
+        profile.push({ c, dates, cash, text });
+      }
+      const dateCol = profile.slice().sort((a, b) => b.dates - a.dates)[0];
+      const moneyCols = profile.filter((p) => p.cash > 0).map((p) => p.c);
+      const textCols = profile
+        .filter((p) => p.c !== dateCol?.c && !moneyCols.includes(p.c) && p.text > 0)
+        .sort((a, b) => b.text - a.text);
+
+      const period = periodDates(title.s, year);
+      const staff = clean(title.s).split(/[\s\d]/)[0] || "Denis";
+
+      raw.forEach(({ seg, row }) => {
+        const amount = moneyCols.reduce((a, c) => a + money(seg[c]), 0);
+        const customer = textCols[0] ? seg[textCols[0].c] : "";
+        const note = textCols[1] ? seg[textCols[1].c] : "";
+        if (!amount && !customer) return;
+        if (!amount) unpriced++;
+
+        out.push({
+          staff,
+          period: clean(title.s),
+          start: period.start,
+          end: period.end,
+          date: dateCol && dateCol.dates ? toDate(seg[dateCol.c], year) : null,
+          customer,
+          amount,
+          note,
+          key: `${sheet}:${col}:${title.i}:${row}`,
+          sheet,
+          row,
+        });
+      });
+    });
+  });
+
+  return { rows: out, blocks, unpriced };
+}
+
 /* ══════════════ BUILD ══════════════ */
 const attendanceSheets = wb.SheetNames.filter((n) => /^Ирц\s*\d{4}/.test(n.trim()));
 const packageSheets = wb.SheetNames.filter((n) => /^Багц\s*\d{4}/.test(n.trim()));
@@ -321,6 +459,44 @@ for (const sheet of packageSheets) {
   }
 }
 
+/* ── payroll ── */
+const payrollSql = [];
+let payrollCount = 0, payrollSum = 0;
+for (const sheet of wb.SheetNames.filter((n) => /salary|цалин/i.test(n))) {
+  const { rows, blocks, unpriced } = readPayroll(sheet);
+  if (!rows.length) continue;
+  payrollCount += rows.length;
+  const sum = rows.reduce((a, r) => a + r.amount, 0);
+  payrollSum += sum;
+  rows.forEach((r) => allStaff.add(r.staff));
+  report.push(
+    `${sheet}: ${rows.length} payroll lines over ${blocks} pay periods · ` +
+      `₮${sum.toLocaleString("en-US")}` +
+      (unpriced ? ` · ${unpriced} lines with no amount` : ""),
+  );
+
+  payrollSql.push(`-- ── ${sheet} ──`);
+  for (let i = 0; i < rows.length; i += 200) {
+    const values = rows
+      .slice(i, i + 200)
+      .map(
+        (r) =>
+          `((select id from public.staff where name = ${q(r.staff)}),${q(r.staff)},${q(r.period)},` +
+          `${r.start ? q(r.start) + "::date" : "null::date"},${r.end ? q(r.end) + "::date" : "null::date"},` +
+          `${r.date ? q(r.date) + "::date" : "null::date"},${q(r.customer)},${r.amount},${q(r.note)},` +
+          `'workbook',${q(r.key)},${q(r.sheet)},${r.row})`,
+      )
+      .join(",\n");
+    payrollSql.push(
+      "insert into public.payroll\n" +
+        "  (staff_id,staff_name,period_label,period_start,period_end,work_date,customer_label,amount,note,source,source_key,workbook_sheet,workbook_row)\n" +
+        "select v.* from (values\n" + values + "\n" +
+        ") as v(staff_id,staff_name,period_label,period_start,period_end,work_date,customer_label,amount,note,source,source_key,workbook_sheet,workbook_row)\n" +
+        "where not exists (select 1 from public.payroll p where p.source_key = v.source_key);",
+    );
+  }
+}
+
 const staffValues = [...allStaff]
   .map((n, i) => `(${q(n)},${100 + i})`)
   .join(", ");
@@ -354,6 +530,9 @@ const body = [
   "",
   "-- ══════════ БАГЦ — sessions used ══════════",
   ...redemptionSql,
+  "",
+  "-- ══════════ ЦАЛИН ══════════",
+  ...payrollSql,
 ].join("\n\n");
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -361,6 +540,7 @@ fs.writeFileSync(OUT, header + body + "\n");
 
 console.log(report.join("\n"));
 console.log(
-  `\nstaff: ${allStaff.size} · shifts: ${shiftCount} · contracts: ${contractCount} · redemptions: ${redemptionCount}`,
+  `\nstaff: ${allStaff.size} · shifts: ${shiftCount} · contracts: ${contractCount} · ` +
+    `redemptions: ${redemptionCount} · payroll: ${payrollCount} lines, ₮${payrollSum.toLocaleString("en-US")}`,
 );
 console.log("wrote " + OUT);
