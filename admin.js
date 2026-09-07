@@ -369,21 +369,29 @@ async function loadAll() {
 function renderCoverage() {
   const body = $("coverageBody");
   if (!body) return;
+  const inYear = (y) => cache.sales.filter((s) => String(s.sale_date || "").startsWith(y)).length;
+  const devices = cache.sales.filter(
+    (s) => s.cryo_cabin || s.oxy_pro || s.led_pro || s.x_cryo || s.zerobody || s.normatec || s.oxygen,
+  ).length;
+
+  /* expected = what the workbook holds, as counted by scripts/import-workbook.mjs
+     and scripts/import-attendance-packages.mjs */
   const rows = [
-    ["2026 борлуулалт", 1031, cache.sales.length, "imported"],
-    ["2025 борлуулалт", "review", 0, "missing"],
-    ["Зардал", 330, cache.expenses.length, "partial"],
-    ["Үйлчлүүлэгч", 115, cache.customers.length, "partial"],
-    ["Үйлчилгээний нэр", 35, cache.services.filter((x) => x.category === "legacy-import").length, "partial"],
-    ["Үйлчилгээний session", 2829, 0, "missing"],
-    ["Хэрэглэгчийн багц", 245, 0, "missing"],
-    ["Ирц", 320, cache.attendance.length, "partial"],
-    ["Азот / бараа материал", 69, cache.inventory.length, "partial"],
-    ["Цалин", 254, 0, "missing"],
+    ["2026 борлуулалт", 1022, inYear("2026")],
+    ["2025 борлуулалт", 853, inYear("2025")],
+    ["Зардал", 119, cache.expenses.length],
+    ["Үйлчлүүлэгч", 120, cache.customers.length],
+    ["Үйлчилгээний нэр", 35, cache.services.filter((x) => x.category === "legacy-import").length],
+    ["Үйлчилгээний session (борлуулалтын мөр дотор)", 1041, devices],
+    ["Хэрэглэгчийн багц", 808, cache.contracts.length],
+    ["Ирц", 526, cache.workdays.length + cache.attendance.length],
+    ["Азот / бараа материал", 69, cache.inventory.length],
+    ["Цалин", 254, 0],
   ];
   body.innerHTML = "";
   const labels = { imported: "Баталгаатай орсон", partial: "Хэсэгчилсэн", missing: "Ороогүй" };
-  rows.forEach(([name, expected, actual, state]) => {
+  rows.forEach(([name, expected, actual]) => {
+    const state = actual >= expected ? "imported" : actual > 0 ? "partial" : "missing";
     const tr = document.createElement("tr");
     tr.appendChild(cell(name, "t-strong"));
     tr.appendChild(cell(String(expected)));
@@ -832,12 +840,15 @@ function renderMessages() {
 function renderServices() {
   const body = $("svcBody");
   body.innerHTML = "";
-  if (!cache.services.length) {
+  /* the names imported from the old sheets are history, not a price list —
+     they are counted on the Excel шилжилт page instead */
+  const services = cache.services.filter((s) => s.category !== "legacy-import");
+  if (!services.length) {
     body.innerHTML =
       '<tr><td colspan="6"><div class="empty">Үйлчилгээ алга. setup.sql-ийг ажиллуулсан уу?</div></td></tr>';
     return;
   }
-  cache.services.forEach((s) => {
+  services.forEach((s) => {
     const tr = document.createElement("tr");
     tr.appendChild(cell(s.name, "t-strong"));
     tr.appendChild(cell(s.category || "—"));
