@@ -246,16 +246,22 @@ for (const sheet of attendanceSheets) {
       .slice(i, i + 200)
       .map(
         (s) =>
-          `((select id from public.staff where name = ${q(s.staff)}),${q(s.staff)},${q(s.date)},` +
-          `${s.n},${q(s.clockIn)}::timestamptz,${s.clockOut ? q(s.clockOut) + "::timestamptz" : "null"},` +
+          `((select id from public.staff where name = ${q(s.staff)}),${q(s.staff)},${q(s.date)}::date,` +
+          `${s.n},${q(s.clockIn)}::timestamptz,${s.clockOut ? q(s.clockOut) + "::timestamptz" : "null::timestamptz"},` +
           `'workbook',${q(s.key)},${q(s.sheet)},${s.row})`,
       )
       .join(",\n");
+    /* the table guards both (staff_id, work_date) and source_key, and a row
+       may already be there from the dashboard, so skip on either rather
+       than leaning on a single ON CONFLICT target */
     chunks.push(
       "insert into public.staff_workdays\n" +
         "  (staff_id,staff_name,work_date,workday_number,clock_in,clock_out,source,source_key,workbook_sheet,workbook_row)\n" +
-        "values\n" + values + "\n" +
-        "on conflict (source_key) do nothing;",
+        "select v.* from (values\n" + values + "\n" +
+        ") as v(staff_id,staff_name,work_date,workday_number,clock_in,clock_out,source,source_key,workbook_sheet,workbook_row)\n" +
+        "where v.staff_id is not null\n" +
+        "  and not exists (select 1 from public.staff_workdays w where w.staff_id = v.staff_id and w.work_date = v.work_date)\n" +
+        "  and not exists (select 1 from public.staff_workdays w where w.source_key = v.source_key);",
     );
   }
 }
@@ -280,15 +286,16 @@ for (const sheet of packageSheets) {
       .slice(i, i + 200)
       .map(
         (c) =>
-          `(${q(c.customer)},${q(c.label)},${c.start ? q(c.start) : "null"},` +
+          `(${q(c.customer)},${q(c.label)},${c.start ? q(c.start) + "::date" : "null::date"},` +
           `${c.total ?? "null"},${q(c.status)},${q(c.key)},${q(c.notes)})`,
       )
       .join(",\n");
     contractSql.push(
       "insert into public.customer_package_contracts\n" +
         "  (customer_label,package_label,purchased_on,total_units,status,source_key,notes)\n" +
-        "values\n" + values + "\n" +
-        "on conflict do nothing;",
+        "select v.* from (values\n" + values + "\n" +
+        ") as v(customer_label,package_label,purchased_on,total_units,status,source_key,notes)\n" +
+        "where not exists (select 1 from public.customer_package_contracts c where c.source_key = v.source_key);",
     );
   }
 
@@ -299,13 +306,17 @@ for (const sheet of packageSheets) {
       .map(
         (r) =>
           `((select id from public.customer_package_contracts where source_key = ${q(r.contractKey)}),` +
-          `${q(r.date)},1,${q(r.key)})`,
+          `${q(r.date)}::date,1,${q(r.key)})`,
       )
       .join(",\n");
+    /* source_key is a partial unique index, which ON CONFLICT cannot infer,
+       and contract_id is NOT NULL — so filter instead of catching */
     redemptionSql.push(
       "insert into public.package_redemptions (contract_id,used_on,units,source_key)\n" +
-        "values\n" + values + "\n" +
-        "on conflict (source_key) do nothing;",
+        "select v.* from (values\n" + values + "\n" +
+        ") as v(contract_id,used_on,units,source_key)\n" +
+        "where v.contract_id is not null\n" +
+        "  and not exists (select 1 from public.package_redemptions p where p.source_key = v.source_key);",
     );
   }
 }
