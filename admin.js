@@ -383,7 +383,7 @@ function renderCoverage() {
   const rows = [
     ["2026 борлуулалт", 1022, inYear("2026")],
     ["2025 борлуулалт", 853, inYear("2025")],
-    ["Зардал", 119, cache.expenses.length],
+    ["Зардал", 71, cache.expenses.length],
     ["Үйлчлүүлэгч", 120, cache.customers.length],
     ["Үйлчилгээний нэр", 35, cache.services.filter((x) => x.category === "legacy-import").length],
     ["Үйлчилгээний session (борлуулалтын мөр дотор)", 1041, devices],

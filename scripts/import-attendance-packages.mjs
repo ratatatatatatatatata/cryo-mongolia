@@ -23,6 +23,7 @@ import XLSX from "xlsx";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeParts } from "./sql-parts.mjs";
 
 const FILE = process.argv[2];
 if (!FILE) {
@@ -533,14 +534,13 @@ const body = [
   "",
   "-- ══════════ ЦАЛИН ══════════",
   ...payrollSql,
-].join("\n\n");
+].filter(Boolean);
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, header + body + "\n");
+writeParts(OUT, header, body);
 
 console.log(report.join("\n"));
 console.log(
   `\nstaff: ${allStaff.size} · shifts: ${shiftCount} · contracts: ${contractCount} · ` +
     `redemptions: ${redemptionCount} · payroll: ${payrollCount} lines, ₮${payrollSum.toLocaleString("en-US")}`,
 );
-console.log("wrote " + OUT);

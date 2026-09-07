@@ -30,6 +30,7 @@ import XLSX from "xlsx";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeParts } from "./sql-parts.mjs";
 
 const FILE = process.argv[2];
 if (!FILE) {
@@ -462,26 +463,68 @@ function readExpenses() {
      Хэнээс→item, Zarlaga→qty, Юунд→unit price, Хэн→amount, Үлдэгдэл→paid with */
   const col = {
     date: H.findIndex((c) => c.includes("Он сар")),
+    income: H.findIndex((c) => /орлого/i.test(c)),
     item: H.indexOf("Хэнээс"),
     qty: H.indexOf("Zarlaga"),
+    unit: H.indexOf("Юунд"),
     amount: H.indexOf("Хэн"),
     paidWith: H.indexOf("Үлдэгдэл"),
     note: H.indexOf("Тэмдэглэл"),
   };
+  const ws = wb.Sheets["Зардал"];
   const out = [];
-  rows.slice(h + 1).forEach((r) => {
+  let income = 0, incomeSum = 0, subtotals = 0, unpriced = 0, undated = 0, undatedSum = 0;
+
+  rows.slice(h + 1).forEach((r, k) => {
     if (!r) return;
-    const d = toDate(r[col.date], 2025);
-    const item = String(r[col.item] || "").trim();
+    const excelRow = h + 1 + k;
+
+    /* Only the total column is trusted. Lower down the sheet the columns
+       shift — a row can put its amount where the quantity belongs — so
+       working an amount out from unit × quantity turns a ₮8,750 bin-bag
+       purchase into millions. Where the bookkeeper left the total empty
+       the row is simply not a priced expense. */
     const amount = num(r[col.amount]);
-    if (!d || (!item && !amount)) return;
+
+    if (!amount) {
+      /* the same sheet doubles as a till: a row with money only in Орлого
+         is income or a balance carried forward, and belongs to the Income
+         sheets rather than the expense ledger */
+      if (col.income >= 0 && num(r[col.income])) {
+        income++;
+        incomeSum += num(r[col.income]);
+      } else if (String(r[col.item] || "").trim()) {
+        unpriced++;
+      }
+      return;
+    }
+
+    const cell = ws[XLSX.utils.encode_cell({ r: excelRow, c: col.amount })];
+    if (cell && cell.f) {
+      subtotals++;
+      return;
+    }
+
+    const d = toDate(r[col.date], 2025);
+    if (!d) {
+      undated++;
+      undatedSum += amount;
+      return;
+    }
+
+    /* where the columns shifted, the description sits where the unit price
+       normally would — text there can only be a description */
+    let item = String(r[col.item] || "").trim();
+    if (!item && col.unit >= 0 && !num(r[col.unit])) item = String(r[col.unit] || "").trim();
+
     out.push({
       date: d, item: item || "—", qty: num(r[col.qty]) || null, amount,
       paid_with: String(r[col.paidWith] || "").trim(),
       note: String(r[col.note] || "").trim(),
     });
   });
-  return out;
+
+  return Object.assign(out, { income, incomeSum, subtotals, unpriced, undated, undatedSum });
 }
 
 /* ── build the SQL ── */
@@ -667,7 +710,15 @@ if (cus.rows.length) {
 const exp = readExpenses();
 if (exp.length) {
   const expSum = exp.reduce((s, r) => s + r.amount, 0);
-  report.push(`Зардал: ${exp.length} expenses · ₮${expSum.toLocaleString("en-US")}`);
+  report.push(
+    `Зардал: ${exp.length} expenses · ₮${expSum.toLocaleString("en-US")}` +
+      (exp.subtotals ? ` · ${exp.subtotals} subtotal rows skipped` : "") +
+      (exp.income
+        ? ` · ${exp.income} till-income rows left out (₮${exp.incomeSum.toLocaleString("en-US")}) — they belong to the Income sheets`
+        : "") +
+      (exp.unpriced ? ` · ${exp.unpriced} rows with a description but no total` : "") +
+      (exp.undated ? ` · ${exp.undated} priced rows with no readable date (₮${exp.undatedSum.toLocaleString("en-US")})` : ""),
+  );
   const values = exp.map(
     (r) => `(${q(r.date)},${q(r.item)},${r.qty ?? "null"},${r.amount},${q(r.paid_with)},${q(r.note)},'import')`,
   );
@@ -705,8 +756,7 @@ delete from public.expenses where source = 'import';
 `;
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, header + chunks.join("\n\n") + "\n");
+writeParts(OUT, header, chunks);
 
 console.log(report.join("\n"));
 console.log(`\nTotal: ${grandRows} sales · ₮${grand.toLocaleString("en-US")}`);
-console.log("wrote " + OUT);
