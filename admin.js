@@ -304,31 +304,49 @@ function wireBookingFilters() {
 /* ══════════════════════════════════════════════════════════════
    DATA
    ══════════════════════════════════════════════════════════════ */
+/* Supabase caps a single response at 1000 rows however large a .limit()
+   asks for, so a table with more than that silently arrives truncated —
+   the sales ledger came back as the newest 1000 rows and a whole year
+   looked missing. Page through with .range() until a short page arrives.
+   Each job is a function because a query builder can only be used once. */
+const PAGE = 1000;
+
+async function fetchAll(build, max = 50000) {
+  const rows = [];
+  for (let from = 0; from < max; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) return { data: rows, error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: rows, error: null };
+}
+
 async function loadAll() {
   const jobs = [
-    sb.from("bookings").select("*").order("created_at", { ascending: false }).limit(500),
-    sb.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(300),
-    sb.from("services").select("*").order("sort", { ascending: true }),
-    sb.from("packages").select("*").order("sort", { ascending: true }),
-    sb.from("report_monthly").select("*"),
-    sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).limit(5000),
-    sb.from("expenses").select("*").order("spend_date", { ascending: false }).limit(2000),
-    sb.from("staff").select("*").order("sort", { ascending: true }),
-    sb.from("customers").select("id,full_name,phone,email,notes,source,created_at,updated_at").order("updated_at", { ascending: false }).limit(1000),
-    sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
-    sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
-    sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).limit(2000),
-    sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).limit(1000),
-    sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).limit(3000),
-    sb.from("package_redemptions").select("contract_id,used_on,units").limit(20000),
-    sb.from("payroll").select("*").order("work_date", { ascending: false }).limit(5000),
+    () => sb.from("bookings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("contact_messages").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("services").select("*").order("sort", { ascending: true }),
+    () => sb.from("packages").select("*").order("sort", { ascending: true }),
+    () => sb.from("report_monthly").select("*"),
+    () => sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("expenses").select("*").order("spend_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("staff").select("*").order("sort", { ascending: true }),
+    () => sb.from("customers").select("id,full_name,phone,email,notes,source,created_at,updated_at").order("updated_at", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("attendance").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("inventory_items").select("*").order("name", { ascending: true }),
+    () => sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("package_redemptions").select("contract_id,used_on,units").order("id", { ascending: true }),
+    () => sb.from("payroll").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
-    jobs.push(sb.from("profiles").select("*").order("created_at", { ascending: true }));
+    jobs.push(() => sb.from("profiles").select("*").order("created_at", { ascending: true }));
   }
 
-  const res = await Promise.all(jobs);
+  const res = await Promise.all(jobs.map((job) => fetchAll(job)));
   cache.bookings = res[0].data || [];
   cache.messages = res[1].data || [];
   cache.services = res[2].data || [];
