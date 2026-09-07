@@ -620,6 +620,34 @@
           <tbody id="pkgBody"></tbody>
         </table></div>
       </div>
+
+      <div class="page-head" style="margin-top:26px">
+        <div>
+          <div class="page-title">Үйлчлүүлэгчийн багц</div>
+          <div class="page-sub" id="cpkSub">Хэн ямар багц авсан, хэдийг ашигласан, хэд үлдсэн</div>
+        </div>
+      </div>
+      <div class="kpis" id="cpkKpis"></div>
+      <div class="panel">
+        <div class="filters">
+          <div class="field inline-field"><label for="cpkSearch">Хайх</label><input class="ctl sm" id="cpkSearch" placeholder="Үйлчлүүлэгч эсвэл багц"/></div>
+          <div class="field inline-field"><label for="cpkStatus">Төлөв</label><select class="ctl sm" id="cpkStatus">
+            <option value="all">Бүгд</option>
+            <option value="active">Идэвхтэй</option>
+            <option value="completed">Дууссан</option>
+            <option value="expired">Хугацаа дууссан</option>
+            <option value="cancelled">Цуцалсан</option>
+            <option value="needs_review">Шалгах</option>
+          </select></div>
+          <div class="field inline-field"><label for="cpkPkg">Багц</label><select class="ctl sm" id="cpkPkg"><option value="all">Бүх багц</option></select></div>
+        </div>
+      </div>
+      <div class="panel" style="padding:0;overflow:hidden;">
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>Үйлчлүүлэгч</th><th>Багц</th><th>Эхэлсэн</th><th>Ашигласан</th><th>Нийт</th><th>Үлдэгдэл</th><th>Сүүлд ирсэн</th><th>Төлөв</th></tr></thead>
+          <tbody id="cpkBody"></tbody>
+        </table></div>
+      </div>
     </section>
 
     <!-- ── USERS (owner only) ── -->

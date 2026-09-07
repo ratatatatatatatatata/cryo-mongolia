@@ -52,8 +52,12 @@ let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], inventory: [],
+  contracts: [], redemptions: [],
 };
 let bkFilter = "all";
+let cpkSearch = "";
+let cpkStatus = "all";
+let cpkPkg = "all";
 let overviewYear = String(new Date().getFullYear());
 let attendanceYear = "all";
 let attendanceStaff = "all";
@@ -100,6 +104,7 @@ function fmtDate(v) {
   wireStaff();
   wireAttendance();
   wireInventory();
+  wireContracts();
 
   /* the login screen always renders; it just explains itself when the
      project has no anon key yet, instead of vanishing behind a setup page */
@@ -285,6 +290,8 @@ async function loadAll() {
     sb.from("attendance").select("*").order("work_date", { ascending: false }).limit(1000),
     sb.from("inventory_items").select("*").order("name", { ascending: true }).limit(1000),
     sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).limit(2000),
+    sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).limit(3000),
+    sb.from("package_redemptions").select("contract_id,used_on,units").limit(20000),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -304,6 +311,8 @@ async function loadAll() {
   cache.attendance = res[9].data || [];
   cache.inventory = res[10].data || [];
   cache.workdays = res[11].data || [];
+  cache.contracts = res[12].data || [];
+  cache.redemptions = res[13].data || [];
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -320,6 +329,7 @@ async function loadAll() {
   renderMessages();
   renderServices();
   renderPackages();
+  renderContracts();
   renderUsers();
   renderCustomers();
   renderStaff();
@@ -899,6 +909,164 @@ function renderPackages() {
     );
     body.appendChild(tr);
   });
+}
+
+/* ── customer packages: who bought what, how much is left ─────── */
+const CPK_STATUS = {
+  active: ["Идэвхтэй", "#58c6ff"],
+  completed: ["Дууссан", "var(--text-muted)"],
+  expired: ["Хугацаа дууссан", "#ffb454"],
+  cancelled: ["Цуцалсан", "#ff7a7a"],
+  needs_review: ["Шалгах", "#ffb454"],
+};
+
+function contractRows() {
+  /* one pass over the redemptions so a customer with hundreds of visits
+     still costs the same as one with a single visit */
+  const used = new Map();
+  const last = new Map();
+  cache.redemptions.forEach((r) => {
+    const id = Number(r.contract_id);
+    used.set(id, (used.get(id) || 0) + (Number(r.units) || 1));
+    const on = String(r.used_on || "");
+    if (on && on > (last.get(id) || "")) last.set(id, on);
+  });
+  return cache.contracts.map((c) => {
+    const id = Number(c.id);
+    const spent = used.get(id) || 0;
+    const total = c.total_units == null ? null : Number(c.total_units);
+    return {
+      ...c,
+      __used: spent,
+      __total: total,
+      __left: total == null ? null : Math.max(0, total - spent),
+      __last: last.get(id) || "",
+      __label: c.package_label || "—",
+      __customer: c.customer_label || "—",
+    };
+  });
+}
+
+function renderContracts() {
+  const body = $("cpkBody");
+  if (!body) return;
+
+  const all = contractRows();
+  syncContractFilters(all);
+
+  const needle = cpkSearch.trim().toLowerCase();
+  const rows = all
+    .filter((r) => cpkStatus === "all" || r.status === cpkStatus)
+    .filter((r) => cpkPkg === "all" || r.__label === cpkPkg)
+    .filter(
+      (r) =>
+        !needle ||
+        r.__customer.toLowerCase().includes(needle) ||
+        r.__label.toLowerCase().includes(needle),
+    )
+    .sort(
+      (a, b) =>
+        String(b.__last).localeCompare(String(a.__last)) ||
+        String(b.purchased_on || "").localeCompare(String(a.purchased_on || "")),
+    );
+
+  const customers = new Set(all.map((r) => r.__customer)).size;
+  const activeRows = all.filter((r) => r.status === "active");
+  const remaining = activeRows.reduce((a, r) => a + (r.__left || 0), 0);
+  const usedTotal = all.reduce((a, r) => a + r.__used, 0);
+
+  $("cpkKpis").innerHTML = [
+    ["Үйлчлүүлэгч", customers.toLocaleString("en-US"), all.length + " багц"],
+    ["Идэвхтэй багц", activeRows.length.toLocaleString("en-US"), "дуусаагүй"],
+    ["Үлдсэн эрх", remaining.toLocaleString("en-US"), "идэвхтэй багцад"],
+    ["Ашигласан удаа", usedTotal.toLocaleString("en-US"), "нийт ирц"],
+  ]
+    .map(
+      ([l, v, n]) =>
+        '<div class="kpi"><div class="kpi-label">' + l + '</div><div class="kpi-val">' + v +
+        '</div><div class="kpi-note">' + n + "</div></div>",
+    )
+    .join("");
+
+  $("cpkSub").textContent = rows.length
+    ? `${rows.length} багц харагдаж байна`
+    : "Үйлчлүүлэгчийн багц";
+
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML =
+      '<tr><td colspan="8"><div class="empty">Үйлчлүүлэгчийн багц алга. Excel-ээс импортлосон уу?</div></td></tr>';
+    return;
+  }
+
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(r.__customer, "t-strong"));
+
+    const pkg = document.createElement("td");
+    const name = document.createElement("div");
+    name.textContent = esc(r.__label);
+    pkg.appendChild(name);
+    if (r.notes) {
+      const note = document.createElement("div");
+      note.style.cssText = "font-size:11.5px;color:var(--text-muted);margin-top:3px";
+      note.textContent = esc(r.notes);
+      pkg.appendChild(note);
+    }
+    tr.appendChild(pkg);
+
+    tr.appendChild(cell(r.purchased_on || "—", "t-mono"));
+    tr.appendChild(cell(r.__used, "t-mono"));
+    tr.appendChild(cell(r.__total == null ? "—" : r.__total, "t-mono"));
+    tr.appendChild(cell(r.__left == null ? "—" : r.__left, "t-mono"));
+    tr.appendChild(cell(r.__last || "—", "t-mono"));
+
+    const [label, colour] = CPK_STATUS[r.status] || [r.status, "var(--text-muted)"];
+    const st = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.textContent = label;
+    pill.style.cssText =
+      "display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;" +
+      `color:${colour};border:1px solid currentColor;opacity:.9`;
+    st.appendChild(pill);
+    tr.appendChild(st);
+
+    body.appendChild(tr);
+  });
+}
+
+function syncContractFilters(rows) {
+  const select = $("cpkPkg");
+  if (!select) return;
+  const labels = [...new Set(rows.map((r) => r.__label))].sort((a, b) => a.localeCompare(b));
+  select.innerHTML = '<option value="all">Бүх багц</option>';
+  labels.forEach((l) => select.appendChild(new Option(l, l)));
+  cpkPkg = labels.includes(cpkPkg) ? cpkPkg : "all";
+  select.value = cpkPkg;
+}
+
+function wireContracts() {
+  const search = $("cpkSearch");
+  if (search) {
+    search.addEventListener("input", () => {
+      cpkSearch = search.value;
+      renderContracts();
+    });
+  }
+  const status = $("cpkStatus");
+  if (status) {
+    status.addEventListener("change", () => {
+      cpkStatus = status.value;
+      renderContracts();
+    });
+  }
+  const pkg = $("cpkPkg");
+  if (pkg) {
+    pkg.addEventListener("change", () => {
+      cpkPkg = pkg.value;
+      renderContracts();
+    });
+  }
 }
 
 function saveCell(run) {
