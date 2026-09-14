@@ -71,40 +71,16 @@ function toggleMenu() {
    BOOKING SYSTEM
 ════════════════════════════════════════ */
 
-const TIMES = [
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-  "20:00",
-];
+const SLOT_STEP_MINUTES = 5;
+const OPEN_MINUTES = 9 * 60;
+const CLOSE_MINUTES = 21 * 60;
 const WD = ["Ням", "Дав", "Мяг", "Лха", "Пүр", "Баа", "Бям"];
 
-const bookedMap = {};
-function getBooked(key) {
-  if (!bookedMap[key]) {
-    const arr = [];
-    const n = 2 + Math.floor(Math.random() * 3);
-    while (arr.length < n) {
-      const t = TIMES[Math.floor(Math.random() * TIMES.length)];
-      if (!arr.includes(t)) arr.push(t);
-    }
-    bookedMap[key] = arr;
-  }
-  return bookedMap[key];
-}
-
-let bk = { dateKey: "", time: "", bank: "", bankName: "" };
+let bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [] };
 let dateOffset = 0;
 const DATE_SHOW = 7;
 let qrInterval = null;
+let availabilityUnsubscribe = null;
 
 function dateFromOffset(n) {
   const d = new Date();
@@ -113,10 +89,61 @@ function dateFromOffset(n) {
   return d;
 }
 function fmtKey(d) {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function slotIso(dateKey, time) {
+  return `${dateKey}T${time}:00+08:00`;
+}
+function minutesLabel(n) {
+  return `${n} минут + 2 минутын төхөөрөмж бэлтгэх завсар`;
+}
+function activeService() {
+  return bk.services.find((s) => Number(s.id) === Number(bk.service?.id)) || bk.service;
 }
 
-/* Build date tabs */
+async function loadBookingSetup() {
+  if (!window.cryoData?.ready) return;
+  const res = await window.cryoData.getBookableServices();
+  if (res?.error) {
+    showToast("Үйлчилгээний мэдээлэл татаж чадсангүй");
+    return;
+  }
+  bk.services = res.data || [];
+  const select = document.getElementById("b_service");
+  if (!select) return;
+  select.innerHTML = '<option value="">Төхөөрөмж сонгоно уу</option>';
+  bk.services.forEach((s) => {
+    const option = document.createElement("option");
+    option.value = String(s.id);
+    option.textContent = `${s.name} · ${s.duration_minutes} мин`;
+    select.appendChild(option);
+  });
+  if (bk.services.length === 1) {
+    select.value = String(bk.services[0].id);
+    await pickService(select.value);
+  }
+}
+
+async function pickService(id) {
+  bk.service = bk.services.find((s) => Number(s.id) === Number(id)) || null;
+  bk.time = "";
+  const hint = document.getElementById("bookingDurationHint");
+  if (hint) hint.textContent = bk.service ? minutesLabel(bk.service.duration_minutes) : "Эхлээд төхөөрөмжөө сонгоно уу";
+  await refreshAvailability();
+}
+
+async function refreshAvailability() {
+  bk.blocks = [];
+  if (bk.service && bk.dateKey && window.cryoData?.ready) {
+    const res = await window.cryoData.getBookingBlocks(bk.service.id, bk.dateKey);
+    if (!res?.error) bk.blocks = res.data || [];
+  }
+  buildTimeGrid();
+}
+
 function buildDateTabs() {
   const tabs = document.getElementById("dateTabs");
   if (!tabs) return;
@@ -142,126 +169,105 @@ function shiftDates(dir) {
   buildDateTabs();
 }
 
-function pickDate(key, el) {
+async function pickDate(key, el) {
   bk.dateKey = key;
   bk.time = "";
-  document
-    .querySelectorAll(".date-tab")
-    .forEach((t) => t.classList.remove("selected"));
+  document.querySelectorAll(".date-tab").forEach((t) => t.classList.remove("selected"));
   el.classList.add("selected");
-  buildTimeGrid();
+  await refreshAvailability();
 }
 
-/* Build time grid */
+function isUnavailable(start, finishWithBuffer) {
+  return bk.blocks.some((block) => {
+    const occupiedStart = new Date(block.starts_at).getTime();
+    const occupiedEnd = new Date(block.blocked_until || block.ends_at).getTime();
+    return start < occupiedEnd && finishWithBuffer > occupiedStart;
+  });
+}
+
 function buildTimeGrid() {
   const grid = document.getElementById("timeGrid");
   if (!grid) return;
   grid.innerHTML = "";
-  const booked = bk.dateKey ? getBooked(bk.dateKey) : [];
-  TIMES.forEach((t) => {
-    const s = document.createElement("div");
-    const b = booked.includes(t);
-    s.className =
-      "time-slot" + (b ? " booked" : "") + (t === bk.time ? " selected" : "");
-    s.textContent = t;
-    if (!b) s.onclick = () => pickTime(t, s);
-    grid.appendChild(s);
-  });
+  const service = activeService();
+  if (!service || !bk.dateKey) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;padding:18px">Төхөөрөмж болон огноогоо сонгоно уу.</div>';
+    return;
+  }
+  const duration = Number(service.duration_minutes) || 30;
+  for (let minute = OPEN_MINUTES; minute + duration <= CLOSE_MINUTES; minute += SLOT_STEP_MINUTES) {
+    const hh = String(Math.floor(minute / 60)).padStart(2, "0");
+    const mm = String(minute % 60).padStart(2, "0");
+    const time = `${hh}:${mm}`;
+    const start = new Date(slotIso(bk.dateKey, time)).getTime();
+    const finishWithBuffer = start + (duration + 2) * 60000;
+    const busy = isUnavailable(start, finishWithBuffer);
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.className = "time-slot" + (busy ? " booked" : "") + (time === bk.time ? " selected" : "");
+    slot.textContent = time;
+    slot.disabled = busy;
+    slot.title = busy ? "Энэ төхөөрөмж тухайн хугацаанд захиалгатай" : minutesLabel(duration);
+    if (!busy) slot.onclick = () => pickTime(time, slot);
+    grid.appendChild(slot);
+  }
 }
 
-function pickTime(t, el) {
-  bk.time = t;
-  document
-    .querySelectorAll(".time-slot")
-    .forEach((s) => s.classList.remove("selected"));
+function pickTime(time, el) {
+  bk.time = time;
+  document.querySelectorAll(".time-slot").forEach((s) => s.classList.remove("selected"));
   el.classList.add("selected");
 }
 
-/* Step navigation */
 function setStepDots(active) {
   [1, 2, 3].forEach((i) => {
     const dot = document.getElementById("dot" + i);
     const line = document.getElementById("line" + i);
     if (!dot) return;
-    dot.className =
-      "step-dot" + (i < active ? " done" : i === active ? " active" : "");
+    dot.className = "step-dot" + (i < active ? " done" : i === active ? " active" : "");
     if (line) line.className = "step-line" + (i < active ? " done" : "");
   });
 }
-
 function showPanel(id) {
-  ["step1", "step2", "step2b", "step3"].forEach((p) => {
-    const el = document.getElementById(p);
-    if (el) el.classList.remove("active");
-  });
-  const target = document.getElementById(id);
-  if (target) target.classList.add("active");
+  ["step1", "step2", "step2b", "step3"].forEach((p) => document.getElementById(p)?.classList.remove("active"));
+  document.getElementById(id)?.classList.add("active");
 }
-
 function goStepNum(n) {
   setStepDots(n);
   showPanel("step" + n);
 }
 
-/* Validate & go to step 2 */
 function goStep2() {
   const name = document.getElementById("b_name")?.value.trim();
   const phone = document.getElementById("b_phone")?.value.trim();
-  if (!name) {
-    shakeInput("b_name");
-    return;
-  }
-  if (!phone) {
-    shakeInput("b_phone");
-    return;
-  }
-  if (!bk.dateKey) {
-    showToast("Огноо сонгоно уу");
-    return;
-  }
-  if (!bk.time) {
-    showToast("Цаг сонгоно уу");
-    return;
-  }
-
-  const d = new Date(bk.dateKey);
-  const dl = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WD[d.getDay()]})`;
-  setText("sum_date", dl);
-  setText("sum_time", bk.time);
+  if (!name) return shakeInput("b_name");
+  if (!phone) return shakeInput("b_phone");
+  if (!bk.service) return showToast("Төхөөрөмж сонгоно уу");
+  if (!bk.dateKey) return showToast("Огноо сонгоно уу");
+  if (!bk.time) return showToast("Цаг сонгоно уу");
+  const d = new Date(bk.dateKey + "T00:00:00");
+  setText("sum_service", bk.service.name);
+  setText("sum_date", `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WD[d.getDay()]})`);
+  setText("sum_time", `${bk.time} · ${minutesLabel(bk.service.duration_minutes)}`);
   setStepDots(2);
   showPanel("step2");
 }
 
 function selectBank(el, id, name) {
-  document
-    .querySelectorAll(".bank-btn")
-    .forEach((b) => b.classList.remove("selected"));
+  document.querySelectorAll(".bank-btn").forEach((b) => b.classList.remove("selected"));
   el.classList.add("selected");
   bk.bank = id;
   bk.bankName = name;
 }
 
-/* Show QR */
 function showQR() {
-  if (!bk.bank) {
-    showToast("Банкаа сонгоно уу");
-    return;
-  }
-
-  // Mark slot booked immediately
-  if (!bookedMap[bk.dateKey]) bookedMap[bk.dateKey] = [];
-  if (!bookedMap[bk.dateKey].includes(bk.time))
-    bookedMap[bk.dateKey].push(bk.time);
-
+  if (!bk.bank) return showToast("Банкаа сонгоно уу");
   setText("qrBankName", bk.bankName.toUpperCase() + " — QPAY");
   setStepDots(2);
   showPanel("step2b");
   startTimer();
-
-  // Simulate payment after 6s
   setTimeout(() => {
-    if (document.getElementById("step2b")?.classList.contains("active"))
-      doConfirm();
+    if (document.getElementById("step2b")?.classList.contains("active")) doConfirm();
   }, 6000);
 }
 
@@ -276,75 +282,67 @@ function startTimer() {
       if (el) el.textContent = "00:00";
       return;
     }
-    const m = String(Math.floor(secs / 60)).padStart(2, "0");
-    const s = String(secs % 60).padStart(2, "0");
-    if (el) el.textContent = `${m}:${s}`;
+    if (el) el.textContent = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
   }, 1000);
 }
 
-function doConfirm() {
+async function doConfirm() {
   if (qrInterval) clearInterval(qrInterval);
-  const ref = "CRYO-" + (1000 + Math.floor(Math.random() * 9000));
+  const service = activeService();
+  if (!service || !bk.dateKey || !bk.time) return goStepNum(1);
+  const ref = "CRYO-" + Date.now().toString(36).toUpperCase();
   const name = document.getElementById("b_name")?.value || "";
   const phone = document.getElementById("b_phone")?.value || "";
-  const d = new Date(bk.dateKey);
-  const dl = `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WD[d.getDay()]})`;
-
-  /* push the booking into the admin dashboard (no-op without Supabase) */
-  if (window.cryoData) {
-    window.cryoData
-      .saveBooking({
-        ref: ref,
-        customer_name: name || "—",
-        phone: phone,
-        booked_date: bk.dateKey || null,
-        booked_time: bk.time || null,
-        amount: 100000,
-        deposit: 100000,
-        bank: bk.bankName || null,
-        status: "pending",
-        user_id:
-          window.cryoAuth && window.cryoAuth.user ? window.cryoAuth.user.id : null,
-      })
-      .then(function (r) {
-        if (r && r.error) console.warn("[cryo] booking not saved:", r.error.message);
-      });
+  const userId = window.cryoAuth?.user?.id || null;
+  if (!window.cryoData?.ready) {
+    showToast("Захиалгын системтэй холбогдож чадсангүй");
+    return goStepNum(1);
   }
-
+  const result = await window.cryoData.saveBooking({
+    ref,
+    customer_name: name || "—",
+    phone,
+    service_id: service.id,
+    starts_at: slotIso(bk.dateKey, bk.time),
+    amount: 100000,
+    deposit: 100000,
+    bank: bk.bankName || null,
+    status: "pending",
+    user_id: userId,
+  });
+  if (result?.error) {
+    const conflict = result.error.code === "23P01" || /overlap|conflict/i.test(result.error.message || "");
+    showToast(conflict ? "Энэ цаг дөнгөж захиалагдлаа. Өөр цаг сонгоно уу." : "Захиалга хадгалахад алдаа гарлаа.");
+    goStepNum(1);
+    await refreshAvailability();
+    return;
+  }
+  const d = new Date(bk.dateKey + "T00:00:00");
   setText("bookingRef", ref);
   const det = document.getElementById("confirmDetails");
-  if (det) {
-    det.innerHTML =
-      `<strong style="color:var(--text-primary)">${name}</strong> · ${phone}<br>` +
-      `📅 ${dl} · ⏰ ${bk.time}<br>` +
-      `<span style="color:var(--accent);font-size:12px;">✓ ₮100,000 — ${bk.bankName}</span>`;
-  }
+  if (det) det.innerHTML =
+    `<strong style="color:var(--text-primary)">${name}</strong> · ${phone}<br>` +
+    `❄ ${service.name}<br>📅 ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} · ⏰ ${bk.time}<br>` +
+    `<span style="color:var(--accent);font-size:12px;">✓ ₮100,000 — ${bk.bankName}</span>`;
   setStepDots(3);
   showPanel("step3");
 }
 
-/* Modal open / close */
 function openModal() {
-  /* customers book from an account; with no Supabase this opens straight through */
-  if (window.cryoAuth) {
-    window.cryoAuth.require(openBookingModal);
-    return;
-  }
+  if (window.cryoAuth) return window.cryoAuth.require(openBookingModal);
   openBookingModal();
 }
 
-function openBookingModal() {
-  bk = { dateKey: "", time: "", bank: "", bankName: "" };
+async function openBookingModal() {
+  bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [] };
   dateOffset = 0;
   buildDateTabs();
   buildTimeGrid();
-  document
-    .querySelectorAll(".bank-btn")
-    .forEach((b) => b.classList.remove("selected"));
+  document.querySelectorAll(".bank-btn").forEach((b) => b.classList.remove("selected"));
+  const prof = window.cryoAuth?.profile;
   const nameEl = document.getElementById("b_name");
   const phoneEl = document.getElementById("b_phone");
-  const prof = window.cryoAuth && window.cryoAuth.profile;
-  if (nameEl) nameEl.value = (prof && prof.full_name) || "";
+  if (nameEl) nameEl.value = prof?.full_name || "";
   if (phoneEl) phoneEl.value = "";
   setStepDots(1);
   showPanel("step1");
@@ -352,68 +350,55 @@ function openBookingModal() {
   overlay.classList.add("open");
   overlay.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
+  await loadBookingSetup();
+  if (availabilityUnsubscribe) availabilityUnsubscribe();
+  if (window.cryoData?.subscribeAvailability) {
+    availabilityUnsubscribe = window.cryoData.subscribeAvailability(() => refreshAvailability());
+  }
   setTimeout(() => document.getElementById("b_name")?.focus(), 80);
 }
 
 function closeModal() {
   if (qrInterval) clearInterval(qrInterval);
+  if (availabilityUnsubscribe) availabilityUnsubscribe();
+  availabilityUnsubscribe = null;
   const overlay = document.getElementById("modalOverlay");
   overlay.classList.remove("open");
   overlay.setAttribute("aria-hidden", "true");
   document.body.style.overflow = "";
 }
-
 function closeModalOnBg(e) {
   if (e.target === document.getElementById("modalOverlay")) closeModal();
 }
-
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && document.getElementById("modalOverlay")?.classList.contains("open")) closeModal();
 });
 
-/* ── Helpers ── */
 function setText(id, val) {
   const el = document.getElementById(id);
   if (el) el.textContent = val;
 }
-
 function shakeInput(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.style.borderColor = "#ff6b6b";
   el.style.animation = "shake .35s ease";
-  setTimeout(() => {
-    el.style.borderColor = "";
-    el.style.animation = "";
-  }, 600);
+  setTimeout(() => { el.style.borderColor = ""; el.style.animation = ""; }, 600);
   el.focus();
-
   if (!document.getElementById("shake-style")) {
     const s = document.createElement("style");
     s.id = "shake-style";
-    s.textContent = `@keyframes shake {
-      0%,100%{transform:translateX(0)}
-      20%{transform:translateX(-5px)}
-      40%{transform:translateX(5px)}
-      60%{transform:translateX(-4px)}
-      80%{transform:translateX(4px)}
-    }`;
+    s.textContent = "@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}";
     document.head.appendChild(s);
   }
 }
-
 function showToast(msg) {
-  const existing = document.getElementById("cryo-toast");
-  if (existing) existing.remove();
-
+  document.getElementById("cryo-toast")?.remove();
   const toast = document.createElement("div");
   toast.id = "cryo-toast";
   toast.className = "toast";
   toast.textContent = msg;
   document.body.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("show"));
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 500);
-  }, 2800);
+  setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 500); }, 2800);
 }
