@@ -214,7 +214,7 @@ let adminBookingChannel = null;
 function setupBookingRealtime() {
   if (adminBookingChannel || !sb) return;
   adminBookingChannel = sb.channel("erp-bookings-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, async () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "booking_blocks" }, async () => {
       const result = await fetchAll(() => sb.from("bookings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }));
       if (!result.error) {
         cache.bookings = result.data || [];
