@@ -31,7 +31,6 @@
 
     <div class="gate-tabs" id="gateTabs">
       <button type="button" class="on" data-mode="signin">Нэвтрэх</button>
-      <button type="button" data-mode="signup">Бүртгүүлэх</button>
     </div>
 
     <div id="authMsg"></div>
@@ -43,7 +42,7 @@
       </div>
       <div class="field" style="margin-top:16px;">
         <label for="au_email">И-мэйл</label>
-        <input class="ctl" type="email" id="au_email" autocomplete="email" required placeholder="you@cryomongolia.mn"/>
+        <input class="ctl" type="email" id="au_email" autocomplete="email" required placeholder="cryomongolia@gmail.com"/>
       </div>
       <div class="field" style="margin-top:16px;">
         <label for="au_pass">Нууц үг</label>
@@ -57,8 +56,7 @@
     </form>
 
     <p class="gate-sub" style="margin:20px 0 0;font-size:11.5px;line-height:1.7">
-      Шинээр бүртгүүлсэн хэрэглэгч эхлээд <b>staff</b> эрхтэй байна.
-      Үндсэн админ (owner) л админ эрх олгоно.
+      Ажилтнууд <b>cryomongolia@gmail.com</b> бүртгэлээр нэвтэрч, дараа нь өөрийн нэрийг сонгоно.
     </p>
   </div>
 </div>
@@ -83,6 +81,11 @@
 <div class="shell" id="shell" style="display:none;">
   <aside class="side">
     <a href="index.html" class="side-logo admin-brand" aria-label="CRYO Mongolia — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"><span><b>CRYO<em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
+
+    <div id="sharedStaffPicker" style="display:none;margin:0 14px 16px;">
+      <label for="sharedStaffSelect" style="display:block;margin-bottom:7px;font-size:12px;color:var(--text-secondary);">Ажилтны нэр</label>
+      <select class="ctl sm" id="sharedStaffSelect" aria-label="Ажилтны нэр сонгох" style="width:100%;"></select>
+    </div>
 
     <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="coverage" id="navCoverage"><span class="ic">✓</span> Excel шилжилт</button>
