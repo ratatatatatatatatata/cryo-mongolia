@@ -16,10 +16,38 @@ const money = (n) => Number(n || 0).toLocaleString("en-US");
 window.cryoData = {
   ready: !!sb,
 
+  async getBookableServices() {
+    if (!sb) return { data: [] };
+    return sb.from("services")
+      .select("id,slug,name,duration,duration_minutes,price")
+      .eq("active", true)
+      .neq("category", "legacy-import")
+      .order("sort", { ascending: true });
+  },
+
+  async getBookingBlocks(serviceId, dateKey) {
+    if (!sb) return { data: [] };
+    const from = `${dateKey}T00:00:00+08:00`;
+    const to = `${dateKey}T23:59:59+08:00`;
+    return sb.from("booking_blocks")
+      .select("service_id,starts_at,ends_at,blocked_until,status")
+      .eq("service_id", serviceId)
+      .gte("starts_at", from)
+      .lte("starts_at", to);
+  },
+
+  subscribeAvailability(callback) {
+    if (!sb) return () => {};
+    const channel = sb.channel("public-booking-availability")
+      .on("postgres_changes", { event: "*", schema: "public", table: "booking_blocks" }, callback)
+      .subscribe();
+    return () => sb.removeChannel(channel);
+  },
+
   async saveBooking(row) {
     if (!sb) return { skipped: true };
     try {
-      return await sb.from("bookings").insert(row);
+      return await sb.from("bookings").insert(row).select("id,ref").single();
     } catch (e) {
       return { error: e };
     }
