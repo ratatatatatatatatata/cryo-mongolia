@@ -41,6 +41,7 @@ const ROLE_MN = {
   staff: "Ажилтан",
   customer: "Үйлчлүүлэгч",
 };
+const SHARED_STAFF_EMAIL = "cryomongolia@gmail.com";
 
 const ADMIN_ONLY_NAV = [
   "navOverview", "navCoverage", "navExpenses", "navBookings", "navMessages", "navServices",
@@ -61,6 +62,7 @@ let cpkPkg = "all";
 let overviewYear = String(new Date().getFullYear());
 let attendanceYear = "all";
 let attendanceStaff = "all";
+let sharedStaffId = null;
 
 /* ── tiny DOM helpers ─────────────────────────────────────────── */
 function show(el, on = true) {
@@ -68,6 +70,22 @@ function show(el, on = true) {
 }
 function isAdminUser() {
   return me?.role === "owner" || me?.role === "admin";
+}
+function isSharedStaffAccount() {
+  return me?.role === "staff" && String(me?.email || "").toLowerCase() === SHARED_STAFF_EMAIL;
+}
+function selectedSharedStaff() {
+  return isSharedStaffAccount()
+    ? cache.staff.find((staff) => Number(staff.id) === Number(sharedStaffId) && staff.active)
+    : null;
+}
+function saleBelongsToStaff(sale, staff) {
+  if (!staff) return false;
+  const names = [staff.name, ...(staff.aliases || [])]
+    .map((name) => String(name || "").trim().toLowerCase())
+    .filter(Boolean);
+  return Number(sale.staff_id) === Number(staff.id)
+    || (!sale.staff_id && names.includes(String(sale.therapist || "").trim().toLowerCase()));
 }
 function cell(text, cls) {
   const td = document.createElement("td");
@@ -356,6 +374,7 @@ async function loadAll() {
   cache.sales = res[5].data || [];
   cache.expenses = res[6].data || [];
   cache.staff = res[7].data || [];
+  setupSharedStaffPicker();
   cache.customers = res[8].data || [];
   cache.attendance = res[9].data || [];
   cache.inventory = res[10].data || [];
@@ -389,6 +408,41 @@ async function loadAll() {
   renderStaff();
   renderAttendance();
   renderInventory();
+}
+
+function setupSharedStaffPicker() {
+  const wrap = $("sharedStaffPicker");
+  const select = $("sharedStaffSelect");
+  if (!wrap || !select) return;
+  show(wrap, isSharedStaffAccount());
+  if (!isSharedStaffAccount()) return;
+
+  const activeStaff = cache.staff.filter((staff) => staff.active);
+  const saved = Number(sessionStorage.getItem("cryo-active-staff"));
+  if (!activeStaff.some((staff) => Number(staff.id) === Number(sharedStaffId))) {
+    sharedStaffId = activeStaff.some((staff) => Number(staff.id) === saved)
+      ? saved
+      : activeStaff[0]?.id || null;
+  }
+
+  select.innerHTML = "";
+  activeStaff.forEach((staff) => {
+    const option = document.createElement("option");
+    option.value = String(staff.id);
+    option.textContent = staff.name;
+    select.appendChild(option);
+  });
+  select.value = sharedStaffId ? String(sharedStaffId) : "";
+  select.onchange = () => {
+    sharedStaffId = Number(select.value) || null;
+    if (sharedStaffId) sessionStorage.setItem("cryo-active-staff", String(sharedStaffId));
+    $("ledForm").style.display = "none";
+    ledEditing = null;
+    ledLimit = 100;
+    renderReports();
+    renderLedger();
+    renderAttendance();
+  };
 }
 
 function renderCoverage() {
@@ -1624,12 +1678,13 @@ function wireReports() {
 function reportRows() {
   const [from, to] = rangeBounds(me?.role === "staff" ? "today" : repRange);
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
+  const activeStaff = selectedSharedStaff();
   return {
     from,
     to: end,
     rows: cache.sales.filter((b) => {
       const d = new Date(b.sale_date + "T00:00:00");
-      return d >= from && d <= end;
+      return d >= from && d <= end && (!activeStaff || saleBelongsToStaff(b, activeStaff));
     }),
   };
 }
@@ -1642,6 +1697,7 @@ function renderReports() {
   }
   $("repYear").value = repRange === "all" ? "all" : repSelectedYear;
   const isStaffReport = me?.role === "staff";
+  const activeStaff = selectedSharedStaff();
   const { from, to, rows } = reportRows();
 
   $("repRange").textContent = fmtDate(from) + " — " + fmtDate(to);
@@ -1663,7 +1719,7 @@ function renderReports() {
   const compareRevenue = compareRows.reduce((sum, row) => sum + rowTotal(row), 0);
   const comparePct = compareRevenue ? ((revenue - compareRevenue) / compareRevenue) * 100 : null;
   $("rRevenueNote").textContent = isStaffReport
-    ? `${rows.length} өнөөдрийн бүртгэл`
+    ? `${activeStaff ? activeStaff.name + " · " : ""}${rows.length} өнөөдрийн бүртгэл`
     : repRange === "all"
     ? rows.length + " борлуулалтын бүртгэл"
     : `${rows.length} бүртгэл · өмнөх оны мөн үеэс ${comparePct === null ? "өгөгдөлгүй" : `${comparePct >= 0 ? "+" : ""}${comparePct.toFixed(1)}%`}`;
@@ -1678,7 +1734,7 @@ function renderReports() {
   $("rRate").innerHTML =
     '<small>₮</small>' + (isStaffReport ? staffAmount : profit).toLocaleString("en-US");
   $("rRateNote").textContent = isStaffReport
-    ? "Таны борлуулалтын бүртгэлээс"
+    ? `${activeStaff?.name || "Таны"} борлуулалтын бүртгэлээс`
     : "Зардал " + money(expenses);
 
   /* daily (or monthly for long ranges) trend */
@@ -1865,7 +1921,9 @@ const rowTotal = (r) =>
   Number(r.invoice || 0) + Number(r.barter || 0) - Number(r.refund || 0);
 
 function ledRows() {
+  const activeStaff = selectedSharedStaff();
   return cache.sales.filter((r) => {
+    if (activeStaff && !saleBelongsToStaff(r, activeStaff)) return false;
     if (ledMonth !== "all" && String(r.sale_date).slice(0, 7) !== ledMonth) return false;
     if (ledStaff !== "all" && (r.therapist || "—") !== ledStaff) return false;
     if (ledReviewOnly && !r.needs_review) return false;
@@ -2045,9 +2103,8 @@ function openLedForm(row) {
     sel.appendChild(o);
   });
   if (me.role === "staff") {
-    const ownStaff = cache.staff.find((staff) =>
-      staff.user_id === me.id ||
-      String(staff.email || "").toLowerCase() === String(me.email || "").toLowerCase(),
+    const ownStaff = selectedSharedStaff() || cache.staff.find((staff) =>
+      staff.user_id === me.id || String(staff.email || "").toLowerCase() === String(me.email || "").toLowerCase(),
     );
     const ownName = ownStaff?.name || me.full_name || me.email;
     if (![...sel.options].some((option) => option.value === ownName)) {
@@ -2171,12 +2228,24 @@ function wireAttendance() {
 
 async function clockAttendance(mode) {
   const today = new Date().toISOString().slice(0, 10);
-  const current = cache.attendance.find((r) => r.work_date === today && r.user_id === me.id);
+  const activeStaff = selectedSharedStaff();
+  const current = cache.attendance.find((r) =>
+    r.work_date === today && r.user_id === me.id && (!activeStaff || Number(r.staff_id) === Number(activeStaff.id)),
+  );
   let result;
   if (mode === "in") {
     if (current) return alert("Өнөөдрийн ажил эхэлсэн цаг бүртгэгдсэн байна.");
-    const priorDays = cache.attendance.filter((row) => row.user_id === me.id).length;
-    result = await sb.from("attendance").insert({ work_date: today, staff_name: me.full_name || me.email, user_id: me.id, workday_number: priorDays + 1, clock_in: new Date().toISOString() }).select().maybeSingle();
+    const priorDays = cache.attendance.filter((row) =>
+      activeStaff ? Number(row.staff_id) === Number(activeStaff.id) : row.user_id === me.id,
+    ).length;
+    result = await sb.from("attendance").insert({
+      work_date: today,
+      staff_id: activeStaff?.id || null,
+      staff_name: activeStaff?.name || me.full_name || me.email,
+      user_id: me.id,
+      workday_number: priorDays + 1,
+      clock_in: new Date().toISOString(),
+    }).select().maybeSingle();
   } else {
     if (!current) return alert("Эхлээд ажил эхлэх товчийг дарна уу.");
     if (current.clock_out) return alert("Ажил дууссан цаг бүртгэгдсэн байна.");
@@ -2608,7 +2677,7 @@ function renderLedger() {
       remove.textContent = "Устгах";
       remove.addEventListener("click", () => archiveSale(r));
       act.appendChild(remove);
-    } else if (r.created_by === me?.id || cache.staff.some((staff) => Number(staff.id) === Number(r.staff_id) && staff.user_id === me?.id)) {
+    } else if (isSharedStaffAccount() || r.created_by === me?.id || cache.staff.some((staff) => Number(staff.id) === Number(r.staff_id) && staff.user_id === me?.id)) {
       const request = pendingDeletionFor(r.id);
       const remove = document.createElement("button");
       remove.className = "btn-sm ghost";
