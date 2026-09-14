@@ -44,7 +44,7 @@ const ROLE_MN = {
 const SHARED_STAFF_EMAIL = "cryomongolia@gmail.com";
 
 const ADMIN_ONLY_NAV = [
-  "navOverview", "navCoverage", "navExpenses", "navBookings", "navMessages", "navServices",
+  "navOverview", "navCoverage", "navExpenses", "navMessages", "navServices",
   "navPackages", "navStaff", "navInventory", "navPayroll", "navUsers",
 ];
 
@@ -190,6 +190,7 @@ async function route() {
   badge.className = "side-role role-" + me.role;
   const isAdmin = me.role === "owner" || me.role === "admin";
   ADMIN_ONLY_NAV.forEach((id) => show($(id), isAdmin && (id !== "navUsers" || me.role === "owner")));
+  show($("navBookings"), true);
   show($("navCustomers"), true);
   show($("navReports"), true);
   show($("navAttendance"), true);
@@ -206,6 +207,22 @@ async function route() {
   }
 
   await loadAll();
+  setupBookingRealtime();
+}
+
+let adminBookingChannel = null;
+function setupBookingRealtime() {
+  if (adminBookingChannel || !sb) return;
+  adminBookingChannel = sb.channel("erp-bookings-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "booking_blocks" }, async () => {
+      const result = await fetchAll(() => sb.from("bookings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }));
+      if (!result.error) {
+        cache.bookings = result.data || [];
+        renderBookings();
+        renderOverview();
+      }
+    })
+    .subscribe();
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -345,7 +362,7 @@ async function loadAll() {
     () => sb.from("bookings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("contact_messages").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("services").select("*").order("sort", { ascending: true }),
-    () => sb.from("packages").select("*").order("sort", { ascending: true }),
+    () => sb.from("packages").select("*").is("archived_at", null).order("sort", { ascending: true }),
     () => sb.from("report_monthly").select("*"),
     () => sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("expenses").select("*").order("spend_date", { ascending: false }).order("id", { ascending: false }),
@@ -823,8 +840,10 @@ function renderBookings() {
     who.append(n, p);
     tr.appendChild(who);
 
-    tr.appendChild(cell(b.package || b.service || "—"));
-    tr.appendChild(cell(`${fmtDate(b.booked_date)} · ${b.booked_time || "—"}`, "t-mono"));
+    const service = cache.services.find((s) => Number(s.id) === Number(b.service_id));
+    tr.appendChild(cell(b.package || service?.name || b.service || "—"));
+    const duration = b.duration_minutes ? ` · ${b.duration_minutes} мин` : "";
+    tr.appendChild(cell(`${fmtDate(b.booked_date)} · ${b.booked_time || "—"}${duration}`, "t-mono"));
     tr.appendChild(cell(money(b.amount), "t-mono"));
 
     const st = document.createElement("td");
@@ -838,7 +857,8 @@ function renderBookings() {
       if (b.status === k) o.selected = true;
       sel.appendChild(o);
     });
-    sel.addEventListener("change", async () => {
+    sel.disabled = !isAdminUser();
+    if (isAdminUser()) sel.addEventListener("change", async () => {
       st.classList.add("saving");
       const { error } = await sb.from("bookings").update({ status: sel.value }).eq("id", b.id);
       st.classList.remove("saving");
@@ -1037,20 +1057,37 @@ function renderPackages() {
     ac.appendChild(acIn);
     tr.appendChild(ac);
 
-    tr.appendChild(
-      saveCell(async () => {
-        const patch = {
-          old_price: Number(oldIn.value) || 0,
-          price: Number(newIn.value) || 0,
-          featured: ftIn.checked,
-          active: acIn.checked,
-          updated_at: new Date().toISOString(),
-        };
-        const { error } = await sb.from("packages").update(patch).eq("id", p.id);
-        if (error) throw error;
-        Object.assign(p, patch);
-      }),
-    );
+    const actions = saveCell(async () => {
+      const patch = {
+        old_price: Number(oldIn.value) || 0,
+        price: Number(newIn.value) || 0,
+        featured: ftIn.checked,
+        active: acIn.checked,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await sb.from("packages").update(patch).eq("id", p.id);
+      if (error) throw error;
+      Object.assign(p, patch);
+    });
+    const remove = document.createElement("button");
+    remove.className = "btn-sm ghost";
+    remove.style.marginLeft = "7px";
+    remove.textContent = "Устгах";
+    remove.addEventListener("click", async () => {
+      if (!confirm(`“${p.name}” багцыг сайтаас устгах уу? Түүхэн тайлан хадгалагдана.`)) return;
+      remove.disabled = true;
+      const { error } = await sb.from("packages")
+        .update({ active: false, archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", p.id);
+      if (error) {
+        remove.disabled = false;
+        return alert("Багц устгаж чадсангүй: " + error.message);
+      }
+      cache.packages = cache.packages.filter((row) => row.id !== p.id);
+      renderPackages();
+    });
+    actions.appendChild(remove);
+    tr.appendChild(actions);
     body.appendChild(tr);
   });
 }

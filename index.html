@@ -573,6 +573,13 @@
         <div class="form-group"><label>Нэр</label><input type="text" id="b_name" placeholder="Таны нэр"/></div>
         <div class="form-group"><label>Утас</label><input type="tel" id="b_phone" placeholder="+976 ···· ····"/></div>
       </div>
+      <div class="form-group">
+        <label for="b_service">Төхөөрөмж / үйлчилгээ</label>
+        <select id="b_service" onchange="pickService(this.value)">
+          <option value="">Төхөөрөмж сонгоно уу</option>
+        </select>
+        <div id="bookingDurationHint" style="font-size:11.5px;color:var(--text-muted);margin-top:7px;">Эхлээд төхөөрөмжөө сонгоно уу</div>
+      </div>
       <div class="deposit-badge">
         <div class="dep-amount">₮100,000</div>
         <div class="dep-info"><div class="dep-title">Урьдчилгаа төлбөр</div><div class="dep-sub">Цаг баталгаажуулахад шаардлагатай.<br>Үлдэгдлийг ирэхдээ бэлнээр төлнө.</div></div>
@@ -592,6 +599,7 @@
       <h3 style="font-family:var(--ff-display);font-size:25px;font-weight:600;margin-bottom:6px;">Төлбөр</h3>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Банкаа сонгоод QR код авна уу</p>
       <div class="order-summary">
+        <div class="order-row"><span>Төхөөрөмж</span><span id="sum_service">–</span></div>
         <div class="order-row"><span>Огноо</span><span id="sum_date">–</span></div>
         <div class="order-row"><span>Цаг</span><span id="sum_time">–</span></div>
         <div class="order-row"><span>Урьдчилгаа</span><span>₮100,000</span></div>
