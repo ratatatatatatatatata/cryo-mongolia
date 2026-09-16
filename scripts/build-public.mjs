@@ -44,26 +44,6 @@ fs.cpSync(path.join(root, "photos"), path.join(output, "photos"), {
   },
 });
 
-// Keep the source page simple, but stage the supplied ZeroBody device image
-// into the production treatment card during the public build.
-const indexPath = path.join(output, "index.html");
-let indexHtml = fs.readFileSync(indexPath, "utf8");
-const zerobodyBefore = `<div class="treatment-card active-card" data-svc="zerobody" data-cat="relax" data-tilt="7">\n      <div class="card-visual"></div>`;
-const zerobodyAfter = `<div class="treatment-card active-card" data-svc="zerobody" data-cat="relax" data-tilt="7">\n      <div class="card-visual zerobody-visual"><img src="photos/img-zerobody.webp" alt="ZeroBody™ — Хуурай хөвөх" loading="lazy"/></div>`;
-if (!indexHtml.includes(zerobodyBefore)) {
-  throw new Error("ZeroBody treatment card marker was not found in index.html");
-}
-indexHtml = indexHtml.replace(zerobodyBefore, zerobodyAfter);
-fs.writeFileSync(indexPath, indexHtml);
-
-// The supplied ZeroBody asset has a transparent background. Treat it as a
-// device/product image instead of cropping it like the lifestyle photos.
-const indexCssPath = path.join(output, "index.css");
-fs.appendFileSync(
-  indexCssPath,
-  `\n\n/* ZeroBody treatment device image */\n.treatment-card[data-svc="zerobody"] .card-visual{\n  background:\n    radial-gradient(80% 95% at 50% 100%,rgba(88,198,255,.28),transparent 64%),\n    linear-gradient(150deg,rgba(24,49,79,.82),rgba(8,16,28,.96));\n}\n.treatment-card[data-svc="zerobody"] .card-visual img{\n  inset:8px 14px 6px;\n  width:calc(100% - 28px);\n  height:calc(100% - 14px);\n  object-fit:contain;\n  object-position:center;\n  opacity:.96;\n  filter:drop-shadow(0 18px 24px rgba(0,0,0,.48)) saturate(.95) contrast(1.03);\n}\n.treatment-card[data-svc="zerobody"] .card-visual::after{\n  background:linear-gradient(to bottom,transparent 58%,rgba(8,16,28,.56));\n}\n.treatment-card[data-svc="zerobody"]:hover .card-visual img{\n  transform:scale(1.035);\n  opacity:1;\n}\n`,
-);
-
 const forbidden = [
   "supabase",
   "scripts",
