@@ -403,6 +403,16 @@ section+section,.stats+section{border-top:1px solid var(--border)}
   background:linear-gradient(180deg,rgba(178,226,255,.16),transparent 70%);
   transform:rotate(16deg);filter:blur(22px);
 }
+.about-anatomy{
+  position:relative;z-index:2;width:auto;height:94%;max-width:94%;object-fit:contain;
+  object-position:center bottom;
+  filter:drop-shadow(0 0 24px rgba(88,198,255,.38)) drop-shadow(0 28px 34px rgba(0,0,0,.42));
+  animation:anatomyFloat 7s ease-in-out infinite;
+}
+@keyframes anatomyFloat{
+  0%,100%{transform:translateY(4px) scale(.985)}
+  50%{transform:translateY(-6px) scale(1)}
+}
 .cryo-anim{width:280px;height:280px;position:relative;transform-style:preserve-3d;
   animation:gyro 30s linear infinite}
 .cryo-anim .cryo-ring{position:absolute;inset:0;border-radius:50%;
@@ -964,7 +974,7 @@ body.has-halo .cursor-halo{opacity:1}
   .stage-item img{height:200px}
   .treatment-grid{grid-template-columns:1fr}
   .about-visual{height:320px}
-  .cryo-anim{transform:scale(.78)}
+  .about-anatomy{height:93%;max-width:88%}
 }
 
 /* Responsive hardening: phones, tablets, laptops and wide desktops */
@@ -1016,6 +1026,7 @@ body.has-halo .cursor-halo{opacity:1}
   .about{gap:34px}
   .about-visual{height:280px}
   .about-card-main{inset:0}
+  .about-anatomy{height:92%;max-width:86%}
   .about-float-badge{right:0;bottom:0}
   .pillars{grid-template-columns:1fr;margin-top:30px}
   .treatment-card,.price-card,.benefit-card{border-radius:20px}
@@ -1039,6 +1050,9 @@ body.has-halo .cursor-halo{opacity:1}
   .time-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
   .deposit-badge{align-items:flex-start;gap:12px;padding:14px}
   .dep-amount{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .about-anatomy{animation:none}
 }
 
 @media(max-width:380px){
