@@ -188,8 +188,13 @@ function readIncome(sheet, year, visits) {
     };
     const total = money.golomt + money.khan + money.cash + money.invoice + money.barter - money.refund;
     const name = String(r[col.name] || "").trim();
-    if (/^Нэрс$/i.test(name) || /^Total:$/i.test(name)) return;
+    const services = String(r[col.svc] || "").trim();
+    if (/^Нэрс$/i.test(name) || /^Total\s*:?\s*$/i.test(name)) return;
     if (total === 0 && !name) return;
+    /* Monthly summary blocks are copied below the transaction table as
+       cached values. They have money but no customer or service, so they
+       look like unnamed sales unless explicitly excluded. */
+    if (!name && !services) return;
     if (!last) return;
 
     /* a SUM in a money cell means this is a subtotal line, not a sale */
@@ -203,7 +208,7 @@ function readIncome(sheet, year, visits) {
     }
 
     const row = {
-      date: last, name, services: String(r[col.svc] || "").trim(), ...money,
+      date: last, name, services, ...money,
       cabin: 0, oxy: 0, led: 0, xcryo: 0, zero: 0, norma: 0, oxygen: 0,
       therapist: null, therapist_amount: 0, gift: 0, internal: false, notes: "",
       needs_review: !name,
@@ -339,7 +344,8 @@ function readIncomeBlocks(sheet, year, visits) {
       if (seg.every((x) => x == null || String(x).trim() === "")) continue;
 
       const name = String(seg[col.name] || "").trim();
-      if (/^нэрс$/i.test(name) || /^total:?$/i.test(name)) continue;
+      const services = col.svc >= 0 ? String(seg[col.svc] || "").trim() : "";
+      if (/^нэрс$/i.test(name) || /^total\s*:?\s*$/i.test(name)) continue;
 
       /* a SUM in a money cell means the line is a subtotal, not a sale */
       const isSubtotal = moneyCols.some((c) => {
@@ -371,6 +377,7 @@ function readIncomeBlocks(sheet, year, visits) {
       const total =
         money.golomt + money.khan + money.cash + money.invoice + money.barter - money.refund;
       if (total === 0 && !name) continue;
+      if (!name && !services) continue;
 
       /* the cash blocks record a month but no day */
       let date = last;
@@ -387,7 +394,7 @@ function readIncomeBlocks(sheet, year, visits) {
         date,
         name,
         phone: col.phone >= 0 ? String(seg[col.phone] || "").trim() : "",
-        services: col.svc >= 0 ? String(seg[col.svc] || "").trim() : "",
+        services,
         ...money,
         cabin: 0, oxy: 0, led: 0, xcryo: 0, zero: 0, norma: 0, oxygen: 0,
         therapist: null, therapist_amount: 0, gift: 0,

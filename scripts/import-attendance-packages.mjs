@@ -512,8 +512,17 @@ ${report.map((l) => "--  " + l).join("\n")}
 --  supabase/local/ is gitignored so it never reaches the public repo.
 --
 --  Safe to re-run: every row carries a source_key and conflicts are
---  ignored, so nothing duplicates.
+--  ignored, so nothing duplicates. Workbook-derived rows are refreshed
+--  first, while manually entered rows remain untouched.
 -- ═══════════════════════════════════════════════════════════════
+
+-- Mirror the latest workbook instead of keeping rows that were removed
+-- from it. Redemptions must be removed before their contracts because the
+-- foreign key intentionally uses ON DELETE RESTRICT.
+delete from public.package_redemptions where source_key is not null;
+delete from public.customer_package_contracts where source_key is not null;
+delete from public.staff_workdays where source = 'workbook';
+delete from public.payroll where source = 'workbook';
 
 -- staff seen in the attendance sheet ("Sara" is the same person the
 -- sales sheets call "Сараа")
