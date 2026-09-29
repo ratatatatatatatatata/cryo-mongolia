@@ -2331,15 +2331,13 @@ function renderAttendance() {
   if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
   renderAttendanceKpis(attendanceRows);
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = `<tr><td colspan="8"><div class="empty">${fmtDate(day)}-ны ээлж, ирцийн мэдээлэл алга байна.</div></td></tr>`);
+  if (!attendanceRows.length) return void (body.innerHTML = `<tr><td colspan="6"><div class="empty">${fmtDate(day)}-ны ээлж, ирцийн мэдээлэл алга байна.</div></td></tr>`);
   attendanceRows.forEach((row) => {
-    const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
+    const end = row.clock_out ? new Date(row.clock_out) : null;
     const tr = document.createElement("tr");
+    tr.appendChild(cell(fmtDate(row.work_date), "t-mono t-strong"));
     tr.appendChild(cell(row.staff_name, "t-strong"));
     tr.appendChild(cell(row.workday_number ? `${row.workday_number} дэх` : "—", "t-mono"));
-    tr.appendChild(cell(attendanceTime(start), "t-mono"));
-    tr.appendChild(cell(attendanceTime(end), "t-mono"));
-    tr.appendChild(cell(attendanceDuration(start, end), "t-mono t-strong"));
     const statusCell = document.createElement("td");
     const status = attendanceStatus(row, end);
     const pill = document.createElement("span");
@@ -2371,36 +2369,15 @@ function shiftAttendanceDate(amount) {
   renderAttendance();
 }
 
-function attendanceTime(date) {
-  return date && !Number.isNaN(date.getTime())
-    ? date.toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" })
-    : "—";
-}
-
-function attendanceMinutes(start, end) {
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
-}
-
-function attendanceDuration(start, end) {
-  const minutes = attendanceMinutes(start, end);
-  if (!minutes) return "—";
-  const hours = Math.floor(minutes / 60), rest = minutes % 60;
-  return `${hours}ц ${rest}м`;
-}
-
 function renderAttendanceKpis(rows) {
   const host = $("attKpis");
   if (!host) return;
   const left = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Гарсан").length;
   const active = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Ээлжтэй").length;
-  const minutes = rows.reduce((sum, row) => sum + attendanceMinutes(row.clock_in ? new Date(row.clock_in) : null, row.clock_out ? new Date(row.clock_out) : null), 0);
-  const duration = minutes ? `${Math.floor(minutes / 60)}ц ${minutes % 60}м` : "0ц";
   host.innerHTML = [
     ["Ажилласан хүн", rows.length, "Тухайн өдрийн бүртгэл"],
     ["Ээлжтэй", active, "Одоогоор гараагүй"],
     ["Гарсан", left, "Ээлж дууссан"],
-    ["Нийт ажилласан", duration, "Бүртгэгдсэн цагаар"],
   ].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`).join("");
 }
 
@@ -2526,8 +2503,6 @@ function openAttendanceForm(row = null) {
   $("att_staff").value = row?.staff_id ? String(row.staff_id) : "";
   $("att_date").value = row?.work_date || selectedAttendanceDate || localDateKey(new Date());
   $("att_day").value = row?.workday_number || "";
-  $("att_in").value = timeInputValue(row?.clock_in) || "09:00";
-  $("att_out").value = timeInputValue(row?.clock_out);
   $("att_note").value = row?.note || "";
   show($("attForm"));
   $("attForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -2542,10 +2517,9 @@ async function saveAttendance() {
   const staff = cache.staff.find((item) => String(item.id) === $("att_staff").value);
   const workDate = $("att_date").value;
   const workdayNumber = Number($("att_day").value);
-  const clockIn = attendanceTimestamp(workDate, $("att_in").value);
-  const clockOut = attendanceTimestamp(workDate, $("att_out").value);
-  if (!staff || !workDate || !clockIn || workdayNumber < 1) return alert("Ажилтан, огноо, хэд дэх өдөр, эхэлсэн цагийг бөглөнө үү.");
-  if (clockOut && new Date(clockOut) < new Date(clockIn)) return alert("Дууссан цаг эхэлсэн цагаас өмнө байж болохгүй.");
+  const clockIn = attendanceEditing?.clock_in || attendanceTimestamp(workDate, "00:00");
+  const clockOut = attendanceEditing?.clock_out || null;
+  if (!staff || !workDate || workdayNumber < 1) return alert("Ажилтан, огноо, хэд дэх өдрийг бөглөнө үү.");
 
   const duplicate = allAttendanceRows().find((row) => Number(row.staff_id) === Number(staff.id) && row.work_date === workDate && (!attendanceEditing || row.__table !== attendanceEditing.__table || Number(row.id) !== Number(attendanceEditing.id)));
   if (duplicate) return alert("Энэ ажилтны тухайн өдрийн ирц бүртгэгдсэн байна. Одоо байгаа мөрийг засна уу.");
