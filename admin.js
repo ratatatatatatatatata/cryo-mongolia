@@ -62,6 +62,7 @@ let cpkPkg = "all";
 let overviewYear = String(new Date().getFullYear());
 let attendanceYear = "all";
 let attendanceStaff = "all";
+let selectedAttendanceDate = localDateKey(new Date());
 let sharedStaffId = null;
 
 /* ── tiny DOM helpers ─────────────────────────────────────────── */
@@ -196,6 +197,7 @@ async function route() {
   show($("navReports"), true);
   show($("navAttendance"), true);
   show($("attAdd"), isAdmin);
+  show($("todayStatusPanel"), isAdmin);
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
 
@@ -2256,6 +2258,16 @@ function wireAttendance() {
   $("attSave")?.addEventListener("click", saveAttendance);
   $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
   $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
+  $("attViewDate")?.addEventListener("change", (event) => {
+    selectedAttendanceDate = event.target.value || localDateKey(new Date());
+    renderAttendance();
+  });
+  $("attPrevDay")?.addEventListener("click", () => shiftAttendanceDate(-1));
+  $("attNextDay")?.addEventListener("click", () => shiftAttendanceDate(1));
+  $("attToday")?.addEventListener("click", () => {
+    selectedAttendanceDate = localDateKey(new Date());
+    renderAttendance();
+  });
   $("att_staff")?.addEventListener("change", (event) => {
     if (!attendanceEditing && event.target.value) $("att_day").value = nextWorkdayNumber(event.target.value);
   });
@@ -2302,28 +2314,32 @@ async function clockAttendance(mode) {
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
   syncAttendanceFilters();
-  const today = localDateKey(new Date());
+  const day = selectedAttendanceDate || localDateKey(new Date());
+  if ($("attViewDate")) $("attViewDate").value = day;
   renderAttendanceStaffChecks();
   const baseRows = allAttendanceRows()
-    .filter((row) => String(row.work_date || "").slice(0, 10) === today)
+    .filter((row) => String(row.work_date || "").slice(0, 10) === day)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
   const byStaff = new Map();
-  cache.staff.filter((staff) => staff.active).forEach((staff) => byStaff.set(String(staff.id), { staff_id: staff.id, staff_name: staff.name, work_date: today, __directory: true }));
   baseRows.forEach((row) => byStaff.set(String(row.staff_id || row.staff_name), row));
-  cache.dailyStatus.filter((row) => row.work_date === today).forEach((status) => {
+  cache.dailyStatus.filter((row) => row.work_date === day).forEach((status) => {
     const key = String(status.staff_id);
-    byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: today, daily_status: status.status, daily_note: status.note });
+    byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: day, daily_status: status.status, daily_note: status.note });
   });
   const attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
-  $("attSub").textContent = `${fmtDate(today)} · ${attendanceRows.length} ажилтан`;
+  $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан ажилласан`;
+  if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
+  renderAttendanceKpis(attendanceRows);
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = '<tr><td colspan="5"><div class="empty">Өнөөдрийн ээлжийн мэдээлэл алга байна.</div></td></tr>');
+  if (!attendanceRows.length) return void (body.innerHTML = `<tr><td colspan="8"><div class="empty">${fmtDate(day)}-ны ээлж, ирцийн мэдээлэл алга байна.</div></td></tr>`);
   attendanceRows.forEach((row) => {
     const start = row.clock_in ? new Date(row.clock_in) : null, end = row.clock_out ? new Date(row.clock_out) : null;
     const tr = document.createElement("tr");
     tr.appendChild(cell(row.staff_name, "t-strong"));
-    const shift = `${start?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"} — ${end?.toLocaleTimeString("mn-MN", {hour:"2-digit",minute:"2-digit"}) || "—"}`;
-    tr.appendChild(cell(shift, "t-mono"));
+    tr.appendChild(cell(row.workday_number ? `${row.workday_number} дэх` : "—", "t-mono"));
+    tr.appendChild(cell(attendanceTime(start), "t-mono"));
+    tr.appendChild(cell(attendanceTime(end), "t-mono"));
+    tr.appendChild(cell(attendanceDuration(start, end), "t-mono t-strong"));
     const statusCell = document.createElement("td");
     const status = attendanceStatus(row, end);
     const pill = document.createElement("span");
@@ -2346,6 +2362,46 @@ function renderAttendance() {
     tr.appendChild(actions);
     body.appendChild(tr);
   });
+}
+
+function shiftAttendanceDate(amount) {
+  const date = new Date(`${selectedAttendanceDate || localDateKey(new Date())}T12:00:00`);
+  date.setDate(date.getDate() + amount);
+  selectedAttendanceDate = localDateKey(date);
+  renderAttendance();
+}
+
+function attendanceTime(date) {
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" })
+    : "—";
+}
+
+function attendanceMinutes(start, end) {
+  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+}
+
+function attendanceDuration(start, end) {
+  const minutes = attendanceMinutes(start, end);
+  if (!minutes) return "—";
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  return `${hours}ц ${rest}м`;
+}
+
+function renderAttendanceKpis(rows) {
+  const host = $("attKpis");
+  if (!host) return;
+  const left = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Гарсан").length;
+  const active = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Ээлжтэй").length;
+  const minutes = rows.reduce((sum, row) => sum + attendanceMinutes(row.clock_in ? new Date(row.clock_in) : null, row.clock_out ? new Date(row.clock_out) : null), 0);
+  const duration = minutes ? `${Math.floor(minutes / 60)}ц ${minutes % 60}м` : "0ц";
+  host.innerHTML = [
+    ["Ажилласан хүн", rows.length, "Тухайн өдрийн бүртгэл"],
+    ["Ээлжтэй", active, "Одоогоор гараагүй"],
+    ["Гарсан", left, "Ээлж дууссан"],
+    ["Нийт ажилласан", duration, "Бүртгэгдсэн цагаар"],
+  ].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`).join("");
 }
 
 function localDateKey(date) {
@@ -2394,9 +2450,10 @@ function toggleAllAttendanceStaff() {
 }
 
 async function markSelectedStaffLeft() {
+  if (!isAdminUser()) return alert("Зөвхөн админ ажилтны төлөв өөрчлөх эрхтэй.");
   const ids = [...$("attStaffChecks").querySelectorAll("input:checked")].map((input) => Number(input.value));
   if (!ids.length) return alert("Гарсан ажилтнаас сонгоно уу.");
-  const today = localDateKey(new Date());
+  const today = selectedAttendanceDate || localDateKey(new Date());
   const rows = ids.map((id) => {
     const staff = cache.staff.find((item) => Number(item.id) === id);
     return { work_date: today, staff_id: id, staff_name: staff.name, status: "left", note: "Өнөөдөр гарсан", reported_by: me.id };
@@ -2467,7 +2524,7 @@ function openAttendanceForm(row = null) {
   attendanceEditing = row;
   $("attFormTitle").textContent = row ? "Ээлж, ирц засах" : "Ээлж, ирц нэмэх";
   $("att_staff").value = row?.staff_id ? String(row.staff_id) : "";
-  $("att_date").value = row?.work_date || new Date().toISOString().slice(0, 10);
+  $("att_date").value = row?.work_date || selectedAttendanceDate || localDateKey(new Date());
   $("att_day").value = row?.workday_number || "";
   $("att_in").value = timeInputValue(row?.clock_in) || "09:00";
   $("att_out").value = timeInputValue(row?.clock_out);
