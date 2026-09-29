@@ -121,7 +121,11 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .st-done     {background:rgba(80,220,160,.14);color:#8ceec2;border:1px solid rgba(80,220,160,.3)}
 .st-cancelled{background:rgba(255,110,110,.12);color:#ffa3a3;border:1px solid rgba(255,110,110,.28)}
 .st-transferred{background:rgba(160,120,255,.14);color:#d6c7ff;border:1px solid rgba(160,120,255,.32)}
-.today-attendance{min-width:620px!important}
+.today-attendance{min-width:980px!important}
+.attendance-date-panel{padding:14px 18px}
+.attendance-date-nav{display:flex;align-items:flex-end;justify-content:center;gap:10px;flex-wrap:wrap}
+.attendance-date-field{min-width:190px}
+.attendance-kpis{margin-bottom:18px}
 .staff-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
 .staff-check{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:rgba(3,6,12,.42);color:var(--text-secondary);cursor:pointer;transition:all var(--ease)}
 .staff-check:hover{border-color:var(--border-strong);color:var(--ice-100)}
@@ -293,3 +297,8 @@ tr.review td{background:rgba(255,180,80,.05)}
 #impPreview{min-width:640px}
 @media(max-width:1100px){.map-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.map-grid{grid-template-columns:1fr}.map-row label{flex:0 0 90px}}
+@media(max-width:640px){
+  .attendance-date-nav{display:grid;grid-template-columns:1fr 1fr}
+  .attendance-date-field{grid-column:1/-1;grid-row:1;min-width:0}
+  .attendance-date-nav .btn-sm{width:100%;justify-content:center}
+}
