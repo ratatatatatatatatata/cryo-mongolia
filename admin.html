@@ -494,14 +494,23 @@
     <!-- ── ATTENDANCE ── -->
     <section class="view" data-panel="attendance">
       <div class="page-head">
-        <div><div class="page-title">Өнөөдрийн ээлж</div><div class="page-sub" id="attSub">Өнөөдрийн ажилтны төлөв</div></div>
+        <div><div class="page-title">Ээлж, ирц</div><div class="page-sub" id="attSub">Сонгосон өдрийн ажилтны бүртгэл</div></div>
         <div class="head-actions">
           <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
         </div>
       </div>
+      <div class="panel attendance-date-panel">
+        <div class="attendance-date-nav">
+          <button class="btn-sm ghost" id="attPrevDay" aria-label="Өмнөх өдөр">← Өмнөх</button>
+          <div class="field attendance-date-field"><label for="attViewDate">Хянах огноо</label><input class="ctl" id="attViewDate" type="date"/></div>
+          <button class="btn-sm ghost" id="attToday">Өнөөдөр</button>
+          <button class="btn-sm ghost" id="attNextDay" aria-label="Дараагийн өдөр">Дараах →</button>
+        </div>
+      </div>
+      <div class="kpis attendance-kpis" id="attKpis"></div>
       <div class="panel" id="todayStatusPanel">
         <div class="panel-head">
-          <div><div class="panel-title">Өнөөдөр гарсан ажилтан</div><div class="page-sub">Админы бүртгэсэн идэвхтэй ажилтнуудаас нэг эсвэл олныг сонгоно</div></div>
+          <div><div class="panel-title" id="attStatusTitle">Тухайн өдөр гарсан ажилтан</div><div class="page-sub">Админы бүртгэсэн идэвхтэй ажилтнуудаас нэг эсвэл олныг сонгоно</div></div>
           <button class="btn-sm ghost" id="attSelectAll">Бүгдийг сонгох</button>
         </div>
         <div class="staff-check-grid" id="attStaffChecks"></div>
@@ -522,7 +531,7 @@
         </div>
         <div class="form-actions"><button class="btn-sm primary" id="attSave">Хадгалах</button><button class="btn-sm ghost" id="attFormCancel">Болих</button></div>
       </div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Ажилтан</th><th>Ээлжийн цаг</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Эхэлсэн</th><th>Дууссан</th><th>Ажилласан</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
     <!-- ── PAYROLL ── -->
