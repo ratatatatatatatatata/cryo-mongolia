@@ -44,7 +44,7 @@ const ROLE_MN = {
 const SHARED_STAFF_EMAIL = "cryomongolia@gmail.com";
 
 const ADMIN_ONLY_NAV = [
-  "navOverview", "navCoverage", "navExpenses", "navMessages", "navServices",
+  "navOverview", "navCoverage", "navExpenses", "navServices",
   "navPackages", "navStaff", "navInventory", "navPayroll", "navUsers",
 ];
 
@@ -191,6 +191,7 @@ async function route() {
   const isAdmin = me.role === "owner" || me.role === "admin";
   ADMIN_ONLY_NAV.forEach((id) => show($(id), isAdmin && (id !== "navUsers" || me.role === "owner")));
   show($("navBookings"), true);
+  show($("navMessages"), true);
   show($("navCustomers"), true);
   show($("navReports"), true);
   show($("navAttendance"), true);
@@ -911,22 +912,27 @@ function renderMessages() {
     tr.appendChild(msg);
 
     const act = document.createElement("td");
-    const btn = document.createElement("button");
-    btn.className = "btn-sm " + (m.handled ? "ghost" : "primary");
-    btn.textContent = m.handled ? "Буцаах" : "Хариулсан";
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      const { error } = await sb
-        .from("contact_messages")
-        .update({ handled: !m.handled })
-        .eq("id", m.id);
-      btn.disabled = false;
-      if (error) return alert("Хадгалж чадсангүй: " + error.message);
-      m.handled = !m.handled;
-      renderMessages();
-      renderOverview();
-    });
-    act.appendChild(btn);
+    if (isAdminUser()) {
+      const btn = document.createElement("button");
+      btn.className = "btn-sm " + (m.handled ? "ghost" : "primary");
+      btn.textContent = m.handled ? "Буцаах" : "Хариулсан";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        const { error } = await sb
+          .from("contact_messages")
+          .update({ handled: !m.handled })
+          .eq("id", m.id);
+        btn.disabled = false;
+        if (error) return alert("Хадгалж чадсангүй: " + error.message);
+        m.handled = !m.handled;
+        renderMessages();
+        renderOverview();
+      });
+      act.appendChild(btn);
+    } else {
+      act.textContent = m.handled ? "Хариулсан" : "Хүлээгдэж буй";
+      act.style.color = "var(--text-muted)";
+    }
     tr.appendChild(act);
 
     body.appendChild(tr);

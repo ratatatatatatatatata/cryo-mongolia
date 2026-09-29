@@ -125,6 +125,7 @@ drop policy if exists "create own booking"     on public.bookings;
 drop policy if exists "customers read own"     on public.bookings;
 drop policy if exists "customers cancel own"   on public.bookings;
 drop policy if exists "admins read bookings"   on public.bookings;
+drop policy if exists "staff read bookings"    on public.bookings;
 drop policy if exists "admins update bookings" on public.bookings;
 drop policy if exists "owner deletes bookings" on public.bookings;
 
@@ -141,6 +142,13 @@ create policy "customers cancel own" on public.bookings for update
   using (user_id = auth.uid())
   with check (user_id = auth.uid() and status in ('pending','cancelled'));
 create policy "admins read bookings"   on public.bookings for select using (public.is_admin());
+create policy "staff read bookings" on public.bookings for select to authenticated
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid()) and p.role = 'staff'
+    )
+  );
 create policy "admins update bookings" on public.bookings for update
   using (public.is_admin()) with check (public.is_admin());
 create policy "owner deletes bookings" on public.bookings for delete using (public.is_owner());
@@ -164,10 +172,18 @@ create table if not exists public.contact_messages (
 alter table public.contact_messages enable row level security;
 drop policy if exists "public sends message"   on public.contact_messages;
 drop policy if exists "admins read messages"   on public.contact_messages;
+drop policy if exists "staff read messages"    on public.contact_messages;
 drop policy if exists "admins update messages" on public.contact_messages;
 create policy "public sends message"   on public.contact_messages for insert
   to anon, authenticated with check (true);
 create policy "admins read messages"   on public.contact_messages for select using (public.is_admin());
+create policy "staff read messages" on public.contact_messages for select to authenticated
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid()) and p.role = 'staff'
+    )
+  );
 create policy "admins update messages" on public.contact_messages for update
   using (public.is_admin()) with check (public.is_admin());
 
