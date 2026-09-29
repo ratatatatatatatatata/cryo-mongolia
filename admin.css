@@ -190,6 +190,41 @@ input.ctl.num{max-width:130px;text-align:right;font-variant-numeric:tabular-nums
   .head-actions{width:100%;justify-content:flex-start}
 }
 
+/* Compact ERP layout for phones and tablets. */
+@media(max-width:1000px){
+  .side{position:sticky;top:0;z-index:80;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .side::-webkit-scrollbar{display:none}
+  .side-logo,.side-foot{flex:0 0 auto}
+  .side a.nav-item,.side button.nav-item{flex:0 0 auto;white-space:nowrap}
+  .page-head{align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .filters{overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:640px){
+  .gate{padding:16px}
+  .gate-card{padding:30px 20px;border-radius:22px}
+  .side{padding:10px 12px;gap:6px}
+  .side-logo{min-width:max-content}
+  .side-user{display:none}
+  .main{padding:20px 14px 42px}
+  .page-title{font-size:21px;line-height:1.2}
+  .page-sub{font-size:12px}
+  .head-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .head-actions .btn-sm{width:100%;justify-content:center}
+  .panel{padding:18px 14px;border-radius:18px}
+  .kpi{padding:20px}
+  .kpi-val{font-size:28px}
+  .form-grid,.form-grid.dev{grid-template-columns:1fr}
+  .form-grid .field[style*="grid-column"]{grid-column:auto!important}
+  .filters>*{flex:0 0 auto}
+  .form-actions{align-items:stretch}
+  .form-actions .btn,.form-actions .btn-sm{width:100%;justify-content:center}
+  .staff-check-grid{grid-template-columns:1fr}
+  table.tbl{font-size:12px}
+  .tbl-wrap{margin-inline:-14px;border-radius:0;border-inline:0}
+  .modal,.dialog{max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}
+  input,select,textarea{font-size:16px}
+}
+
 
 /* ══════════ PRINT (report view) ══════════ */
 @media print{

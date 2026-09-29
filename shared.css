@@ -369,6 +369,30 @@ footer p{font-size:12px}
   .hero-badges{grid-template-columns:1fr}
 }
 
+@media(max-width:700px){
+  html{scroll-padding-top:64px}
+  .topnav{padding-top:env(safe-area-inset-top);height:calc(60px + env(safe-area-inset-top))}
+  .dev-hero{padding-top:calc(92px + env(safe-area-inset-top))}
+  .dev-hero>*{min-width:0}
+  .dev-title{word-break:keep-all;hyphens:none;text-wrap:balance}
+  .hero-badges{align-items:stretch}
+  .hero-badge{height:100%}
+  .feat-card,.contra-card,.applicator-card{padding:22px 20px}
+  .howto-step{align-items:flex-start;padding:16px}
+  .spec-table-wrap,.treatment-table-wrap{margin-inline:calc(var(--shell) * -1);border-radius:0;border-inline:0}
+  .spec-table,.treatment-table{font-size:12px}
+  .spec-table th,.spec-table td,.treatment-table th,.treatment-table td{padding:12px 14px}
+  input,select,textarea{font-size:16px}
+}
+
+@media(max-width:420px){
+  .nav-logo{font-size:13px}
+  .back-btn{padding:8px 10px}
+  .hero-badges{grid-template-columns:1fr}
+  .dev-title{font-size:clamp(34px,11vw,46px)}
+  .cta-bar p{font-size:14px}
+}
+
 @media(hover:none),(pointer:coarse){
   .cursor-halo{display:none!important}
   .feat-card:hover,.hero-badge:hover{transform:none}
