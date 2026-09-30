@@ -521,12 +521,12 @@
       <div class="kpis attendance-kpis" id="attKpis"></div>
       <div class="panel" id="todayStatusPanel">
         <div class="panel-head">
-          <div><div class="panel-title" id="attStatusTitle">Тухайн өдөр гарсан ажилтан</div><div class="page-sub">Админы бүртгэсэн идэвхтэй ажилтнуудаас нэг эсвэл олныг сонгоно</div></div>
+          <div><div class="panel-title" id="attStatusTitle">Тухайн өдөр гарсан ажилтан</div><div class="page-sub">Нэг эсвэл олон ажилтныг зэрэг сонгож бүртгэнэ</div></div>
           <button class="btn-sm ghost" id="attSelectAll">Бүгдийг сонгох</button>
         </div>
         <div class="staff-check-grid" id="attStaffChecks"></div>
         <div class="form-actions">
-          <button class="btn-sm primary" id="attMarkLeft">Сонгосныг “Гарсан” болгох</button>
+          <button class="btn-sm primary" id="attMarkLeft">Сонгосныг “Гарсан” гэж бүртгэх</button>
           <span class="page-sub" id="attSelectionNote">Ажилтан сонгоогүй</span>
         </div>
       </div>
@@ -633,6 +633,7 @@
           <div class="page-sub">Төлөв солих, дэлгэрэнгүй харах</div>
         </div>
         <div class="filters" id="bkFilters">
+          <select class="ctl sm" id="bkDevice" aria-label="Төхөөрөмжөөр шүүх"><option value="all">Бүх төхөөрөмж</option></select>
           <button class="chip-btn on" data-status="all">Бүгд</button>
           <button class="chip-btn" data-status="pending">Хүлээгдэж буй</button>
           <button class="chip-btn" data-status="confirmed">Баталгаажсан</button>
@@ -643,7 +644,7 @@
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr>
-            <th>Дугаар</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ</th>
+            <th>Дугаар</th><th>Үйлчлүүлэгч</th><th>Төхөөрөмж</th>
             <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th>
           </tr></thead>
           <tbody id="bkBody"></tbody>
@@ -769,6 +770,17 @@
     </section>
 
   </main>
+</div>
+
+<div class="detail-overlay" id="cpkDetailOverlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="cpkDetailTitle">
+  <div class="detail-modal">
+    <div class="panel-head">
+      <div><div class="panel-title" id="cpkDetailTitle">Багцын дэлгэрэнгүй</div><div class="page-sub" id="cpkDetailSub"></div></div>
+      <button class="btn-sm ghost" id="cpkDetailClose">✕ Хаах</button>
+    </div>
+    <div class="kpis package-detail-kpis" id="cpkDetailKpis"></div>
+    <div class="tbl-wrap"><table class="tbl package-history"><thead><tr><th>№</th><th>Огноо</th><th>Төхөөрөмж / үйлчилгээ</th><th>Тоо</th><th>Тэмдэглэл</th></tr></thead><tbody id="cpkDetailBody"></tbody></table></div>
+  </div>
 </div>
 
 <script src="supabase-config.js"></script>
