@@ -56,6 +56,7 @@ let cache = {
   contracts: [], redemptions: [], payroll: [], saleDeletionRequests: [],
 };
 let bkFilter = "all";
+let bkDevice = "all";
 let cpkSearch = "";
 let cpkStatus = "all";
 let cpkPkg = "all";
@@ -197,7 +198,7 @@ async function route() {
   show($("navReports"), true);
   show($("navAttendance"), true);
   show($("attAdd"), isAdmin);
-  show($("todayStatusPanel"), false);
+  show($("todayStatusPanel"), isAdmin);
   show($("staffAttendancePanel"), !isAdmin);
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
@@ -393,7 +394,7 @@ async function loadAll() {
     () => sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("daily_staff_status").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("customer_package_contracts").select("*").order("purchased_on", { ascending: false }).order("id", { ascending: false }),
-    () => sb.from("package_redemptions").select("contract_id,used_on,units").order("id", { ascending: true }),
+    () => sb.from("package_redemptions").select("id,contract_id,session_id,used_on,units,service_id,service_label,staff_id,notes").order("id", { ascending: true }),
     () => sb.from("payroll").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("sale_deletion_requests").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
   ];
@@ -838,7 +839,10 @@ function renderOverviewStaff(salesRows, attendanceRows) {
 function renderBookings() {
   const body = $("bkBody");
   body.innerHTML = "";
-  const rows = cache.bookings.filter((b) => bkFilter === "all" || b.status === bkFilter);
+  syncBookingDeviceFilter();
+  const rows = cache.bookings
+    .filter((b) => bkFilter === "all" || b.status === bkFilter)
+    .filter((b) => bkDevice === "all" || String(b.service_id || "") === bkDevice);
 
   if (!rows.length) {
     body.innerHTML = '<tr><td colspan="6"><div class="empty">Захиалга алга байна.</div></td></tr>';
@@ -895,6 +899,20 @@ function renderBookings() {
 
     body.appendChild(tr);
   });
+}
+
+function syncBookingDeviceFilter() {
+  const select = $("bkDevice");
+  if (!select) return;
+  const current = bkDevice;
+  select.innerHTML = '<option value="all">Бүх төхөөрөмж</option>';
+  cache.services.filter((service) => service.active).forEach((service) => select.appendChild(new Option(service.name, String(service.id))));
+  bkDevice = [...select.options].some((option) => option.value === current) ? current : "all";
+  select.value = bkDevice;
+  if (!select.dataset.wired) {
+    select.dataset.wired = "1";
+    select.addEventListener("change", () => { bkDevice = select.value; renderBookings(); });
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1201,12 +1219,21 @@ function renderContracts() {
   body.innerHTML = "";
   if (!rows.length) {
     body.innerHTML =
-      '<tr><td colspan="8"><div class="empty">Үйлчлүүлэгчийн багц алга. Excel-ээс импортлосон уу?</div></td></tr>';
+      '<tr><td colspan="9"><div class="empty">Үйлчлүүлэгчийн багц алга. Excel-ээс импортлосон уу?</div></td></tr>';
     return;
   }
 
   rows.forEach((r) => {
     const tr = document.createElement("tr");
+    tr.className = "clickable-row";
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-label", `${r.__customer} — ${r.__label} багцын дэлгэрэнгүй`);
+    tr.addEventListener("click", (event) => {
+      if (!event.target.closest("button,select,input,a")) openContractDetail(r);
+    });
+    tr.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openContractDetail(r); }
+    });
     tr.appendChild(cell(r.__customer, "t-strong"));
 
     const pkg = document.createElement("td");
@@ -1292,6 +1319,46 @@ function wireContracts() {
   $("cpkClose")?.addEventListener("click", closeContractForm);
   $("cpkCancel")?.addEventListener("click", closeContractForm);
   $("cpkSave")?.addEventListener("click", saveContract);
+  $("cpkDetailClose")?.addEventListener("click", closeContractDetail);
+  $("cpkDetailOverlay")?.addEventListener("click", (event) => { if (event.target === $("cpkDetailOverlay")) closeContractDetail(); });
+}
+
+function closeContractDetail() {
+  show($("cpkDetailOverlay"), false);
+}
+
+function openContractDetail(row) {
+  const history = cache.redemptions
+    .filter((item) => Number(item.contract_id) === Number(row.id))
+    .sort((a, b) => String(b.used_on || "").localeCompare(String(a.used_on || "")) || Number(b.id || 0) - Number(a.id || 0));
+  $("cpkDetailTitle").textContent = `${row.__customer} — ${row.__label}`;
+  $("cpkDetailSub").textContent = `${row.purchased_on || "Огноо тодорхойгүй"} эхэлсэн · ${row.expires_on || "хугацаагүй"}`;
+  $("cpkDetailKpis").innerHTML = [
+    ["Нийт эрх", row.__total == null ? "—" : row.__total, "Багцын хэмжээ"],
+    ["Ашигласан", row.__used, `${history.length} бүртгэл`],
+    ["Үлдэгдэл", row.__left == null ? "—" : row.__left, "Одоогийн үлдэгдэл"],
+    ["Сүүлд орсон", row.__last ? fmtDate(row.__last) : "—", "Сүүлийн үйлчилгээ"],
+  ].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`).join("");
+
+  const body = $("cpkDetailBody");
+  body.innerHTML = "";
+  if (!history.length) {
+    body.innerHTML = '<tr><td colspan="5"><div class="empty">Энэ багцын ашиглалтын түүх алга.</div></td></tr>';
+  } else {
+    history.forEach((item, index) => {
+      const service = cache.services.find((entry) => Number(entry.id) === Number(item.service_id));
+      const staff = cache.staff.find((entry) => Number(entry.id) === Number(item.staff_id));
+      const tr = document.createElement("tr");
+      tr.appendChild(cell(history.length - index, "t-mono"));
+      tr.appendChild(cell(fmtDate(item.used_on), "t-mono t-strong"));
+      tr.appendChild(cell(item.service_label || service?.name || row.__label || "—", "t-strong"));
+      tr.appendChild(cell(item.units || 1, "t-mono"));
+      tr.appendChild(cell([staff?.name, item.notes].filter(Boolean).join(" · ") || "—"));
+      body.appendChild(tr);
+    });
+  }
+  show($("cpkDetailOverlay"));
+  $("cpkDetailClose").focus();
 }
 
 /* ── customer packages: add and edit by hand ──────────────────── */
