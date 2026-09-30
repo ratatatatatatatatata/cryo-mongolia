@@ -1280,7 +1280,6 @@ body.has-halo .cursor-halo{opacity:1}
 .social-auth-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
 .social-auth-btn:disabled{opacity:.55;cursor:wait}
 .social-auth-btn.facebook{background:#1877f2}
-.social-auth-btn.instagram{background:linear-gradient(120deg,#833ab4,#fd1d1d,#fcb045)}
 .social-auth-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.18);font-size:16px;font-weight:900}
 .auth-divider{display:flex;align-items:center;gap:12px;margin:4px 0 16px;color:var(--text-muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
 .auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--border)}
