@@ -2372,31 +2372,43 @@ function wireAttendance() {
   });
 }
 
-async function toggleTodayAttendance(staff) {
+async function updateTodayAttendance(staff, action, button) {
   const today = localDateKey(new Date());
   const current = cache.attendance.find((row) => row.work_date === today && Number(row.staff_id) === Number(staff.id));
-  if (current?.clock_out) return;
+  if (button) button.disabled = true;
 
   let result;
-  if (current) {
-    result = await sb.from("attendance")
-      .update({ clock_out: new Date().toISOString() })
-      .eq("id", current.id)
-      .select()
-      .maybeSingle();
-  } else {
+  if (action === "arrive" && !current) {
     result = await sb.from("attendance").insert({
       work_date: today,
       staff_id: staff.id,
       staff_name: staff.name,
       user_id: me.id,
       workday_number: nextWorkdayNumber(staff.id),
-      clock_in: new Date().toISOString(),
+      clock_in: null,
     }).select().maybeSingle();
+  } else if (action === "start" && current && !current.clock_in) {
+    result = await sb.from("attendance")
+      .update({ clock_in: new Date().toISOString() })
+      .eq("id", current.id)
+      .select()
+      .maybeSingle();
+  } else if (action === "finish" && current?.clock_in && !current.clock_out) {
+    result = await sb.from("attendance")
+      .update({ clock_out: new Date().toISOString() })
+      .eq("id", current.id)
+      .select()
+      .maybeSingle();
+  } else {
+    if (button) button.disabled = false;
+    return renderAttendance();
   }
 
   if (result.error?.code === "23505") return renderAttendance();
-  if (result.error) return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
+  if (result.error) {
+    if (button) button.disabled = false;
+    return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
+  }
   if (current && result.data) Object.assign(current, result.data);
   else if (result.data) cache.attendance.unshift(result.data);
   renderAttendance();
@@ -2421,7 +2433,7 @@ function renderAttendance() {
   const chosenStaff = selectedSharedStaff();
   if (!isAdminUser() && chosenStaff && !isSharedStaffAccount()) attendanceRows = attendanceRows.filter((row) => Number(row.staff_id) === Number(chosenStaff.id));
   renderAttendanceSelfService();
-  $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан ажилласан`;
+  $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан бүртгэлтэй`;
   if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
   renderAttendanceKpis(attendanceRows);
   body.innerHTML = "";
@@ -2473,7 +2485,7 @@ function renderAttendanceKpis(rows) {
   const active = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Ээлжтэй").length;
   const totalMinutes = rows.reduce((sum, row) => sum + attendanceMinutes(row.clock_in, row.clock_out), 0);
   host.innerHTML = [
-    ["Ажилласан хүн", rows.length, "Тухайн өдрийн бүртгэл"],
+    ["Бүртгэлтэй хүн", rows.length, "Тухайн өдрийн ирц"],
     ["Ээлжтэй", active, "Одоогоор гараагүй"],
     ["Гарсан", left, "Ээлж дууссан"],
     ["Нийт цаг", formatMinutes(totalMinutes), "Бүртгэгдсэн хугацаа"],
@@ -2511,23 +2523,26 @@ function renderAttendanceSelfService() {
   host.innerHTML = "";
   cache.staff.filter((staff) => staff.active).forEach((staff) => {
     const row = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(staff.id));
-    const state = row?.clock_out ? "done" : row ? "active" : "idle";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `attendance-person-card is-${state}`;
-    button.disabled = state === "done";
-    button.setAttribute("aria-label", state === "active" ? `${staff.name} явсан цаг бүртгэх` : state === "done" ? `${staff.name} ирц хаагдсан` : `${staff.name} ирсэн цаг бүртгэх`);
-    button.innerHTML = `<span class="attendance-person-main"><span class="attendance-person-name"></span><span class="attendance-person-time"></span></span><span class="attendance-person-state"></span>`;
-    button.querySelector(".attendance-person-name").textContent = staff.name;
-    button.querySelector(".attendance-person-time").textContent = state === "done"
-      ? `${formatAttendanceTime(row.clock_in)} — ${formatAttendanceTime(row.clock_out)}`
-      : state === "active" ? `Ирсэн ${formatAttendanceTime(row.clock_in)} · Тарахдаа дахин дар` : "Ирсэн цаг бүртгэх";
-    button.querySelector(".attendance-person-state").textContent = state === "done" ? "Хаагдсан" : state === "active" ? "Ажиллаж байна" : "Ирээгүй";
-    if (state !== "done") button.addEventListener("click", () => toggleTodayAttendance(staff));
-    host.appendChild(button);
+    const state = row?.clock_out ? "done" : row?.clock_in ? "active" : row ? "arrived" : "idle";
+    const action = state === "idle" ? "arrive" : state === "arrived" ? "start" : state === "active" ? "finish" : "done";
+    const card = document.createElement("article");
+    card.className = `attendance-person-card is-${state}`;
+    card.innerHTML = `<div class="attendance-person-head"><span class="attendance-person-name"></span><span class="attendance-person-state"></span></div><div class="attendance-person-time"></div><button type="button" class="attendance-person-action"></button>`;
+    card.querySelector(".attendance-person-name").textContent = staff.name;
+    card.querySelector(".attendance-person-time").textContent = state === "done"
+      ? `Ажилласан ${formatAttendanceTime(row.clock_in)} — ${formatAttendanceTime(row.clock_out)}`
+      : state === "active" ? `Эхэлсэн ${formatAttendanceTime(row.clock_in)}`
+        : state === "arrived" ? "Өнөөдрийн ирц бүртгэгдсэн" : "Өнөөдөр бүртгэлгүй";
+    card.querySelector(".attendance-person-state").textContent = state === "done" ? "Хаагдсан" : state === "active" ? "Ажиллаж байна" : state === "arrived" ? "Ирсэн" : "Ирээгүй";
+    const actionButton = card.querySelector(".attendance-person-action");
+    actionButton.textContent = state === "idle" ? "Өнөөдөр ирсэн" : state === "arrived" ? "Ажил эхлүүлэх" : state === "active" ? "Тарах" : "Ажил дууссан";
+    actionButton.className += state === "active" ? " is-finish" : state === "done" ? " is-done" : "";
+    actionButton.disabled = state === "done";
+    if (state !== "done") actionButton.addEventListener("click", () => updateTodayAttendance(staff, action, actionButton));
+    host.appendChild(card);
   });
   const arrived = cache.attendance.filter((row) => row.work_date === today && row.staff_id).length;
-  const active = cache.attendance.filter((row) => row.work_date === today && row.staff_id && !row.clock_out).length;
+  const active = cache.attendance.filter((row) => row.work_date === today && row.staff_id && row.clock_in && !row.clock_out).length;
   $("attSelfStatus").textContent = `${arrived} ажилтан ирсэн · ${active} ажилтан ажиллаж байна`;
 }
 
@@ -2540,6 +2555,7 @@ function attendanceStatus(row, end) {
   const note = String(row.note || "").toLowerCase();
   if (note.includes("шилжүүл")) return { label: "Өөр хүнд шилжүүлсэн", className: "st-transferred" };
   if (note.includes("гарсан") || (end && end <= new Date())) return { label: "Гарсан", className: "st-done" };
+  if (!row.clock_in) return { label: "Ирсэн", className: "st-pending" };
   return { label: "Ээлжтэй", className: "st-confirmed" };
 }
 
