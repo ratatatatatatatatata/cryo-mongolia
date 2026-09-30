@@ -507,6 +507,17 @@
           <button class="btn-sm ghost" id="attNextDay" aria-label="Дараагийн өдөр">Дараах →</button>
         </div>
       </div>
+      <div class="panel attendance-clock-panel" id="staffAttendancePanel" style="display:none">
+        <div class="attendance-clock-copy">
+          <div class="panel-title">Өнөөдрийн ирц бүртгэл</div>
+          <div class="page-sub" id="attSelfStatus">Ажилтнаа сонгоод ирсэн цагаа бүртгэнэ үү.</div>
+          <div class="attendance-clock-times" id="attSelfTimes"></div>
+        </div>
+        <div class="attendance-clock-actions">
+          <button class="btn-sm primary" id="attClockIn">Ирсэн цаг бүртгэх</button>
+          <button class="btn-sm ghost" id="attClockOut">Явсан цаг бүртгэх</button>
+        </div>
+      </div>
       <div class="kpis attendance-kpis" id="attKpis"></div>
       <div class="panel" id="todayStatusPanel">
         <div class="panel-head">
@@ -525,11 +536,13 @@
           <div class="field"><label for="att_staff">Ажилтан *</label><select class="ctl" id="att_staff"></select></div>
           <div class="field"><label for="att_date">Огноо *</label><input class="ctl" id="att_date" type="date"/></div>
           <div class="field"><label for="att_day">Хэд дэх өдөр *</label><input class="ctl" id="att_day" type="number" min="1" step="1" required/></div>
-          <div class="field" style="grid-column:span 2"><label for="att_note">Төлөв, тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500" placeholder="Жишээ: Гарсан, Өөр хүнд шилжүүлсэн"/></div>
+          <div class="field"><label for="att_in">Ирсэн цаг *</label><input class="ctl" id="att_in" type="time"/></div>
+          <div class="field"><label for="att_out">Явсан цаг</label><input class="ctl" id="att_out" type="time"/></div>
+          <div class="field" style="grid-column:1/-1"><label for="att_note">Төлөв, тэмдэглэл</label><input class="ctl" id="att_note" maxlength="500" placeholder="Жишээ: Ээлж солилцсон"/></div>
         </div>
         <div class="form-actions"><button class="btn-sm primary" id="attSave">Хадгалах</button><button class="btn-sm ghost" id="attFormCancel">Болих</button></div>
       </div>
-      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
+      <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl today-attendance"><thead><tr><th>Огноо</th><th>Ажилтан</th><th>Хэд дэх өдөр</th><th>Ирсэн цаг</th><th>Явсан цаг</th><th>Нийт цаг</th><th>Төлөв</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="attBody"></tbody></table></div></div>
     </section>
 
     <!-- ── PAYROLL ── -->
