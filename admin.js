@@ -2347,7 +2347,6 @@ function wireAttendance() {
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
   $("attSave")?.addEventListener("click", saveAttendance);
-  $("attClockIn")?.addEventListener("click", clockTodayAttendance);
   $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
   $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
   $("attViewDate")?.addEventListener("change", (event) => {
@@ -2373,16 +2372,20 @@ function wireAttendance() {
   });
 }
 
-async function clockTodayAttendance() {
+async function toggleTodayAttendance(staff) {
   const today = localDateKey(new Date());
-  const selectedIds = [...document.querySelectorAll("#attSelfStaffChecks input:checked:not(:disabled)")]
-    .map((input) => Number(input.value))
-    .filter(Boolean);
-  if (!selectedIds.length) return alert("Өнөөдөр ирсэн нэг эсвэл хэд хэдэн ажилтны нэрийг сонгоно уу.");
+  const current = cache.attendance.find((row) => row.work_date === today && Number(row.staff_id) === Number(staff.id));
+  if (current?.clock_out) return;
 
-  const staffRows = cache.staff.filter((staff) => staff.active && selectedIds.includes(Number(staff.id)));
-  const results = await Promise.all(staffRows.map(async (staff) => {
-    const result = await sb.from("attendance").insert({
+  let result;
+  if (current) {
+    result = await sb.from("attendance")
+      .update({ clock_out: new Date().toISOString() })
+      .eq("id", current.id)
+      .select()
+      .maybeSingle();
+  } else {
+    result = await sb.from("attendance").insert({
       work_date: today,
       staff_id: staff.id,
       staff_name: staff.name,
@@ -2390,15 +2393,13 @@ async function clockTodayAttendance() {
       workday_number: nextWorkdayNumber(staff.id),
       clock_in: new Date().toISOString(),
     }).select().maybeSingle();
-    return { staff, ...result };
-  }));
+  }
 
-  const saved = results.filter((result) => result.data);
-  saved.forEach((result) => cache.attendance.unshift(result.data));
-  const failed = results.filter((result) => result.error && result.error.code !== "23505");
+  if (result.error?.code === "23505") return renderAttendance();
+  if (result.error) return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
+  if (current && result.data) Object.assign(current, result.data);
+  else if (result.data) cache.attendance.unshift(result.data);
   renderAttendance();
-  if (failed.length) return alert(`${saved.length} ажилтны ирц бүртгэгдлээ. ${failed.length} бүртгэлд алдаа гарлаа: ${failed[0].error.message}`);
-  alert(`${saved.length || selectedIds.length} ажилтны өнөөдрийн ирц амжилттай бүртгэгдлээ.`);
 }
 
 function renderAttendance() {
@@ -2507,33 +2508,27 @@ function renderAttendanceSelfService() {
   const today = localDateKey(new Date());
   const host = $("attSelfStaffChecks");
   if (!host) return;
-  const selected = new Set([...host.querySelectorAll("input:checked")].map((input) => input.value));
   host.innerHTML = "";
   cache.staff.filter((staff) => staff.active).forEach((staff) => {
-    const registered = cache.attendance.some((row) => row.work_date === today && Number(row.staff_id) === Number(staff.id));
-    const label = document.createElement("label");
-    label.className = "staff-check";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = String(staff.id);
-    input.disabled = registered;
-    input.checked = !registered && selected.has(input.value);
-    input.addEventListener("change", updateEmployeeAttendanceSelection);
-    const text = document.createElement("span");
-    text.textContent = registered ? `${staff.name} · Бүртгэгдсэн` : staff.name;
-    label.append(input, text);
-    host.appendChild(label);
+    const row = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(staff.id));
+    const state = row?.clock_out ? "done" : row ? "active" : "idle";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `attendance-person-card is-${state}`;
+    button.disabled = state === "done";
+    button.setAttribute("aria-label", state === "active" ? `${staff.name} явсан цаг бүртгэх` : state === "done" ? `${staff.name} ирц хаагдсан` : `${staff.name} ирсэн цаг бүртгэх`);
+    button.innerHTML = `<span class="attendance-person-main"><span class="attendance-person-name"></span><span class="attendance-person-time"></span></span><span class="attendance-person-state"></span>`;
+    button.querySelector(".attendance-person-name").textContent = staff.name;
+    button.querySelector(".attendance-person-time").textContent = state === "done"
+      ? `${formatAttendanceTime(row.clock_in)} — ${formatAttendanceTime(row.clock_out)}`
+      : state === "active" ? `Ирсэн ${formatAttendanceTime(row.clock_in)} · Тарахдаа дахин дар` : "Ирсэн цаг бүртгэх";
+    button.querySelector(".attendance-person-state").textContent = state === "done" ? "Хаагдсан" : state === "active" ? "Ажиллаж байна" : "Ирээгүй";
+    if (state !== "done") button.addEventListener("click", () => toggleTodayAttendance(staff));
+    host.appendChild(button);
   });
-  updateEmployeeAttendanceSelection();
-}
-
-function updateEmployeeAttendanceSelection() {
-  const selected = document.querySelectorAll("#attSelfStaffChecks input:checked:not(:disabled)").length;
-  const registered = document.querySelectorAll("#attSelfStaffChecks input:disabled").length;
-  $("attSelfStatus").textContent = selected
-    ? `${selected} ажилтан сонгосон · ${registered} ажилтан өнөөдөр бүртгэгдсэн`
-    : `Нэг эсвэл хэд хэдэн нэр сонгоно уу · ${registered} ажилтан өнөөдөр бүртгэгдсэн`;
-  $("attClockIn").disabled = selected === 0;
+  const arrived = cache.attendance.filter((row) => row.work_date === today && row.staff_id).length;
+  const active = cache.attendance.filter((row) => row.work_date === today && row.staff_id && !row.clock_out).length;
+  $("attSelfStatus").textContent = `${arrived} ажилтан ирсэн · ${active} ажилтан ажиллаж байна`;
 }
 
 function localDateKey(date) {
