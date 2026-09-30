@@ -67,6 +67,16 @@ function injectMarkup() {
 
     <div id="authNote"></div>
 
+    <div class="social-auth-grid">
+      <button type="button" class="social-auth-btn facebook" data-social-provider="facebook" aria-label="Facebook-аар үргэлжлүүлэх">
+        <span class="social-auth-icon">f</span><span>Facebook-аар үргэлжлүүлэх</span>
+      </button>
+      <button type="button" class="social-auth-btn instagram" data-social-provider="custom:instagram" aria-label="Instagram-аар үргэлжлүүлэх">
+        <span class="social-auth-icon">◎</span><span>Instagram-аар үргэлжлүүлэх</span>
+      </button>
+    </div>
+    <div class="auth-divider"><span>эсвэл и-мэйлээр</span></div>
+
     <form id="cAuthForm">
       <div class="form-group" id="cNameWrap" style="display:none;">
         <label for="c_name">Нэр</label>
@@ -246,6 +256,19 @@ function wireAuth() {
       $("authNote").innerHTML = "";
     }),
   );
+  document.querySelectorAll("[data-social-provider]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const provider = button.dataset.socialProvider;
+      button.disabled = true;
+      localStorage.setItem("cryo-social-source", provider === "facebook" ? "facebook" : "instagram");
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo } });
+      button.disabled = false;
+      if (error) note("err", provider === "facebook"
+        ? "Facebook нэвтрэлтийг Meta App болон Supabase дээр идэвхжүүлэх шаардлагатай: " + error.message
+        : "Instagram нэвтрэлтийг Meta App-ийн Custom OAuth provider-той холбох шаардлагатай: " + error.message);
+    });
+  });
 
   $("cAuthForm").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -450,5 +473,10 @@ async function refresh() {
     if (!document.hidden) syncRole();
   });
   window.addEventListener("pageshow", () => syncRole());
-  refresh();
+  refresh().then(() => {
+    const source = new URLSearchParams(window.location.search).get("source") || new URLSearchParams(window.location.search).get("utm_source");
+    if (!session && ["facebook", "instagram"].includes(String(source || "").toLowerCase())) {
+      openAuth("signup", `${source}-аар хурдан бүртгүүлээд цаг захиална уу.`);
+    }
+  });
 })();
