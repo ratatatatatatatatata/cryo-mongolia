@@ -136,6 +136,12 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .staff-check:has(input:checked){border-color:rgba(88,198,255,.5);background:rgba(88,198,255,.1);color:var(--ice-100)}
 .staff-check input{width:17px;height:17px;accent-color:#58c6ff;flex:0 0 auto}
 .staff-check span{font-size:13px;font-weight:700}
+.clickable-row{cursor:pointer}
+.clickable-row:focus-visible{outline:2px solid var(--ice-400);outline-offset:-2px}
+.detail-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(1,5,12,.82);backdrop-filter:blur(12px)}
+.detail-modal{width:min(980px,100%);max-height:min(820px,calc(100vh - 48px));overflow:auto;padding:24px;border:1px solid var(--border-strong);border-radius:var(--r-lg);background:#081321;box-shadow:0 30px 90px rgba(0,0,0,.55)}
+.package-detail-kpis{margin:18px 0}
+.package-history{min-width:720px!important}
 
 /* ── controls ── */
 .field{display:flex;flex-direction:column;gap:7px}
@@ -308,4 +314,6 @@ tr.review td{background:rgba(255,180,80,.05)}
   .attendance-clock-panel{align-items:stretch;flex-direction:column}
   .attendance-clock-actions{display:grid;grid-template-columns:1fr}
   .attendance-clock-actions .btn-sm{width:100%;justify-content:center}
+  .detail-overlay{padding:10px}
+  .detail-modal{padding:16px;max-height:calc(100vh - 20px)}
 }
