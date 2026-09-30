@@ -200,6 +200,7 @@ async function route() {
   show($("attAdd"), isAdmin);
   show($("todayStatusPanel"), isAdmin);
   show($("staffAttendancePanel"), !isAdmin);
+  show($("attendanceDatePanel"), isAdmin);
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
 
@@ -2346,8 +2347,7 @@ function wireAttendance() {
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
   $("attSave")?.addEventListener("click", saveAttendance);
-  $("attClockIn")?.addEventListener("click", () => clockAttendance("in"));
-  $("attClockOut")?.addEventListener("click", () => clockAttendance("out"));
+  $("attClockIn")?.addEventListener("click", clockTodayAttendance);
   $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
   $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
   $("attViewDate")?.addEventListener("change", (event) => {
@@ -2373,40 +2373,38 @@ function wireAttendance() {
   });
 }
 
-async function clockAttendance(mode) {
+async function clockTodayAttendance() {
   const today = localDateKey(new Date());
-  const activeStaff = selectedSharedStaff();
-  if (isSharedStaffAccount() && !activeStaff) return alert("Эхлээд өөрийн нэрийг сонгоно уу.");
-  const current = cache.attendance.find((r) =>
-    r.work_date === today && r.user_id === me.id && (!activeStaff || Number(r.staff_id) === Number(activeStaff.id)),
-  );
-  let result;
-  if (mode === "in") {
-    if (current) return alert(`${activeStaff?.name || "Таны"} өнөөдрийн ирц аль хэдийн бүртгэгдсэн байна.`);
-    result = await sb.from("attendance").insert({
+  const selectedIds = [...document.querySelectorAll("#attSelfStaffChecks input:checked:not(:disabled)")]
+    .map((input) => Number(input.value))
+    .filter(Boolean);
+  if (!selectedIds.length) return alert("Өнөөдөр ирсэн нэг эсвэл хэд хэдэн ажилтны нэрийг сонгоно уу.");
+
+  const staffRows = cache.staff.filter((staff) => staff.active && selectedIds.includes(Number(staff.id)));
+  const results = await Promise.all(staffRows.map(async (staff) => {
+    const result = await sb.from("attendance").insert({
       work_date: today,
-      staff_id: activeStaff?.id || null,
-      staff_name: activeStaff?.name || me.full_name || me.email,
+      staff_id: staff.id,
+      staff_name: staff.name,
       user_id: me.id,
-      workday_number: nextWorkdayNumber(activeStaff?.id),
+      workday_number: nextWorkdayNumber(staff.id),
       clock_in: new Date().toISOString(),
     }).select().maybeSingle();
-  } else {
-    if (!current) return alert("Эхлээд ажил эхлэх товчийг дарна уу.");
-    if (current.clock_out) return alert("Ажил дууссан цаг бүртгэгдсэн байна.");
-    result = await sb.from("attendance").update({ clock_out: new Date().toISOString() }).eq("id", current.id).select().maybeSingle();
-  }
-  if (result.error?.code === "23505") return alert(`${activeStaff?.name || "Таны"} өнөөдрийн ирц аль хэдийн бүртгэгдсэн байна.`);
-  if (result.error) return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
-  if (mode === "in" && result.data) cache.attendance.unshift(result.data); else if (result.data) Object.assign(current, result.data);
+    return { staff, ...result };
+  }));
+
+  const saved = results.filter((result) => result.data);
+  saved.forEach((result) => cache.attendance.unshift(result.data));
+  const failed = results.filter((result) => result.error && result.error.code !== "23505");
   renderAttendance();
-  if (mode === "in") alert(`${result.data?.staff_name || activeStaff?.name || "Ажилтан"}-ийн өнөөдрийн ирц амжилттай бүртгэгдлээ.`);
+  if (failed.length) return alert(`${saved.length} ажилтны ирц бүртгэгдлээ. ${failed.length} бүртгэлд алдаа гарлаа: ${failed[0].error.message}`);
+  alert(`${saved.length || selectedIds.length} ажилтны өнөөдрийн ирц амжилттай бүртгэгдлээ.`);
 }
 
 function renderAttendance() {
   const body = $("attBody"); if (!body) return;
   syncAttendanceFilters();
-  const day = selectedAttendanceDate || localDateKey(new Date());
+  const day = isAdminUser() ? (selectedAttendanceDate || localDateKey(new Date())) : localDateKey(new Date());
   if ($("attViewDate")) $("attViewDate").value = day;
   renderAttendanceStaffChecks();
   const baseRows = allAttendanceRows()
@@ -2420,7 +2418,7 @@ function renderAttendance() {
   });
   let attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
   const chosenStaff = selectedSharedStaff();
-  if (!isAdminUser() && chosenStaff) attendanceRows = attendanceRows.filter((row) => Number(row.staff_id) === Number(chosenStaff.id));
+  if (!isAdminUser() && chosenStaff && !isSharedStaffAccount()) attendanceRows = attendanceRows.filter((row) => Number(row.staff_id) === Number(chosenStaff.id));
   renderAttendanceSelfService();
   $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан ажилласан`;
   if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
@@ -2506,28 +2504,36 @@ function formatAttendanceDuration(start, end) {
 function renderAttendanceSelfService() {
   const panel = $("staffAttendancePanel");
   if (!panel || isAdminUser()) return;
-  const picker = $("attSelfStaff");
-  if (picker) {
-    const active = cache.staff.filter((item) => item.active);
-    const selected = picker.value;
-    picker.innerHTML = '<option value="">Ажилтан сонгоно уу</option>';
-    active.forEach((item) => picker.appendChild(new Option(item.name, String(item.id))));
-    picker.value = sharedStaffId ? String(sharedStaffId) : selected;
-    picker.disabled = !isSharedStaffAccount();
-    show($("attSelfStaffWrap"), isSharedStaffAccount());
-    if (!picker.dataset.wired) {
-      picker.dataset.wired = "1";
-      picker.addEventListener("change", () => setSharedStaffSelection(picker.value));
-    }
-  }
-  const staff = selectedSharedStaff();
   const today = localDateKey(new Date());
-  const row = cache.attendance.find((item) => item.work_date === today && item.user_id === me.id && (!staff || Number(item.staff_id) === Number(staff.id)));
-  const name = staff?.name || me.full_name || me.email || "Ажилтан";
-  $("attSelfStatus").textContent = row?.clock_out ? `${name} · Өнөөдрийн ээлж дууссан` : row ? `${name} · Өнөөдрийн ирц бүртгэгдсэн` : `${name} · “Өнөөдөр ирсэн” товчийг дарна уу`;
-  $("attSelfTimes").innerHTML = `<span>Ирсэн: ${formatAttendanceTime(row?.clock_in)}</span><span>Явсан: ${formatAttendanceTime(row?.clock_out)}</span><span>Нийт: ${formatAttendanceDuration(row?.clock_in, row?.clock_out)}</span>`;
-  $("attClockIn").disabled = !staff && isSharedStaffAccount() || Boolean(row);
-  $("attClockOut").disabled = !row || Boolean(row?.clock_out);
+  const host = $("attSelfStaffChecks");
+  if (!host) return;
+  const selected = new Set([...host.querySelectorAll("input:checked")].map((input) => input.value));
+  host.innerHTML = "";
+  cache.staff.filter((staff) => staff.active).forEach((staff) => {
+    const registered = cache.attendance.some((row) => row.work_date === today && Number(row.staff_id) === Number(staff.id));
+    const label = document.createElement("label");
+    label.className = "staff-check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = String(staff.id);
+    input.disabled = registered;
+    input.checked = !registered && selected.has(input.value);
+    input.addEventListener("change", updateEmployeeAttendanceSelection);
+    const text = document.createElement("span");
+    text.textContent = registered ? `${staff.name} · Бүртгэгдсэн` : staff.name;
+    label.append(input, text);
+    host.appendChild(label);
+  });
+  updateEmployeeAttendanceSelection();
+}
+
+function updateEmployeeAttendanceSelection() {
+  const selected = document.querySelectorAll("#attSelfStaffChecks input:checked:not(:disabled)").length;
+  const registered = document.querySelectorAll("#attSelfStaffChecks input:disabled").length;
+  $("attSelfStatus").textContent = selected
+    ? `${selected} ажилтан сонгосон · ${registered} ажилтан өнөөдөр бүртгэгдсэн`
+    : `Нэг эсвэл хэд хэдэн нэр сонгоно уу · ${registered} ажилтан өнөөдөр бүртгэгдсэн`;
+  $("attClockIn").disabled = selected === 0;
 }
 
 function localDateKey(date) {
