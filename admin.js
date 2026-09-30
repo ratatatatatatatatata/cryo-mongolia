@@ -2382,7 +2382,7 @@ async function clockAttendance(mode) {
   );
   let result;
   if (mode === "in") {
-    if (current) return alert("Өнөөдрийн ажил эхэлсэн цаг бүртгэгдсэн байна.");
+    if (current) return alert(`${activeStaff?.name || "Таны"} өнөөдрийн ирц аль хэдийн бүртгэгдсэн байна.`);
     result = await sb.from("attendance").insert({
       work_date: today,
       staff_id: activeStaff?.id || null,
@@ -2396,9 +2396,11 @@ async function clockAttendance(mode) {
     if (current.clock_out) return alert("Ажил дууссан цаг бүртгэгдсэн байна.");
     result = await sb.from("attendance").update({ clock_out: new Date().toISOString() }).eq("id", current.id).select().maybeSingle();
   }
+  if (result.error?.code === "23505") return alert(`${activeStaff?.name || "Таны"} өнөөдрийн ирц аль хэдийн бүртгэгдсэн байна.`);
   if (result.error) return alert("Ирц бүртгэж чадсангүй: " + result.error.message);
   if (mode === "in" && result.data) cache.attendance.unshift(result.data); else if (result.data) Object.assign(current, result.data);
   renderAttendance();
+  if (mode === "in") alert(`${result.data?.staff_name || activeStaff?.name || "Ажилтан"}-ийн өнөөдрийн ирц амжилттай бүртгэгдлээ.`);
 }
 
 function renderAttendance() {
@@ -2522,7 +2524,7 @@ function renderAttendanceSelfService() {
   const today = localDateKey(new Date());
   const row = cache.attendance.find((item) => item.work_date === today && item.user_id === me.id && (!staff || Number(item.staff_id) === Number(staff.id)));
   const name = staff?.name || me.full_name || me.email || "Ажилтан";
-  $("attSelfStatus").textContent = row?.clock_out ? `${name} · Өнөөдрийн ээлж дууссан` : row ? `${name} · Ээлж үргэлжилж байна` : `${name} · Ирсэн цагаа бүртгэнэ үү`;
+  $("attSelfStatus").textContent = row?.clock_out ? `${name} · Өнөөдрийн ээлж дууссан` : row ? `${name} · Өнөөдрийн ирц бүртгэгдсэн` : `${name} · “Өнөөдөр ирсэн” товчийг дарна уу`;
   $("attSelfTimes").innerHTML = `<span>Ирсэн: ${formatAttendanceTime(row?.clock_in)}</span><span>Явсан: ${formatAttendanceTime(row?.clock_out)}</span><span>Нийт: ${formatAttendanceDuration(row?.clock_in, row?.clock_out)}</span>`;
   $("attClockIn").disabled = !staff && isSharedStaffAccount() || Boolean(row);
   $("attClockOut").disabled = !row || Boolean(row?.clock_out);
