@@ -128,7 +128,7 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .attendance-kpis{margin-bottom:18px}
 .attendance-clock-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;border-color:rgba(88,198,255,.28);background:linear-gradient(135deg,rgba(88,198,255,.10),rgba(8,18,31,.72))}
 .attendance-clock-copy{display:flex;flex-direction:column;gap:6px}
-.attendance-self-staff-field{width:min(360px,100%);margin:8px 0 4px}
+.attendance-self-staff-field{width:min(720px,100%);margin:8px 0 4px}
 .attendance-clock-times{display:flex;gap:18px;flex-wrap:wrap;color:var(--ice-100);font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
 .attendance-clock-actions{display:flex;gap:10px;flex-wrap:wrap}
 .staff-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
@@ -137,6 +137,7 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .staff-check:has(input:checked){border-color:rgba(88,198,255,.5);background:rgba(88,198,255,.1);color:var(--ice-100)}
 .staff-check input{width:17px;height:17px;accent-color:#58c6ff;flex:0 0 auto}
 .staff-check span{font-size:13px;font-weight:700}
+.staff-check:has(input:disabled){cursor:default;opacity:.62;background:rgba(80,220,160,.07);border-color:rgba(80,220,160,.2)}
 .clickable-row{cursor:pointer}
 .clickable-row:focus-visible{outline:2px solid var(--ice-400);outline-offset:-2px}
 .detail-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:24px;background:rgba(1,5,12,.82);backdrop-filter:blur(12px)}
