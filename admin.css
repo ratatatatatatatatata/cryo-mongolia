@@ -128,6 +128,7 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .attendance-kpis{margin-bottom:18px}
 .attendance-clock-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;border-color:rgba(88,198,255,.28);background:linear-gradient(135deg,rgba(88,198,255,.10),rgba(8,18,31,.72))}
 .attendance-clock-copy{display:flex;flex-direction:column;gap:6px}
+.attendance-self-staff-field{width:min(360px,100%);margin:8px 0 4px}
 .attendance-clock-times{display:flex;gap:18px;flex-wrap:wrap;color:var(--ice-100);font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
 .attendance-clock-actions{display:flex;gap:10px;flex-wrap:wrap}
 .staff-check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
