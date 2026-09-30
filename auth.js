@@ -71,9 +71,6 @@ function injectMarkup() {
       <button type="button" class="social-auth-btn facebook" data-social-provider="facebook" aria-label="Facebook-аар үргэлжлүүлэх">
         <span class="social-auth-icon">f</span><span>Facebook-аар үргэлжлүүлэх</span>
       </button>
-      <button type="button" class="social-auth-btn instagram" data-social-provider="custom:instagram" aria-label="Instagram-аар үргэлжлүүлэх">
-        <span class="social-auth-icon">◎</span><span>Instagram-аар үргэлжлүүлэх</span>
-      </button>
     </div>
     <div class="auth-divider"><span>эсвэл и-мэйлээр</span></div>
 
@@ -260,13 +257,11 @@ function wireAuth() {
     button.addEventListener("click", async () => {
       const provider = button.dataset.socialProvider;
       button.disabled = true;
-      localStorage.setItem("cryo-social-source", provider === "facebook" ? "facebook" : "instagram");
+      localStorage.setItem("cryo-social-source", provider);
       const redirectTo = `${window.location.origin}${window.location.pathname}`;
       const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo } });
       button.disabled = false;
-      if (error) note("err", provider === "facebook"
-        ? "Facebook нэвтрэлтийг Meta App болон Supabase дээр идэвхжүүлэх шаардлагатай: " + error.message
-        : "Instagram нэвтрэлтийг Meta App-ийн Custom OAuth provider-той холбох шаардлагатай: " + error.message);
+      if (error) note("err", "Facebook нэвтрэлтийг Meta App болон Supabase дээр идэвхжүүлэх шаардлагатай: " + error.message);
     });
   });
 
@@ -475,7 +470,7 @@ async function refresh() {
   window.addEventListener("pageshow", () => syncRole());
   refresh().then(() => {
     const source = new URLSearchParams(window.location.search).get("source") || new URLSearchParams(window.location.search).get("utm_source");
-    if (!session && ["facebook", "instagram"].includes(String(source || "").toLowerCase())) {
+    if (!session && String(source || "").toLowerCase() === "facebook") {
       openAuth("signup", `${source}-аар хурдан бүртгүүлээд цаг захиална уу.`);
     }
   });
