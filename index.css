@@ -1275,6 +1275,15 @@ body.has-halo .cursor-halo{opacity:1}
 .auth-note{padding:12px 15px;border-radius:var(--r-md);font-size:12.5px;line-height:1.6;margin-bottom:16px}
 .auth-note.err{background:rgba(255,110,110,.1);border:1px solid rgba(255,110,110,.3);color:#ffa3a3}
 .auth-note.ok{background:rgba(80,220,160,.1);border:1px solid rgba(80,220,160,.28);color:#8ceec2}
+.social-auth-grid{display:grid;gap:10px;margin-bottom:16px}
+.social-auth-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 15px;border-radius:12px;border:1px solid var(--border-mid);color:#fff;font:700 13px/1.2 var(--ff-body);cursor:pointer;transition:transform var(--ease),filter var(--ease),opacity var(--ease)}
+.social-auth-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.social-auth-btn:disabled{opacity:.55;cursor:wait}
+.social-auth-btn.facebook{background:#1877f2}
+.social-auth-btn.instagram{background:linear-gradient(120deg,#833ab4,#fd1d1d,#fcb045)}
+.social-auth-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.18);font-size:16px;font-weight:900}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:4px 0 16px;color:var(--text-muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--border)}
 
 /* account button + dropdown */
 .nav-account{position:relative;flex-shrink:0}
