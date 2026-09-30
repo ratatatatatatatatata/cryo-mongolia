@@ -712,6 +712,8 @@ section+section,.stats+section{border-top:1px solid var(--border)}
 .info-block:last-of-type{border:none}
 .info-label{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--ice-400);margin-bottom:9px}
 .info-value{font-size:15px;color:var(--text-primary);line-height:1.7}
+.info-value a{color:inherit;text-decoration:none;transition:color var(--ease)}
+.info-value a:hover{color:var(--ice-300)}
 .social-row{display:flex;gap:11px;margin-top:30px}
 .social-btn{
   width:46px;height:46px;border:1px solid var(--border);border-radius:14px;
