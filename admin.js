@@ -197,7 +197,8 @@ async function route() {
   show($("navReports"), true);
   show($("navAttendance"), true);
   show($("attAdd"), isAdmin);
-  show($("todayStatusPanel"), isAdmin);
+  show($("todayStatusPanel"), false);
+  show($("staffAttendancePanel"), !isAdmin);
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
 
@@ -211,6 +212,7 @@ async function route() {
 
   await loadAll();
   setupBookingRealtime();
+  setupAttendanceRealtime();
 }
 
 let adminBookingChannel = null;
@@ -222,6 +224,21 @@ function setupBookingRealtime() {
       if (!result.error) {
         cache.bookings = result.data || [];
         renderBookings();
+        renderOverview();
+      }
+    })
+    .subscribe();
+}
+
+let attendanceChannel = null;
+function setupAttendanceRealtime() {
+  if (attendanceChannel || !sb) return;
+  attendanceChannel = sb.channel("erp-attendance-live")
+    .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, async () => {
+      const result = await fetchAll(() => sb.from("attendance").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }));
+      if (!result.error) {
+        cache.attendance = result.data || [];
+        renderAttendance();
         renderOverview();
       }
     })
@@ -2256,6 +2273,8 @@ function wireAttendance() {
   $("attCancel")?.addEventListener("click", closeAttendanceForm);
   $("attFormCancel")?.addEventListener("click", closeAttendanceForm);
   $("attSave")?.addEventListener("click", saveAttendance);
+  $("attClockIn")?.addEventListener("click", () => clockAttendance("in"));
+  $("attClockOut")?.addEventListener("click", () => clockAttendance("out"));
   $("attMarkLeft")?.addEventListener("click", markSelectedStaffLeft);
   $("attSelectAll")?.addEventListener("click", toggleAllAttendanceStaff);
   $("attViewDate")?.addEventListener("change", (event) => {
@@ -2282,23 +2301,21 @@ function wireAttendance() {
 }
 
 async function clockAttendance(mode) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateKey(new Date());
   const activeStaff = selectedSharedStaff();
+  if (isSharedStaffAccount() && !activeStaff) return alert("Эхлээд өөрийн нэрийг сонгоно уу.");
   const current = cache.attendance.find((r) =>
     r.work_date === today && r.user_id === me.id && (!activeStaff || Number(r.staff_id) === Number(activeStaff.id)),
   );
   let result;
   if (mode === "in") {
     if (current) return alert("Өнөөдрийн ажил эхэлсэн цаг бүртгэгдсэн байна.");
-    const priorDays = cache.attendance.filter((row) =>
-      activeStaff ? Number(row.staff_id) === Number(activeStaff.id) : row.user_id === me.id,
-    ).length;
     result = await sb.from("attendance").insert({
       work_date: today,
       staff_id: activeStaff?.id || null,
       staff_name: activeStaff?.name || me.full_name || me.email,
       user_id: me.id,
-      workday_number: priorDays + 1,
+      workday_number: nextWorkdayNumber(activeStaff?.id),
       clock_in: new Date().toISOString(),
     }).select().maybeSingle();
   } else {
@@ -2326,18 +2343,24 @@ function renderAttendance() {
     const key = String(status.staff_id);
     byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: day, daily_status: status.status, daily_note: status.note });
   });
-  const attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
+  let attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
+  const chosenStaff = selectedSharedStaff();
+  if (!isAdminUser() && chosenStaff) attendanceRows = attendanceRows.filter((row) => Number(row.staff_id) === Number(chosenStaff.id));
+  renderAttendanceSelfService();
   $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан ажилласан`;
   if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
   renderAttendanceKpis(attendanceRows);
   body.innerHTML = "";
-  if (!attendanceRows.length) return void (body.innerHTML = `<tr><td colspan="6"><div class="empty">${fmtDate(day)}-ны ээлж, ирцийн мэдээлэл алга байна.</div></td></tr>`);
+  if (!attendanceRows.length) return void (body.innerHTML = `<tr><td colspan="9"><div class="empty">${fmtDate(day)}-ны ээлж, ирцийн мэдээлэл алга байна.</div></td></tr>`);
   attendanceRows.forEach((row) => {
     const end = row.clock_out ? new Date(row.clock_out) : null;
     const tr = document.createElement("tr");
     tr.appendChild(cell(fmtDate(row.work_date), "t-mono t-strong"));
     tr.appendChild(cell(row.staff_name, "t-strong"));
     tr.appendChild(cell(row.workday_number ? `${row.workday_number} дэх` : "—", "t-mono"));
+    tr.appendChild(cell(formatAttendanceTime(row.clock_in), "t-mono t-strong"));
+    tr.appendChild(cell(formatAttendanceTime(row.clock_out), "t-mono"));
+    tr.appendChild(cell(formatAttendanceDuration(row.clock_in, row.clock_out), "t-mono"));
     const statusCell = document.createElement("td");
     const status = attendanceStatus(row, end);
     const pill = document.createElement("span");
@@ -2374,11 +2397,48 @@ function renderAttendanceKpis(rows) {
   if (!host) return;
   const left = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Гарсан").length;
   const active = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Ээлжтэй").length;
+  const totalMinutes = rows.reduce((sum, row) => sum + attendanceMinutes(row.clock_in, row.clock_out), 0);
   host.innerHTML = [
     ["Ажилласан хүн", rows.length, "Тухайн өдрийн бүртгэл"],
     ["Ээлжтэй", active, "Одоогоор гараагүй"],
     ["Гарсан", left, "Ээлж дууссан"],
+    ["Нийт цаг", formatMinutes(totalMinutes), "Бүртгэгдсэн хугацаа"],
   ].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div><div class="kpi-note">${note}</div></div>`).join("");
+}
+
+function formatAttendanceTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function attendanceMinutes(start, end) {
+  if (!start || !end) return 0;
+  const minutes = Math.floor((new Date(end) - new Date(start)) / 60000);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
+}
+
+function formatMinutes(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours ? `${hours}ц ${rest}м` : `${rest}м`;
+}
+
+function formatAttendanceDuration(start, end) {
+  return start && end ? formatMinutes(attendanceMinutes(start, end)) : "—";
+}
+
+function renderAttendanceSelfService() {
+  const panel = $("staffAttendancePanel");
+  if (!panel || isAdminUser()) return;
+  const staff = selectedSharedStaff();
+  const today = localDateKey(new Date());
+  const row = cache.attendance.find((item) => item.work_date === today && item.user_id === me.id && (!staff || Number(item.staff_id) === Number(staff.id)));
+  const name = staff?.name || me.full_name || me.email || "Ажилтан";
+  $("attSelfStatus").textContent = row?.clock_out ? `${name} · Өнөөдрийн ээлж дууссан` : row ? `${name} · Ээлж үргэлжилж байна` : `${name} · Ирсэн цагаа бүртгэнэ үү`;
+  $("attSelfTimes").innerHTML = `<span>Ирсэн: ${formatAttendanceTime(row?.clock_in)}</span><span>Явсан: ${formatAttendanceTime(row?.clock_out)}</span><span>Нийт: ${formatAttendanceDuration(row?.clock_in, row?.clock_out)}</span>`;
+  $("attClockIn").disabled = !staff && isSharedStaffAccount() || Boolean(row);
+  $("attClockOut").disabled = !row || Boolean(row?.clock_out);
 }
 
 function localDateKey(date) {
@@ -2503,6 +2563,8 @@ function openAttendanceForm(row = null) {
   $("att_staff").value = row?.staff_id ? String(row.staff_id) : "";
   $("att_date").value = row?.work_date || selectedAttendanceDate || localDateKey(new Date());
   $("att_day").value = row?.workday_number || "";
+  $("att_in").value = timeInputValue(row?.clock_in) || "09:00";
+  $("att_out").value = timeInputValue(row?.clock_out);
   $("att_note").value = row?.note || "";
   show($("attForm"));
   $("attForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -2517,9 +2579,10 @@ async function saveAttendance() {
   const staff = cache.staff.find((item) => String(item.id) === $("att_staff").value);
   const workDate = $("att_date").value;
   const workdayNumber = Number($("att_day").value);
-  const clockIn = attendanceEditing?.clock_in || attendanceTimestamp(workDate, "00:00");
-  const clockOut = attendanceEditing?.clock_out || null;
-  if (!staff || !workDate || workdayNumber < 1) return alert("Ажилтан, огноо, хэд дэх өдрийг бөглөнө үү.");
+  const clockIn = attendanceTimestamp(workDate, $("att_in").value);
+  const clockOut = attendanceTimestamp(workDate, $("att_out").value);
+  if (!staff || !workDate || workdayNumber < 1 || !clockIn) return alert("Ажилтан, огноо, хэд дэх өдөр, ирсэн цагийг бөглөнө үү.");
+  if (clockOut && new Date(clockOut) < new Date(clockIn)) return alert("Явсан цаг ирсэн цагаас өмнө байж болохгүй.");
 
   const duplicate = allAttendanceRows().find((row) => Number(row.staff_id) === Number(staff.id) && row.work_date === workDate && (!attendanceEditing || row.__table !== attendanceEditing.__table || Number(row.id) !== Number(attendanceEditing.id)));
   if (duplicate) return alert("Энэ ажилтны тухайн өдрийн ирц бүртгэгдсэн байна. Одоо байгаа мөрийг засна уу.");
