@@ -460,10 +460,10 @@ function setupSharedStaffPicker() {
   if (!activeStaff.some((staff) => Number(staff.id) === Number(sharedStaffId))) {
     sharedStaffId = activeStaff.some((staff) => Number(staff.id) === saved)
       ? saved
-      : activeStaff[0]?.id || null;
+      : null;
   }
 
-  select.innerHTML = "";
+  select.innerHTML = '<option value="">Өөрийн нэрийг сонгоно уу</option>';
   activeStaff.forEach((staff) => {
     const option = document.createElement("option");
     option.value = String(staff.id);
@@ -472,15 +472,21 @@ function setupSharedStaffPicker() {
   });
   select.value = sharedStaffId ? String(sharedStaffId) : "";
   select.onchange = () => {
-    sharedStaffId = Number(select.value) || null;
-    if (sharedStaffId) sessionStorage.setItem("cryo-active-staff", String(sharedStaffId));
-    $("ledForm").style.display = "none";
-    ledEditing = null;
-    ledLimit = 100;
-    renderReports();
-    renderLedger();
-    renderAttendance();
+    setSharedStaffSelection(select.value);
   };
+}
+
+function setSharedStaffSelection(value) {
+  sharedStaffId = Number(value) || null;
+  if (sharedStaffId) sessionStorage.setItem("cryo-active-staff", String(sharedStaffId));
+  if ($("sharedStaffSelect")) $("sharedStaffSelect").value = sharedStaffId ? String(sharedStaffId) : "";
+  if ($("attSelfStaff")) $("attSelfStaff").value = sharedStaffId ? String(sharedStaffId) : "";
+  if ($("ledForm")) $("ledForm").style.display = "none";
+  ledEditing = null;
+  ledLimit = 100;
+  renderReports();
+  renderLedger();
+  renderAttendance();
 }
 
 function renderCoverage() {
@@ -2498,6 +2504,20 @@ function formatAttendanceDuration(start, end) {
 function renderAttendanceSelfService() {
   const panel = $("staffAttendancePanel");
   if (!panel || isAdminUser()) return;
+  const picker = $("attSelfStaff");
+  if (picker) {
+    const active = cache.staff.filter((item) => item.active);
+    const selected = picker.value;
+    picker.innerHTML = '<option value="">Ажилтан сонгоно уу</option>';
+    active.forEach((item) => picker.appendChild(new Option(item.name, String(item.id))));
+    picker.value = sharedStaffId ? String(sharedStaffId) : selected;
+    picker.disabled = !isSharedStaffAccount();
+    show($("attSelfStaffWrap"), isSharedStaffAccount());
+    if (!picker.dataset.wired) {
+      picker.dataset.wired = "1";
+      picker.addEventListener("change", () => setSharedStaffSelection(picker.value));
+    }
+  }
   const staff = selectedSharedStaff();
   const today = localDateKey(new Date());
   const row = cache.attendance.find((item) => item.work_date === today && item.user_id === me.id && (!staff || Number(item.staff_id) === Number(staff.id)));
