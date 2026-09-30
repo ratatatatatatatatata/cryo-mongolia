@@ -14,6 +14,8 @@ const publicFiles = [
   "cryo3d.js",
   "data.js",
   "auth.js",
+  "privacy.html",
+  "data-deletion.html",
   "admin.html",
   "admin.css",
   "admin.js",
