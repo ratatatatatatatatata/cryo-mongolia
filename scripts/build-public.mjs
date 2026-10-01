@@ -19,6 +19,7 @@ const publicFiles = [
   "admin.html",
   "admin.css",
   "admin.js",
+  "erp-additions.js",
   "cabin.html",
   "hub.html",
   "ledpro.html",
@@ -32,9 +33,7 @@ fs.mkdirSync(output, { recursive: true });
 
 for (const relativePath of publicFiles) {
   const source = path.join(root, relativePath);
-  if (!fs.existsSync(source)) {
-    throw new Error(`Required public file is missing: ${relativePath}`);
-  }
+  if (!fs.existsSync(source)) throw new Error(`Required public file is missing: ${relativePath}`);
   fs.copyFileSync(source, path.join(output, relativePath));
 }
 
@@ -46,19 +45,9 @@ fs.cpSync(path.join(root, "photos"), path.join(output, "photos"), {
   },
 });
 
-const forbidden = [
-  "supabase",
-  "scripts",
-  ".git",
-  ".github",
-  ".private-backup",
-  "node_modules",
-];
-
+const forbidden = ["supabase", "scripts", ".git", ".github", ".private-backup", "node_modules"];
 for (const relativePath of forbidden) {
-  if (fs.existsSync(path.join(output, relativePath))) {
-    throw new Error(`Forbidden path reached public output: ${relativePath}`);
-  }
+  if (fs.existsSync(path.join(output, relativePath))) throw new Error(`Forbidden path reached public output: ${relativePath}`);
 }
 
 console.log(`[build-public] staged ${publicFiles.length} files and public images only`);
