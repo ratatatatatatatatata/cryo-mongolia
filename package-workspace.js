@@ -82,6 +82,7 @@ function panels() {
       <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Авсан багц</th><th>Авах төлөвтэй</th><th>Ажилтан</th><th>Тэмдэглэл</th></tr></thead><tbody id="pkgLeadBody"></tbody></table></div></div>
       </details>
     </div>`);
+  $("packageSalesOperations")?.appendChild($("pkgLeadPanel"));
   $("pkgVisitDate").value = todayKey();
   $("pkgSaleDate").value = todayKey();
   $("pkgSaleSearch").addEventListener("input", renderSaleCustomers);
