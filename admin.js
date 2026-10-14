@@ -343,6 +343,7 @@ function wireNav() {
       document.querySelectorAll(".view").forEach((s) => {
         s.classList.toggle("on", s.dataset.panel === v);
       });
+      syncSharedStaffPickerVisibility(v);
     });
   });
 }
@@ -350,6 +351,7 @@ function wireNav() {
 function switchView(view) {
   document.querySelectorAll(".nav-item[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === (view === "ledger" ? "reports" : view)));
   document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.dataset.panel === view));
+  syncSharedStaffPickerVisibility(view);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -461,7 +463,8 @@ function setupSharedStaffPicker() {
   const wrap = $("sharedStaffPicker");
   const select = $("sharedStaffSelect");
   if (!wrap || !select) return;
-  show(wrap, isSharedStaffAccount());
+  const activeView = document.querySelector(".view.on")?.dataset.panel || "reports";
+  show(wrap, isSharedStaffAccount() && activeView !== "attendance");
   if (!isSharedStaffAccount()) return;
 
   const activeStaff = cache.staff.filter((staff) => staff.active);
@@ -483,6 +486,10 @@ function setupSharedStaffPicker() {
   select.onchange = () => {
     setSharedStaffSelection(select.value);
   };
+}
+
+function syncSharedStaffPickerVisibility(view) {
+  show($("sharedStaffPicker"), isSharedStaffAccount() && view !== "attendance");
 }
 
 function setSharedStaffSelection(value) {
