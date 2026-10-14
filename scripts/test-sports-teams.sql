@@ -1,8 +1,10 @@
 begin;
 do $$
-declare actor uuid; employee bigint; service_ids bigint[]; team public.sports_teams%rowtype; other public.sports_teams%rowtype;
+declare admin_actor uuid; actor uuid; employee bigint; service_ids bigint[]; team public.sports_teams%rowtype; other public.sports_teams%rowtype;
  member_ids bigint[]; request uuid:=gen_random_uuid(); inserted integer; rejected boolean:=false;
 begin
+ select id into admin_actor from public.profiles where role in ('admin','owner') limit 1;
+ if admin_actor is null then raise exception 'Admin test account missing'; end if;
  select id into actor from public.profiles where role='staff' and lower(email)='cryomongolia@gmail.com';
  select id into employee from public.staff where active order by id limit 1;
  select array_agg(id) into service_ids from (select id from public.services where active and category<>'legacy-import' order by id limit 2) s;
@@ -53,6 +55,29 @@ begin
  begin update public.sports_teams set service_prices=jsonb_build_object(service_ids[1]::text,-1) where id=team.id;
  exception when check_violation then rejected:=true; end;
  if not rejected then raise exception 'Negative team price accepted'; end if;
+
+ rejected:=false;
+ begin update public.sports_team_members set archived_at=now() where id=member_ids[1];
+ exception when insufficient_privilege then rejected:=true; end;
+ if not rejected then raise exception 'Staff could archive member'; end if;
+ rejected:=false;
+ begin update public.sports_teams set archived_at=now() where id=team.id;
+ exception when insufficient_privilege then rejected:=true; end;
+ if not rejected then raise exception 'Staff could archive team'; end if;
+ perform set_config('request.jwt.claim.sub',admin_actor::text,true);
+ update public.sports_team_members set archived_at=now() where id=member_ids[1];
+ if not found then raise exception 'Admin could not archive member'; end if;
+ rejected:=false;
+ begin perform public.record_sports_member_visit(team.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',10)),now(),employee,'Archived member',gen_random_uuid());
+ exception when raise_exception then rejected:=true; end;
+ if not rejected then raise exception 'Archived member accepted visits'; end if;
+ update public.sports_teams set archived_at=now() where id=team.id;
+ if not found then raise exception 'Admin could not archive team'; end if;
+ rejected:=false;
+ begin perform public.record_sports_member_visit(team.id,member_ids[2],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',10)),now(),employee,'Archived team',gen_random_uuid());
+ exception when raise_exception then rejected:=true; end;
+ if not rejected then raise exception 'Archived team accepted visits'; end if;
+ if (select count(*) from public.sports_team_visits where team_id=team.id)<>6 then raise exception 'Archive lost history'; end if;
  execute 'reset role';
  perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
  rejected:=false;

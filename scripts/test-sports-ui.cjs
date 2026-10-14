@@ -15,3 +15,9 @@ vm.runInContext("visits=[{team_id:1,member_id:1,service_label:'Крио',visited
 el('stMonth').value='2026-10';vm.runInContext('setMonth();exportExcel()',context);assert.equal(el('stFrom').value,'2026-10-01');assert.equal(el('stTo').value,'2026-10-31');assert.equal(workbook[0].name,'Нүүр хуудас');assert.equal(workbook[0].rows.find(r=>r[0]==='Нийт оролтын үнэ (₮)')[1],65000);assert.equal(workbook[2].rows.length,2);assert.equal(workbook[2].rows[0][2],'Бат');assert.equal(workbook[2].rows[0][3],'2026-10-14');assert.equal(workbook[2].rows[0][5],'Крио');assert.equal(workbook[2].rows[0][7],45000);assert.equal(workbook[3].rows[0][2],65000);fs.writeFileSync('/tmp/cryo-team-report-sheets.json',JSON.stringify(workbook));
 el('stMonth').value='2028-02';vm.runInContext('setMonth()',context);assert.equal(el('stTo').value,'2028-02-29');
 console.log('Member-specific drafts, focus preservation, monthly filtering, Excel cover total and leap month passed');
+
+vm.runInContext("isTeamAdmin=true;renderDetail()",context);assert.match(el('stDetail').innerHTML,/data-delete-team/);assert.match(el('stDetail').innerHTML,/data-delete-member/);
+vm.runInContext("isTeamAdmin=false;renderDetail()",context);assert.ok(!el('stDetail').innerHTML.includes('data-delete-team'));assert.ok(!el('stDetail').innerHTML.includes('data-delete-member'));
+vm.runInContext("teams[0].archived_at='2026-10-14';renderTeams();renderDetail()",context);assert.ok(!el('stTeams').innerHTML.includes('Баг A'));assert.ok(!el('stDetail').innerHTML.includes('id="stExport"'));
+el('stArchived').checked=true;vm.runInContext('renderTeams();renderDetail()',context);assert.match(el('stTeams').innerHTML,/Баг A/);assert.match(el('stDetail').innerHTML,/id="stExport"/);
+console.log('Admin archive controls, staff restrictions and archived-history visibility passed');
