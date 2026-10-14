@@ -45,7 +45,7 @@ const SHARED_STAFF_EMAIL = "cryomongolia@gmail.com";
 
 const ADMIN_ONLY_NAV = [
   "navOverview", "navCoverage", "navExpenses", "navServices",
-  "navPackages", "navStaff", "navInventory", "navPayroll", "navUsers",
+  "navStaff", "navInventory", "navPayroll", "navUsers",
 ];
 
 let sb = null;
@@ -196,6 +196,7 @@ async function route() {
   show($("navMessages"), true);
   show($("navCustomers"), true);
   show($("navReports"), true);
+  show($("navPackages"), true);
   show($("navAttendance"), true);
   show($("attAdd"), isAdmin);
   show($("todayStatusPanel"), isAdmin);
@@ -203,6 +204,13 @@ async function route() {
   show($("attendanceDatePanel"), isAdmin);
   show($("ledImport"), isAdmin);
   show($("ledReviewWrap"), isAdmin);
+  show($("cpkAdd"), isAdmin);
+  if (!isAdmin) show($("cpkForm"), false);
+
+  $("pkgCatalogTitle").textContent = isAdmin ? "Багцын төрөл" : "Багцын мэдээлэл";
+  $("pkgCatalogSub").textContent = isAdmin
+    ? "Багцын үнэ, хөнгөлөлт, идэвхтэй эсэх"
+    : "Үйлчилгээний багцуудын үнэ болон нөхцөл";
 
   $("navReports").lastChild.textContent = me.role === "staff" ? " Өнөөдрийн борлуулалт" : " Борлуулалт, тайлан";
   $("repTitle").textContent = me.role === "staff" ? "Өнөөдрийн борлуулалт" : "Тайлан";
@@ -1070,6 +1078,16 @@ function renderPackages() {
     tr.appendChild(nm);
 
     tr.appendChild(cell(p.period || "—"));
+
+    if (!isAdminUser()) {
+      tr.appendChild(cell(money(p.old_price || 0), "t-mono"));
+      tr.appendChild(cell(money(p.price || 0), "t-mono t-strong"));
+      tr.appendChild(cell(p.featured ? "Тийм" : "Үгүй"));
+      tr.appendChild(cell(p.active ? "Идэвхтэй" : "Идэвхгүй"));
+      tr.appendChild(cell(""));
+      body.appendChild(tr);
+      return;
+    }
 
     const oldTd = document.createElement("td");
     const oldIn = document.createElement("input");
