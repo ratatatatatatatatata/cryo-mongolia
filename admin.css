@@ -357,3 +357,5 @@ tr.review td{background:rgba(255,180,80,.05)}
 .booking-slot small { margin-top:5px; overflow-wrap:anywhere; }
 .booking-slot:disabled { cursor:default; opacity:.65; background:rgba(128,128,128,.12); }
 .booking-slot:not(:disabled):hover { border-color:currentColor; }
+
+.record-note{white-space:pre-wrap!important;overflow-wrap:anywhere;min-width:180px;max-width:360px;line-height:1.5}

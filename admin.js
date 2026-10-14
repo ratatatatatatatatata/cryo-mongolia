@@ -650,7 +650,7 @@ function renderCustomers() {
   $("cusSub").textContent = `${rows.length} үйлчлүүлэгч · нэр, утсаар хайна`;
   body.innerHTML = "";
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="6"><div class="empty">Үйлчлүүлэгч олдсонгүй.</div></td></tr>';
     return;
   }
   rows.forEach((customer) => {
@@ -659,6 +659,7 @@ function renderCustomers() {
     tr.appendChild(cell(customer.phone || "—", "t-mono"));
     tr.appendChild(cell(customer.email || "—"));
     tr.appendChild(cell(fmtDate(customer.created_at), "t-mono"));
+    tr.appendChild(cell(customer.notes || "—", "record-note"));
     const actions = document.createElement("td");
     const edit = document.createElement("button");
     edit.className = "btn-sm ghost";
@@ -895,7 +896,7 @@ function renderBookings() {
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6"><div class="empty">Захиалга алга байна.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="7"><div class="empty">Захиалга алга байна.</div></td></tr>';
     return;
   }
 
@@ -951,6 +952,7 @@ function renderBookings() {
     });
     st.appendChild(sel);
     tr.appendChild(st);
+    tr.appendChild(cell(b.note || b.notes || "—", "record-note"));
 
     body.appendChild(tr);
   });
@@ -1492,6 +1494,7 @@ function openContractDetail(row) {
   const history = cache.redemptions
     .filter((item) => Number(item.contract_id) === Number(row.id))
     .sort((a, b) => String(b.used_on || "").localeCompare(String(a.used_on || "")) || Number(b.id || 0) - Number(a.id || 0));
+  $("cpkDetailNotes").textContent = row.notes ? `Тэмдэглэл: ${row.notes}` : "";
   $("cpkDetailTitle").textContent = `${row.__customer} — ${row.__label}`;
   $("cpkDetailSub").textContent = `${row.purchased_on || "Огноо тодорхойгүй"} эхэлсэн · ${row.expires_on || "хугацаагүй"}`;
   $("cpkDetailKpis").innerHTML = [
@@ -1989,12 +1992,13 @@ function renderTodaySales() {
   for (const row of rows) {
     const tr=document.createElement('tr');
     [today,row.customer_name || '—',row.services || '—',row.therapist || '—',money(rowTotal(row)),PAYS.filter(([key])=>Number(row[key])).map(([key,label])=>`${label}: ${money(row[key])}`).join(' · ') || '—'].forEach(value=>tr.appendChild(cell(value)));
+    tr.appendChild(cell(row.note || "—", "record-note"));
     const action=document.createElement('td'), button=document.createElement('button');
     button.className='btn-sm ghost'; button.textContent='Засах';
     button.onclick=()=>{switchView('ledger');openLedForm(row);};
     action.appendChild(button);tr.appendChild(action);body.appendChild(tr);
   }
-  if (!rows.length) body.innerHTML='<tr><td colspan="7"><div class="empty">Өнөөдөр борлуулалт бүртгэгдээгүй байна.</div></td></tr>';
+  if (!rows.length) body.innerHTML='<tr><td colspan="8"><div class="empty">Өнөөдөр борлуулалт бүртгэгдээгүй байна.</div></td></tr>';
 }
 
 function renderReports() {
@@ -3164,7 +3168,7 @@ function renderLedger() {
 
   body.innerHTML = "";
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty">Бүртгэл алга байна.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="9"><div class="empty">Бүртгэл алга байна.</div></td></tr>';
     $("ledMore").textContent = "";
     return;
   }
@@ -3214,6 +3218,7 @@ function renderLedger() {
 
     tr.appendChild(cell(money(rowTotal(r)), "t-mono t-strong"));
 
+    tr.appendChild(cell(r.note || "—", "record-note"));
     const act = document.createElement("td");
     act.style.cssText = "display:flex;gap:7px;flex-wrap:wrap";
     if (isAdminUser() || r.created_by === me?.id) {

@@ -225,7 +225,7 @@
 
       <div class="panel">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th><th></th></tr></thead>
+          <thead><tr><th>Нэр</th><th>Утас</th><th>И-мэйл</th><th>Бүртгэсэн</th><th>Тэмдэглэл</th><th></th></tr></thead>
           <tbody id="cusBody"></tbody>
         </table></div>
       </div>
@@ -250,7 +250,7 @@
       <div id="packageSalesOperations" hidden></div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title" id="repTodayTitle">Өнөөдрийн борлуулалтын бүртгэл</div></div>
-        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ / багц</th><th>Ажилтан</th><th>Дүн</th><th>Төлбөр</th><th></th></tr></thead><tbody id="repTodayBody"></tbody></table></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ / багц</th><th>Ажилтан</th><th>Дүн</th><th>Төлбөр</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="repTodayBody"></tbody></table></div>
       </div>
 
       <div class="panel" id="repFiltersPanel">
@@ -479,7 +479,7 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr>
             <th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ</th><th>Төхөөрөмж</th>
-            <th>Ажилтан</th><th>Төлбөр</th><th>Дүн</th><th></th>
+            <th>Ажилтан</th><th>Төлбөр</th><th>Дүн</th><th>Тэмдэглэл</th><th></th>
           </tr></thead>
           <tbody id="ledBody"></tbody>
         </table></div>
@@ -676,7 +676,7 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr>
             <th>Дугаар</th><th>Үйлчлүүлэгч</th><th>Төхөөрөмж</th>
-            <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th>
+            <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th><th>Нэмэлт тэмдэглэл</th>
           </tr></thead>
           <tbody id="bkBody"></tbody>
         </table></div>
@@ -811,7 +811,7 @@
       <div><div class="panel-title" id="cpkDetailTitle">Багцын дэлгэрэнгүй</div><div class="page-sub" id="cpkDetailSub"></div></div>
       <button class="btn-sm ghost" id="cpkDetailClose">✕ Хаах</button>
     </div>
-    <div class="kpis package-detail-kpis" id="cpkDetailKpis"></div>
+    <p class="record-note" id="cpkDetailNotes"></p><div class="kpis package-detail-kpis" id="cpkDetailKpis"></div>
     <div class="tbl-wrap"><table class="tbl package-history"><thead><tr><th>№</th><th>Огноо</th><th>Төхөөрөмж / үйлчилгээ</th><th>Тоо</th><th>Тэмдэглэл</th></tr></thead><tbody id="cpkDetailBody"></tbody></table></div>
   </div>
 </div>

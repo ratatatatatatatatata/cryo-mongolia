@@ -52,7 +52,7 @@ function panels() {
       </div>
       <div id="pkgCustomerDetail" style="display:none">
         <div class="panel">
-          <div class="panel-head"><div><div class="panel-title" id="pkgDetailName"></div><div class="page-sub" id="pkgDetailMeta"></div></div></div>
+          <div class="panel-head"><div><div class="panel-title" id="pkgDetailName"></div><div class="page-sub" id="pkgDetailMeta"></div><p class="record-note" id="pkgDetailNotes"></p></div></div>
           <div class="kpis package-detail-kpis" id="pkgDetailKpis"></div>
           <div class="form-grid" style="margin-top:18px"><div class="field"><label for="pkgVisitDate">Орсон өдөр *</label><input class="ctl" id="pkgVisitDate" type="date"></div><div class="field"><label for="pkgVisitNotes">Тэмдэглэл</label><input class="ctl" id="pkgVisitNotes" maxlength="500" placeholder="Жишээ: өглөөний ээлж"></div></div>
           <div class="field" style="margin-top:14px"><label>Өнөөдөр ашигласан төхөөрөмжүүд *</label><div class="staff-check-grid" id="pkgVisitServices"></div></div>
@@ -181,6 +181,7 @@ function renderSelectedPackage() {
   const left = total == null ? null : Math.max(0, total - spent);
   $("pkgDetailName").textContent = contract.customer_label || "Нэргүй үйлчлүүлэгч";
   $("pkgDetailMeta").textContent = `${contract.package_label || "Багц"} · ${contract.purchased_on || "Эхэлсэн огноогүй"}${contract.expires_on ? ` → ${contract.expires_on}` : ""}`;
+  $("pkgDetailNotes").textContent=contract.notes ? `Тэмдэглэл: ${contract.notes}` : "";
   const items=contract.service_units || [];
   $("pkgVisitServices").innerHTML=(items.length ? items.map(item => {
     const spent=history.filter(row => Number(row.service_id)===Number(item.service_id)).reduce((sum,row)=>sum+Number(row.units),0);
@@ -189,7 +190,7 @@ function renderSelectedPackage() {
   $("pkgDetailKpis").innerHTML = [["Авсан багц", contract.package_label || "—", contract.status || "—"], ["Нийт орох эрх", total == null ? "—" : total, "үйлчилгээ"], ["Орсон", spent, `${history.length} бүртгэл`], ["Үлдсэн", left == null ? "—" : left, "үйлчилгээ"]].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${safe(label)}</div><div class="kpi-value">${safe(value)}</div><div class="kpi-note">${safe(note)}</div></div>`).join("");
   $("pkgVisitBody").innerHTML = history.length ? history.map((item) => {
     const employee = staff.find((person) => Number(person.id) === Number(item.staff_id));
-    return `<tr><td class="t-mono">${safe(item.used_on)}</td><td class="t-strong">${safe(item.service_label || "—")}</td><td>${safe(item.units || 1)}</td><td>${safe(employee?.name || "—")}</td><td>${safe(item.notes || "—")}</td></tr>`;
+    return `<tr><td class="t-mono">${safe(item.used_on)}</td><td class="t-strong">${safe(item.service_label || "—")}</td><td>${safe(item.units || 1)}</td><td>${safe(employee?.name || "—")}</td><td class="record-note">${safe(item.notes || "—")}</td></tr>`;
   }).join("") : '<tr><td colspan="5"><div class="empty">Энэ багцын ашиглалтын түүх алга.</div></td></tr>';
   const employee = currentStaff();
   $("pkgVisitStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";
@@ -222,7 +223,7 @@ function options() {
 function renderLeads() {
   const employee = currentStaff(), admin = ["owner", "admin"].includes(profile.role);
   const rows = admin ? leads : leads.filter((item) => Number(item.staff_id) === Number(employee?.id));
-  $("pkgLeadBody").innerHTML = rows.length ? rows.map((item) => `<tr><td>${new Date(item.created_at).toLocaleDateString("mn-MN")}</td><td class="t-strong">${safe(item.customer_label)}</td><td>${safe(item.purchased_package_label || "—")}</td><td>${safe(item.intended_package_label || "—")}</td><td>${safe(item.staff_name)}</td><td>${safe(item.notes || "—")}</td></tr>`).join("") : '<tr><td colspan="6"><div class="empty">Багцын бүртгэл алга.</div></td></tr>';
+  $("pkgLeadBody").innerHTML = rows.length ? rows.map((item) => `<tr><td>${new Date(item.created_at).toLocaleDateString("mn-MN")}</td><td class="t-strong">${safe(item.customer_label)}</td><td>${safe(item.purchased_package_label || "—")}</td><td>${safe(item.intended_package_label || "—")}</td><td>${safe(item.staff_name)}</td><td class="record-note">${safe(item.notes || "—")}</td></tr>`).join("") : '<tr><td colspan="6"><div class="empty">Багцын бүртгэл алга.</div></td></tr>';
 }
 
 async function allRows(build) {
