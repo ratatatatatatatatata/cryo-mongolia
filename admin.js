@@ -2506,7 +2506,7 @@ function renderStaff() {
     const tr = document.createElement("tr");
     [row.employee_code || "—", row.name, row.title || "—", row.phone || "—", row.email || "—"].forEach((value, i) => tr.appendChild(cell(value, i === 1 ? "t-strong" : "")));
     const names = [row.name, ...(row.aliases || [])].map((name) => String(name).toLowerCase());
-    const workedDays = [...cache.attendance, ...cache.workdays].filter((a) => a.staff_id === row.id || (!a.staff_id && names.includes(String(a.staff_name).toLowerCase()))).length;
+    const workedDays = new Set([...cache.attendance, ...cache.workdays].filter((a) => a.staff_id === row.id || (!a.staff_id && names.includes(String(a.staff_name).toLowerCase()))).map(a=>a.work_date)).size;
     const salesTotal = cache.sales.filter((s) => s.staff_id === row.id || (!s.staff_id && names.includes(String(s.therapist).toLowerCase()))).reduce((sum, sale) => sum + rowTotal(sale), 0);
     tr.appendChild(cell(`${workedDays} өдөр`, "t-mono"));
     tr.appendChild(cell(money(salesTotal), "t-mono t-strong"));
@@ -2632,17 +2632,16 @@ function renderAttendance() {
   const baseRows = allAttendanceRows()
     .filter((row) => String(row.work_date || "").slice(0, 10) === day)
     .sort((a, b) => String(b.work_date).localeCompare(String(a.work_date)) || Number(b.workday_number || 0) - Number(a.workday_number || 0));
-  const byStaff = new Map();
-  baseRows.forEach((row) => byStaff.set(String(row.staff_id || row.staff_name), row));
-  cache.dailyStatus.filter((row) => row.work_date === day).forEach((status) => {
-    const key = String(status.staff_id);
-    byStaff.set(key, { ...(byStaff.get(key) || {}), staff_id: status.staff_id, staff_name: status.staff_name, work_date: day, daily_status: status.status, daily_note: status.note });
+  const attendanceRowsWithStatus=baseRows.map(row=>{
+    const status=cache.dailyStatus.find(item=>item.work_date===day&&Number(item.staff_id)===Number(row.staff_id));
+    return {...row,daily_note:status?.note};
   });
-  let attendanceRows = [...byStaff.values()].sort((a, b) => String(a.staff_name || "").localeCompare(String(b.staff_name || ""), "mn"));
+  cache.dailyStatus.filter(status=>status.work_date===day&&!baseRows.some(row=>Number(row.staff_id)===Number(status.staff_id))).forEach(status=>attendanceRowsWithStatus.push({...status,daily_status:status.status,daily_note:status.note}));
+  let attendanceRows=attendanceRowsWithStatus.sort((a,b)=>String(a.staff_name||'').localeCompare(String(b.staff_name||''),'mn')||String(a.clock_in||'').localeCompare(String(b.clock_in||'')));
   const chosenStaff = selectedSharedStaff();
   if (!isAdminUser() && chosenStaff && !isSharedStaffAccount()) attendanceRows = attendanceRows.filter((row) => Number(row.staff_id) === Number(chosenStaff.id));
   renderAttendanceSelfService();
-  $("attSub").textContent = `${fmtDate(day)} · ${attendanceRows.length} ажилтан бүртгэлтэй`;
+  $("attSub").textContent = `${fmtDate(day)} · ${new Set(attendanceRows.map(row=>row.staff_id||row.staff_name)).size} ажилтан · ${attendanceRows.length} ирцийн бүртгэл`;
   if ($("attStatusTitle")) $("attStatusTitle").textContent = `${fmtDate(day)}-нд гарсан ажилтан`;
   renderAttendanceKpis(attendanceRows);
   body.innerHTML = "";
@@ -2690,11 +2689,13 @@ function shiftAttendanceDate(amount) {
 function renderAttendanceKpis(rows) {
   const host = $("attKpis");
   if (!host) return;
-  const left = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Гарсан").length;
-  const active = rows.filter((row) => attendanceStatus(row, row.clock_out ? new Date(row.clock_out) : null).label === "Ээлжтэй").length;
+  const latest=new Map();rows.forEach(row=>{const key=row.staff_id||row.staff_name;const old=latest.get(key);if(!old||String(row.clock_in||'')>=String(old.clock_in||''))latest.set(key,row);});
+  const people=[...latest.values()];
+  const left=people.filter(row=>row.clock_out||row.daily_status==='left').length;
+  const active=people.filter(row=>row.clock_in&&!row.clock_out).length;
   const totalMinutes = rows.reduce((sum, row) => sum + attendanceMinutes(row.clock_in, row.clock_out), 0);
   host.innerHTML = [
-    ["Бүртгэлтэй хүн", rows.length, "Тухайн өдрийн ирц"],
+    ["Бүртгэлтэй хүн", people.length, "Тухайн өдрийн ирц"],
     ["Ээлжтэй", active, "Одоогоор гараагүй"],
     ["Гарсан", left, "Ээлж дууссан"],
     ["Нийт цаг", formatMinutes(totalMinutes), "Бүртгэгдсэн хугацаа"],
@@ -2723,6 +2724,8 @@ function formatAttendanceDuration(start, end) {
   return start && end ? formatMinutes(attendanceMinutes(start, end)) : "—";
 }
 
+function currentAttendanceSession(staffId,day){return cache.attendance.filter(row=>row.work_date===day&&Number(row.staff_id)===Number(staffId)).sort((a,b)=>Number(Boolean(a.clock_out))-Number(Boolean(b.clock_out))||Number(b.id)-Number(a.id))[0];}
+
 function renderAttendanceSelfService() {
   const panel = $("staffAttendancePanel");
   if (!panel || isAdminUser()) return;
@@ -2742,7 +2745,7 @@ function renderAttendanceSelfService() {
     const grid = document.createElement("div");
     grid.className = "attendance-name-grid";
     activeStaff.forEach((staff) => {
-      const staffRow = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(staff.id));
+      const staffRow = currentAttendanceSession(staff.id, today);
       const label = document.createElement("label");
       label.className = "attendance-name-option";
       const radio = document.createElement("input");
@@ -2775,12 +2778,12 @@ function renderAttendanceSelfService() {
     empty.className = "empty";
     empty.textContent = "Өөрийн нэрийг сонгоод ирцээ бүртгэнэ үү.";
     host.appendChild(empty);
-    const registered = cache.attendance.filter((item) => item.work_date === today && item.clock_in).length;
+    const registered = new Set(cache.attendance.filter((item) => item.work_date === today && item.clock_in).map(item=>item.staff_id)).size;
     $("attSelfStatus").textContent = `Өнөөдөр ${registered} ажилтан ирсэн цагаа бүртгэсэн`;
     return;
   }
 
-  const row = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(employee.id));
+  const row = currentAttendanceSession(employee.id, today);
   const session = document.createElement("div");
   session.className = "attendance-work-session";
   session.innerHTML = `<div class="attendance-session-date"></div><div class="attendance-session-names"></div><div class="attendance-session-timer" aria-live="polite">00:00:00</div><div class="attendance-session-caption"></div><button type="button" class="attendance-session-action"></button>`;
@@ -2806,44 +2809,21 @@ function renderAttendanceSelfService() {
   } else {
     timer.textContent = formatElapsedDuration(row.clock_in, row.clock_out);
     caption.textContent = `${formatAttendanceTime(row.clock_in)}-д ирж, ${formatAttendanceTime(row.clock_out)}-д гарсан`;
-    actionButton.textContent = "Өнөөдрийн ирц бүртгэгдсэн";
-    actionButton.disabled = true;
-    actionButton.classList.add("is-done");
+    actionButton.textContent = "Дахин ирсэн цаг бүртгэх";
+    actionButton.addEventListener("click", () => startIndividualAttendance(employee, actionButton));
   }
   $("attSelfStatus").textContent = `${employee.name} · ирц тусдаа бүртгэгдэнэ`;
 }
 
-async function startIndividualAttendance(employee, button, row = null) {
-  button.disabled = true;
-  const today = localDateKey(new Date());
-  if (!row) {
-    const created = await sb.from("attendance").insert({
-      work_date: today,
-      staff_id: employee.id,
-      staff_name: employee.name,
-      user_id: me.id,
-      workday_number: nextWorkdayNumber(employee.id),
-      clock_in: null,
-    }).select().maybeSingle();
-    if (created.error) {
-      button.disabled = false;
-      if (created.error.code === "23505") return loadAll();
-      return alert("Ирсэн цаг бүртгэж чадсангүй: " + created.error.message);
-    }
-    row = created.data;
-    if (row) cache.attendance.unshift(row);
-  }
-  const result = await sb.from("attendance")
-    .update({ clock_in: new Date().toISOString() })
-    .eq("id", row.id)
-    .select()
-    .maybeSingle();
-  if (result.error) {
-    button.disabled = false;
-    return alert("Ирсэн цаг бүртгэж чадсангүй: " + result.error.message);
-  }
-  if (result.data) Object.assign(row, result.data);
-  if (isSharedStaffAccount()) return setSharedStaffSelection("");
+async function startIndividualAttendance(employee, button) {
+  if(button.disabled)return;
+  button.disabled=true;
+  const result=await sb.rpc('start_employee_attendance',{p_staff_id:employee.id});
+  if(result.error){button.disabled=false;return alert('Ирсэн цаг бүртгэж чадсангүй: '+result.error.message);}
+  const row=Array.isArray(result.data)?result.data[0]:result.data;
+  const current=cache.attendance.find(item=>Number(item.id)===Number(row.id));
+  if(current)Object.assign(current,row);else cache.attendance.unshift(row);
+  if(isSharedStaffAccount())return setSharedStaffSelection('');
   renderAttendance();
 }
 
@@ -2852,6 +2832,8 @@ async function finishIndividualAttendance(row, button) {
   const result = await sb.from("attendance")
     .update({ clock_out: new Date().toISOString() })
     .eq("id", row.id)
+    .is("clock_out", null)
+    .not("clock_in", "is", null)
     .select()
     .maybeSingle();
   if (result.error) {
@@ -3016,8 +2998,8 @@ async function saveAttendance() {
   if (!staff || !workDate || workdayNumber < 1 || !clockIn) return alert("Ажилтан, огноо, хэд дэх өдөр, ирсэн цагийг бөглөнө үү.");
   if (clockOut && new Date(clockOut) < new Date(clockIn)) return alert("Явсан цаг ирсэн цагаас өмнө байж болохгүй.");
 
-  const duplicate = allAttendanceRows().find((row) => Number(row.staff_id) === Number(staff.id) && row.work_date === workDate && (!attendanceEditing || row.__table !== attendanceEditing.__table || Number(row.id) !== Number(attendanceEditing.id)));
-  if (duplicate) return alert("Энэ ажилтны тухайн өдрийн ирц бүртгэгдсэн байна. Одоо байгаа мөрийг засна уу.");
+  const duplicate = allAttendanceRows().find((row) => Number(row.staff_id) === Number(staff.id) && row.work_date === workDate && row.clock_in && new Date(row.clock_in)<(clockOut?new Date(clockOut):Infinity) && (!row.clock_out||new Date(row.clock_out)>new Date(clockIn)) && (!attendanceEditing || row.__table !== attendanceEditing.__table || Number(row.id) !== Number(attendanceEditing.id)));
+  if (duplicate) return alert("Энэ ажилтны ирцийн цаг давхцаж байна. Ирсэн, гарсан цагаа шалгана уу.");
 
   const patch = {
     staff_id: staff.id,
