@@ -13,6 +13,13 @@ begin
  if team.id<>other.id then raise exception 'Duplicate team created'; end if;
  select array_agg(id) into member_ids from public.sports_team_members where team_id=team.id;
  if cardinality(member_ids)<>2 then raise exception 'Roster was not saved atomically'; end if;
+ update public.sports_teams set name='Renamed team' where id=team.id;
+ update public.sports_team_members set full_name='Renamed member' where id=member_ids[1];
+ if (select name from public.sports_teams where id=team.id)<>'Renamed team' or (select full_name from public.sports_team_members where id=member_ids[1])<>'Renamed member' then raise exception 'Staff rename failed'; end if;
+ rejected:=false;
+ begin update public.sports_team_members set team_id=team.id where id=member_ids[1];
+ exception when insufficient_privilege then rejected:=true; end;
+ if not rejected then raise exception 'Non-name update allowed'; end if;
  request:=gen_random_uuid();
  inserted:=public.record_sports_team_visit(team.id,member_ids,service_ids,now(),employee,'QA rollback',request);
  if inserted<>4 then raise exception 'Expected 2 members x 2 devices'; end if;
@@ -45,6 +52,10 @@ begin
  begin perform public.create_sports_team('Unauthorized',array['No access'],gen_random_uuid());
  exception when insufficient_privilege then rejected:=true; end;
  if not rejected then raise exception 'Nonemployee permitted'; end if;
+ execute 'set local role authenticated';
+ update public.sports_teams set name='Unauthorized rename' where id=team.id;
+ if found then raise exception 'Nonemployee rename permitted'; end if;
+ execute 'reset role';
 end $$;
 rollback;
 select 'Sports team creation, roster, batch and individual priced visits, retry deduplication, membership and employee permissions passed; all tests rolled back' as result;

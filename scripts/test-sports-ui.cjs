@@ -1,0 +1,16 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,{value:'',innerHTML:'',textContent:'',disabled:false,hidden:false,focus(){},querySelectorAll(){return[];},addEventListener(){}});return elements.get(id);};
+let boot,auth,workbook,loadCount=0;
+const context=vm.createContext({window:{CRYO_SUPABASE:{},addEventListener(){}},document:{getElementById:el,addEventListener(name,fn){boot=fn;}},createClient:()=>({auth:{onAuthStateChange(fn){auth=fn;}}}),crypto:require('node:crypto').webcrypto,Intl,Date,setTimeout:fn=>fn(),matchesName:()=>true,downloadWorkbook:sheets=>workbook=sheets});
+vm.runInContext(fs.readFileSync('sports-teams.js','utf8').replace(/^import .*;$/gm,''),context);
+context.countLoad=()=>loadCount++;vm.runInContext('load=countLoad;',context);boot();
+vm.runInContext("ready=true;user={id:'same'};",context);auth('SIGNED_IN',{user:{id:'same'}});assert.equal(loadCount,1);
+vm.runInContext("teams=[{id:1,name:'Баг A'},{id:2,name:'Баг B'}];members=[{id:1,team_id:1,full_name:'Бат'},{id:2,team_id:1,full_name:'Сараа'}];services=[{id:10,name:'Крио',price:100}];",context);
+vm.runInContext('chooseMember(1)',context);el('stServices').querySelectorAll=()=>[{value:'10'}];el('stPrice10').value='45000';el('stNote').value='Only member one';el('stWhen').value='2026-10-14T10:00';
+vm.runInContext('chooseMember(2)',context);assert.equal(el('stNote').value,'');assert.ok(!el('stServices').innerHTML.includes('data-device checked'));assert.ok(el('stActiveMember').textContent.includes('Сараа'));
+el('stServices').querySelectorAll=()=>[];el('stNote').value='Only member two';
+vm.runInContext('chooseMember(1)',context);assert.equal(el('stNote').value,'Only member one');assert.equal(el('stWhen').value,'2026-10-14T10:00');assert.match(el('stServices').innerHTML,/value="45000"/);assert.match(el('stServices').innerHTML,/data-device checked/);
+vm.runInContext("visits=[{team_id:1,member_id:1,service_label:'Крио',visited_at:'2026-10-14T01:00:00Z',price:45000},{team_id:1,member_id:2,service_label:'Крио',visited_at:'2026-10-15T01:00:00Z',price:20000},{team_id:1,member_id:2,service_label:'Крио',visited_at:'2026-09-30T15:59:00Z',price:999},{team_id:2,member_id:3,service_label:'Крио',visited_at:'2026-10-14T01:00:00Z',price:999}];selected=1;",context);
+el('stMonth').value='2026-10';vm.runInContext('setMonth();exportExcel()',context);assert.equal(el('stFrom').value,'2026-10-01');assert.equal(el('stTo').value,'2026-10-31');assert.equal(workbook[0].name,'Нүүр хуудас');assert.equal(workbook[0].rows.find(r=>r[0]==='Нийт оролтын үнэ (₮)')[1],65000);assert.equal(workbook[2].rows.length,2);
+el('stMonth').value='2028-02';vm.runInContext('setMonth()',context);assert.equal(el('stTo').value,'2028-02-29');
+console.log('Member-specific drafts, focus preservation, monthly filtering, Excel cover total and leap month passed');
