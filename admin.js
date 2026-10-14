@@ -5,6 +5,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { matchesName } from "./name-search.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const $ = (id) => document.getElementById(id);
@@ -65,6 +66,13 @@ let attendanceYear = "all";
 let attendanceStaff = "all";
 let selectedAttendanceDate = localDateKey(new Date());
 let sharedStaffId = null;
+
+window.addEventListener("cryo:sale-saved", ({ detail: sale }) => {
+  if (!sale?.id) return;
+  cache.sales = [sale, ...cache.sales.filter(item => item.id !== sale.id)];
+  renderReports();
+  renderLedger();
+});
 
 /* ── tiny DOM helpers ─────────────────────────────────────────── */
 function show(el, on = true) {
@@ -504,6 +512,7 @@ function setSharedStaffSelection(value) {
   renderReports();
   renderLedger();
   renderAttendance();
+  window.dispatchEvent(new Event("cryo:staff-changed"));
 }
 
 function renderCoverage() {
@@ -621,7 +630,7 @@ function renderCustomers() {
   const digits = normalizePhone(query);
   const rows = cache.customers.filter((c) => {
     if (!query) return true;
-    return String(c.full_name || "").toLowerCase().includes(query) ||
+    return matchesName(c.full_name, query) ||
       (digits && normalizePhone(c.phone).includes(digits));
   });
 
@@ -1218,7 +1227,7 @@ function renderContracts() {
     .filter(
       (r) =>
         !needle ||
-        r.__customer.toLowerCase().includes(needle) ||
+        matchesName(r.__customer, needle) ||
         r.__label.toLowerCase().includes(needle),
     )
     .sort(
@@ -2091,7 +2100,7 @@ function ledRows() {
     if (ledReviewOnly && !r.needs_review) return false;
     if (ledSearch) {
       const hay = ((r.customer_name || "") + " " + (r.services || "") + " " + (r.note || "")).toLowerCase();
-      if (!hay.includes(ledSearch)) return false;
+      if (!matchesName(hay, ledSearch)) return false;
     }
     return true;
   });

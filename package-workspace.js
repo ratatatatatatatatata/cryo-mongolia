@@ -1,4 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { matchesName } from "./name-search.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const sb = createClient(CFG.url, CFG.anonKey);
@@ -11,6 +12,7 @@ const todayKey = () => {
 
 let customers = [], packages = [], staff = [], leads = [], contracts = [], redemptions = [], services = [];
 let profile = {}, user = null, selectedContractId = null, packageSearch = "";
+const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
 
 function weekday(value) {
   const date = new Date(value + "T12:00:00");
@@ -58,11 +60,36 @@ function panels() {
       </div>
     </div>
     <div id="pkgLeadPanel">
-      <div class="page-head" style="margin-top:26px"><div><div class="page-title">Багцын худалдан авалт, сонирхол</div><div class="page-sub">Үйлчлүүлэгчийн авсан болон дараа авах төлөвтэй багцыг бүртгэнэ</div></div></div>
-      <div class="panel"><div class="form-grid"><div class="field"><label>Үйлчлүүлэгч *</label><select class="ctl" id="pkgLeadCustomer"></select></div><div class="field"><label>Авсан багц</label><select class="ctl" id="pkgLeadPurchased"></select></div><div class="field"><label>Авах төлөвтэй багц</label><select class="ctl" id="pkgLeadIntended"></select></div><div class="field"><label>Тэмдэглэл</label><input class="ctl" id="pkgLeadNotes" maxlength="1000" placeholder="Хэзээ авах, ямар хэрэгцээтэй зэрэг"></div></div><div class="page-sub" id="pkgLeadStaff" style="margin-top:12px"></div><div class="form-actions"><button class="btn-sm primary" id="pkgLeadSave">Багцын мэдээлэл хадгалах</button></div></div>
+      <div class="page-head" style="margin-top:26px"><div><div class="page-title">Багцын борлуулалт</div><div class="page-sub">Бүртгэсэн төлбөр өдрийн борлуулалтад орно</div></div></div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Багцын борлуулалт бүртгэх</div></div>
+        <div class="form-grid">
+          <div class="field"><label for="pkgSaleDate">Огноо *</label><input class="ctl" type="date" id="pkgSaleDate"></div>
+          <div class="field"><label for="pkgSaleSearch">Үйлчлүүлэгч хайх</label><input class="ctl" type="search" id="pkgSaleSearch" placeholder="Нэр / латин галиг / утас" autocomplete="off"></div>
+          <div class="field"><label for="pkgLeadCustomer">Үйлчлүүлэгч *</label><select class="ctl" id="pkgLeadCustomer"></select></div>
+          <div class="field"><label for="pkgLeadPurchased">Багц *</label><select class="ctl" id="pkgLeadPurchased"></select></div>
+          <div class="field"><label for="pkgSalePrice">Багцын үнэ</label><input class="ctl" id="pkgSalePrice" readonly value="—"></div>
+        </div>
+        <div class="form-sub">Төлбөр</div>
+        <div class="form-grid">
+          <div class="field"><label for="pkgSaleBank">Төлбөр хүлээн авах банк / хэлбэр *</label><select class="ctl" id="pkgSaleBank"><option value="">Сонгох</option><option value="golomt">Голомт</option><option value="khan">Хаан</option><option value="cash">Бэлэн</option><option value="invoice">Нэхэмжлэх</option><option value="barter">Barter</option></select></div>
+          <div class="field"><label for="pkgSaleAmount">Бүртгэх дүн *</label><input class="ctl" type="number" min="1" step="1" id="pkgSaleAmount"></div>
+          <div class="field"><label for="pkgLeadNotes">Тэмдэглэл</label><input class="ctl" id="pkgLeadNotes" maxlength="1000"></div>
+        </div>
+        <div class="page-sub" id="pkgLeadStaff" style="margin-top:12px"></div><div class="form-actions"><button class="btn-sm primary" id="pkgLeadSave">Борлуулалт бүртгэх</button><span class="page-sub" id="pkgSaleStatus" role="status"></span></div>
+      </div>
+      <details><summary>Өмнөх багцын худалдан авалт, сонирхлын бүртгэл</summary>
       <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Авсан багц</th><th>Авах төлөвтэй</th><th>Ажилтан</th><th>Тэмдэглэл</th></tr></thead><tbody id="pkgLeadBody"></tbody></table></div></div>
+      </details>
     </div>`);
   $("pkgVisitDate").value = todayKey();
+  $("pkgSaleDate").value = todayKey();
+  $("pkgSaleSearch").addEventListener("input", renderSaleCustomers);
+  $("pkgLeadPurchased").addEventListener("change", () => {
+    const selected = packages.find(item => String(item.id) === $("pkgLeadPurchased").value);
+    $("pkgSalePrice").value = selected ? money(selected.price) : '—';
+    $("pkgSaleAmount").value = selected ? selected.price : '';
+  });
   $("pkgCustomerSearch").addEventListener("input", (event) => {
     packageSearch = event.target.value.trim().toLowerCase();
     renderPackageCustomers();
@@ -80,7 +107,7 @@ function activeContracts() {
 function renderPackageCustomers() {
   const host = $("pkgCustomerList");
   if (!host) return;
-  const rows = activeContracts().filter((contract) => !packageSearch || `${contract.customer_label || ""} ${contract.package_label || ""}`.toLowerCase().includes(packageSearch));
+  const rows = activeContracts().filter((contract) => matchesName(`${contract.customer_label || ""} ${contract.package_label || ""}`, packageSearch));
   host.innerHTML = rows.length ? rows.map((contract) => {
     const total = contract.total_units == null ? null : Number(contract.total_units), spent = used(contract.id);
     const left = total == null ? "Үлдэгдэл тодорхойгүй" : `${Math.max(0, total - spent)} үлдсэн`;
@@ -116,13 +143,22 @@ function renderSelectedPackage() {
   $("pkgVisitStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";
 }
 
-function options() {
+function renderSaleCustomers() {
   const customer = $("pkgLeadCustomer");
   if (!customer) return;
-  customer.innerHTML = '<option value="">Үйлчлүүлэгч сонгох</option>' + customers.map((item) => `<option value="${item.id}">${safe(item.full_name)} · ${safe(item.phone || "утасгүй")}</option>`).join("");
+  const selected = customer.value;
+  const query = $("pkgSaleSearch").value.trim();
+  const rows = customers.filter(item => matchesName(item.full_name, query) || (query && String(item.phone || '').includes(query)));
+  customer.innerHTML = `<option value="">${rows.length ? 'Үйлчлүүлэгч сонгох' : 'Үйлчлүүлэгч олдсонгүй'}</option>` + rows.map((item) => `<option value="${item.id}">${safe(item.full_name)} · ${safe(item.phone || "утасгүй")}</option>`).join("");
+  customer.value = rows.some(item => String(item.id) === selected) ? selected : '';
+}
+
+function options() {
+  renderSaleCustomers();
+  const selectedPackage = $("pkgLeadPurchased").value;
   const packageOptions = '<option value="">Сонгоогүй</option>' + packages.map((item) => `<option value="${item.id}">${safe(item.name)}</option>`).join("");
   $("pkgLeadPurchased").innerHTML = packageOptions;
-  $("pkgLeadIntended").innerHTML = packageOptions;
+  $("pkgLeadPurchased").value = selectedPackage;
   $("pkgVisitServices").innerHTML = services.map((item) => `<label class="staff-check"><input type="checkbox" value="${item.id}"><span>${safe(item.name)}</span></label>`).join("");
   const employee = currentStaff();
   $("pkgLeadStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";
@@ -136,20 +172,38 @@ function renderLeads() {
   $("pkgLeadBody").innerHTML = rows.length ? rows.map((item) => `<tr><td>${new Date(item.created_at).toLocaleDateString("mn-MN")}</td><td class="t-strong">${safe(item.customer_label)}</td><td>${safe(item.purchased_package_label || "—")}</td><td>${safe(item.intended_package_label || "—")}</td><td>${safe(item.staff_name)}</td><td>${safe(item.notes || "—")}</td></tr>`).join("") : '<tr><td colspan="6"><div class="empty">Багцын бүртгэл алга.</div></td></tr>';
 }
 
+async function allRows(build) {
+  const data = [];
+  for (let offset = 0; ; offset += 1000) {
+    const result = await build().range(offset, offset + 999);
+    if (result.error) return result;
+    data.push(...result.data);
+    if (result.data.length < 1000) return { data, error: null };
+  }
+}
+
 async function load() {
   const session = (await sb.auth.getSession()).data.session;
   if (!session) return;
   user = session.user;
   const result = await Promise.all([
-    sb.from("customers").select("id,full_name,phone").order("full_name"),
-    sb.from("packages").select("id,name").is("archived_at", null).order("sort"),
+    allRows(() => sb.from("customers").select("id,full_name,phone").order("full_name").order("id")),
+    sb.from("packages").select("id,name,price").is("archived_at", null).eq("active", true).order("sort"),
     sb.from("staff").select("id,name,email,user_id,active").eq("active", true).order("sort"),
     sb.from("package_sales_leads").select("*").order("created_at", { ascending: false }),
     sb.from("profiles").select("role").eq("id", user.id).maybeSingle(),
-    sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_label,total_units,status,purchased_on,expires_on,notes").order("customer_label"),
-    sb.from("package_redemptions").select("id,contract_id,used_on,units,service_id,service_label,staff_id,notes,created_at").order("used_on", { ascending: false }),
+    allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_label,total_units,status,purchased_on,expires_on,notes").order("customer_label").order("id")),
+    allRows(() => sb.from("package_redemptions").select("id,contract_id,used_on,units,service_id,service_label,staff_id,notes,created_at").order("used_on", { ascending: false }).order("id")),
     sb.from("services").select("id,name,active,category").eq("active", true).neq("category", "legacy-import").order("sort"),
   ]);
+  if (result.some(item => item.error)) {
+    $("pkgSaleStatus").textContent = "Мэдээлэл ачаалж чадсангүй. Хуудсаа дахин ачаална уу.";
+    $("pkgLeadSave").disabled = true;
+    $("pkgVisitSave").disabled = true;
+    return;
+  }
+  $("pkgLeadSave").disabled = false;
+  $("pkgVisitSave").disabled = false;
   customers = result[0].data || []; packages = result[1].data || []; staff = result[2].data || []; leads = result[3].data || [];
   profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = result[7].data || [];
   options();
@@ -180,18 +234,26 @@ async function saveVisit() {
 async function saveLead() {
   const customer = customers.find((item) => String(item.id) === $("pkgLeadCustomer").value);
   const purchased = packages.find((item) => String(item.id) === $("pkgLeadPurchased").value);
-  const intended = packages.find((item) => String(item.id) === $("pkgLeadIntended").value);
   const employee = currentStaff();
   if (!customer) return alert("Үйлчлүүлэгчээ сонгоно уу.");
-  if (!purchased && !intended) return alert("Авсан эсвэл авах төлөвтэй багцаас нэгийг сонгоно уу.");
+  if (!purchased) return alert("Багцаа сонгоно уу.");
+  const bank = $("pkgSaleBank").value, amount = Number($("pkgSaleAmount").value), date = $("pkgSaleDate").value;
+  if (!date || !['golomt','khan','cash','invoice','barter'].includes(bank) || !Number.isSafeInteger(amount) || amount <= 0) return alert("Огноо, төлбөрийн банк болон зөв дүн оруулна уу.");
   if (!employee && !["owner", "admin"].includes(profile.role)) return alert("Бүртгэх ажилтны нэрийг сонгоно уу.");
-  const button = $("pkgLeadSave"); button.disabled = true;
-  const { data, error } = await sb.from("package_sales_leads").insert({ customer_id: customer.id, customer_label: customer.full_name, purchased_package_id: purchased?.id || null, purchased_package_label: purchased?.name || null, intended_package_id: intended?.id || null, intended_package_label: intended?.name || null, staff_id: employee?.id || null, staff_name: employee?.name || user.email, notes: $("pkgLeadNotes").value.trim() || null }).select().single();
-  button.disabled = false;
-  if (error) return alert("Хадгалж чадсангүй: " + error.message);
-  leads.unshift(data);
-  ["pkgLeadCustomer", "pkgLeadPurchased", "pkgLeadIntended", "pkgLeadNotes"].forEach((id) => { $(id).value = ""; });
-  renderLeads();
+  const button = $("pkgLeadSave");
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const { data, error } = await sb.from("sales").insert({ sale_date: date, customer_id: customer.id, customer_name: customer.full_name, phone: customer.phone || null, services: `Багц: ${purchased.name}`, staff_id: employee?.id || null, therapist: employee?.name || null, [bank]: amount, source: 'manual', created_by: user.id, needs_review: false, note: $("pkgLeadNotes").value.trim() || null }).select().single();
+    if (error) throw error;
+    window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data }));
+    ['pkgLeadCustomer','pkgLeadPurchased','pkgLeadNotes','pkgSaleSearch','pkgSaleBank','pkgSaleAmount'].forEach(id => { $(id).value = ''; });
+    $("pkgSalePrice").value = '—';
+    $("pkgSaleStatus").textContent = `Борлуулалт бүртгэгдлээ · ${money(amount)}`;
+    renderSaleCustomers();
+  } catch (error) {
+    alert("Борлуулалт хадгалж чадсангүй: " + error.message);
+  } finally { button.disabled = false; }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -199,6 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pkgLeadSave").addEventListener("click", saveLead);
   $("pkgVisitSave").addEventListener("click", saveVisit);
   $("sharedStaffSelect")?.addEventListener("change", () => { options(); renderLeads(); });
+  window.addEventListener("cryo:staff-changed", () => { options(); renderLeads(); });
   sb.auth.onAuthStateChange((_event, session) => session && setTimeout(load, 0));
   load();
 });

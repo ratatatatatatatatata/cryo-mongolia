@@ -20,6 +20,7 @@ const publicFiles = [
   "admin.css",
   "admin.js",
   "package-workspace.js",
+  "name-search.js",
   "cabin.html",
   "hub.html",
   "ledpro.html",
