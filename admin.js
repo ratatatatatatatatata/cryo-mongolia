@@ -986,12 +986,25 @@ function renderBookingSchedule() {
   if (!date.value) date.value = bookingDateToday();
   if (!date.dataset.wired) {
     date.dataset.wired = '1';
-    $("bkFromDate").value=bookingDateToday();
+    $("bkFromDate").value=isAdminUser() ? '' : bookingDateToday();
+    $("bkAllDates").addEventListener('click', () => {
+      $("bkFromDate").value=isAdminUser() ? '' : bookingDateToday();
+      $("bkToDate").value='';
+      bkFilter='all'; bkDevice='all';
+      $("bkFilters").querySelectorAll('[data-status]').forEach(button => button.classList.toggle('on', button.dataset.status==='all'));
+      renderBookings();
+    });
     ['bkFromDate','bkToDate'].forEach(id => $(id).addEventListener('change',renderBookings));
     date.addEventListener('change', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); });
     $("bkNewCancel").addEventListener('click', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; });
     $("bkNewSave").addEventListener('click', saveStaffBooking);
   }
+  if (date.dataset.filterRole !== me?.role) {
+    date.dataset.filterRole=me?.role || '';
+    $("bkFromDate").value=isAdminUser() ? '' : (bkFilter==='done' ? '' : bookingDateToday());
+    $("bkToDate").value='';
+  }
+  $("bkAllDates").hidden=!isAdminUser();
   date.min=me?.role==='staff' && bkFilter!=='done' ? bookingDateToday() : '';
   if (date.min && date.value<date.min) date.value=date.min;
   tabs.replaceChildren();
