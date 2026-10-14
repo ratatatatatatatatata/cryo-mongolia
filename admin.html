@@ -36,6 +36,7 @@
     <div id="authMsg"></div>
 
 <script type="module" src="package-workspace.js"></script>
+<script type="module" src="sports-teams.js"></script>
 
     <form id="authForm">
       <div class="field" id="nameField" style="display:none;">
@@ -99,6 +100,7 @@
     <button class="nav-item" data-view="messages" id="navMessages"><span class="ic">✉</span> Хүсэлт</button>
     <button class="nav-item" data-view="services" id="navServices"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
     <button class="nav-item" data-view="packages" id="navPackages"><span class="ic">◎</span> Багц</button>
+    <button class="nav-item" data-view="sportsTeams" id="navSportsTeams"><span class="ic">♧</span> Спортын баг</button>
     <button class="nav-item" data-view="staff" id="navStaff"><span class="ic">♙</span> Ажилтнууд</button>
     <button class="nav-item" data-view="attendance" id="navAttendance"><span class="ic">◷</span> Ээлж, ирц</button>
     <button class="nav-item" data-view="payroll" id="navPayroll"><span class="ic">₮</span> Цалин</button>
@@ -714,6 +716,7 @@
     </section>
 
     <!-- ── PACKAGES ── -->
+    <section class="view" data-panel="sportsTeams" id="sportsTeamsPanel"></section>
     <section class="view" data-panel="packages">
       <div id="packageOperations"></div>
       <div class="page-head">

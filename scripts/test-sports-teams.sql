@@ -1,0 +1,34 @@
+begin;
+do $$
+declare actor uuid; employee bigint; service_ids bigint[]; team public.sports_teams%rowtype; other public.sports_teams%rowtype;
+ member_ids bigint[]; request uuid:=gen_random_uuid(); inserted integer; rejected boolean:=false;
+begin
+ select id into actor from public.profiles where role='staff' and lower(email)='cryomongolia@gmail.com';
+ select id into employee from public.staff where active order by id limit 1;
+ select array_agg(id) into service_ids from (select id from public.services where active and category<>'legacy-import' order by id limit 2) s;
+ perform set_config('request.jwt.claim.sub',actor::text,true);
+ execute 'set local role authenticated';
+ team:=public.create_sports_team('QA rollback sports team',array['QA Бат','QA Сараа'],request);
+ other:=public.create_sports_team('QA rollback sports team',array['QA Бат','QA Сараа'],request);
+ if team.id<>other.id then raise exception 'Duplicate team created'; end if;
+ select array_agg(id) into member_ids from public.sports_team_members where team_id=team.id;
+ if cardinality(member_ids)<>2 then raise exception 'Roster was not saved atomically'; end if;
+ request:=gen_random_uuid();
+ inserted:=public.record_sports_team_visit(team.id,member_ids,service_ids,now(),employee,'QA rollback',request);
+ if inserted<>4 then raise exception 'Expected 2 members x 2 devices'; end if;
+ inserted:=public.record_sports_team_visit(team.id,member_ids,service_ids,now(),employee,'QA rollback',request);
+ if inserted<>0 then raise exception 'Retry duplicated visits'; end if;
+ other:=public.create_sports_team('QA rollback other team',array['Other member'],gen_random_uuid());
+ begin perform public.record_sports_team_visit(other.id,member_ids,service_ids,now(),employee,'QA rollback',gen_random_uuid());
+ exception when raise_exception then rejected:=true; end;
+ if not rejected then raise exception 'Wrong team member accepted'; end if;
+ if (select count(*) from public.sports_team_visits where team_id=team.id)<>4 then raise exception 'Visit count incorrect'; end if;
+ execute 'reset role';
+ perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ rejected:=false;
+ begin perform public.create_sports_team('Unauthorized',array['No access'],gen_random_uuid());
+ exception when insufficient_privilege then rejected:=true; end;
+ if not rejected then raise exception 'Nonemployee permitted'; end if;
+end $$;
+rollback;
+select 'Sports team creation, roster, batch visits, retry deduplication, membership and employee permissions passed; all tests rolled back' as result;

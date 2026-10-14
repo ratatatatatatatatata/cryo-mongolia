@@ -22,6 +22,8 @@ const publicFiles = [
   "package-workspace.js",
   "name-search.js",
   "booking-time.js",
+  "sports-teams.js",
+  "excel-export.js",
   "cabin.html",
   "hub.html",
   "ledpro.html",
