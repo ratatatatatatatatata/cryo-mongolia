@@ -6,6 +6,7 @@
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { matchesName } from "./name-search.js";
+import "./booking-time.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const $ = (id) => document.getElementById(id);
@@ -58,6 +59,7 @@ let cache = {
 };
 let bkFilter = "all";
 let bkDevice = "all";
+let bkSelectedSlot = null;
 let cpkSearch = "";
 let cpkStatus = "all";
 let cpkPkg = "all";
@@ -872,9 +874,11 @@ function renderBookings() {
   const body = $("bkBody");
   body.innerHTML = "";
   syncBookingDeviceFilter();
+  renderBookingSchedule();
   const rows = cache.bookings
     .filter((b) => bkFilter === "all" || b.status === bkFilter)
-    .filter((b) => bkDevice === "all" || String(b.service_id || "") === bkDevice);
+    .filter((b) => bkDevice === "all" || (String(b.service_id || "") === bkDevice && b.booked_date === $("bkScheduleDate").value))
+    .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
     body.innerHTML = '<tr><td colspan="6"><div class="empty">Захиалга алга байна.</div></td></tr>';
@@ -925,6 +929,7 @@ function renderBookings() {
       }
       b.status = sel.value;
       renderOverview();
+      renderBookingSchedule();
     });
     st.appendChild(sel);
     tr.appendChild(st);
@@ -945,6 +950,91 @@ function syncBookingDeviceFilter() {
     select.dataset.wired = "1";
     select.addEventListener("change", () => { bkDevice = select.value; renderBookings(); });
   }
+}
+
+function bookingDateToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+}
+
+function renderBookingSchedule() {
+  const tabs = $("bkDeviceTabs"), date = $("bkScheduleDate"), grid = $("bkScheduleSlots");
+  if (!tabs || !date || !grid) return;
+  if (!date.value) date.value = bookingDateToday();
+  if (!date.dataset.wired) {
+    date.dataset.wired = '1';
+    date.addEventListener('change', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); });
+    $("bkNewCancel").addEventListener('click', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; });
+    $("bkNewSave").addEventListener('click', saveStaffBooking);
+  }
+  tabs.replaceChildren();
+  const devices = cache.services.filter(service => service.active && service.category !== 'legacy-import');
+  [{id:'all', name:'Бүх захиалга'}, ...devices].forEach(service => {
+    const button = document.createElement('button');
+    button.className = 'chip-btn' + (String(service.id) === bkDevice ? ' on' : '');
+    button.textContent = service.name;
+    button.setAttribute('aria-pressed', String(String(service.id) === bkDevice));
+    button.onclick = () => { bkDevice = String(service.id); bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); };
+    tabs.appendChild(button);
+  });
+  grid.replaceChildren();
+  const service = devices.find(item => String(item.id) === bkDevice);
+  $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Сул цаг дээр дарж захиалга бүртгэнэ.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
+  if (!service || !date.value) return;
+  const duration = Number(service.duration_minutes) || 30;
+  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled');
+  for (let minute = 9 * 60; minute + duration <= 21 * 60; minute += 30) {
+    const time = `${String(Math.floor(minute / 60)).padStart(2,'0')}:${String(minute % 60).padStart(2,'0')}`;
+    const startsAt = `${date.value}T${time}:00+08:00`, start = Date.parse(startsAt);
+    const end = start + CryoSchedule.blockedMinutes(duration) * 60000;
+    const occupied = bookings.find(row => CryoSchedule.overlaps(start, end, Date.parse(row.starts_at), Date.parse(row.blocked_until || row.ends_at)));
+    const past = start < Date.now();
+    const button = document.createElement('button');
+    button.className = 'booking-slot';
+    button.disabled = !!occupied || past;
+    const label = document.createElement('strong'), detail = document.createElement('small');
+    label.textContent = time;
+    detail.textContent = occupied ? `Захиалгатай · ${occupied.customer_name || ''}` : past ? 'Өнгөрсөн цаг' : 'Сул · Бүртгэх';
+    button.append(label, detail);
+    button.onclick = () => {
+      bkSelectedSlot = { serviceId: service.id, startsAt };
+      $("bkNewTitle").textContent = `${service.name} · ${date.value} ${time}`;
+      $("bkNewStatus").textContent = '';
+      $("bkNewForm").hidden = false;
+      $("bkNewName").focus();
+    };
+    grid.appendChild(button);
+  }
+}
+
+async function saveStaffBooking() {
+  const button = $("bkNewSave"), slot = bkSelectedSlot;
+  if (button.disabled || !slot) return;
+  const name = $("bkNewName").value.trim(), phone = $("bkNewPhone").value.trim();
+  if (!name || !phone) return alert('Үйлчлүүлэгчийн нэр, утсаа оруулна уу.');
+  if (Date.parse(slot.startsAt) <= Date.now()) return alert('Өнгөрсөн цагт захиалга бүртгэх боломжгүй.');
+  const employee = selectedSharedStaff();
+  if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
+  button.disabled = true;
+  try {
+    const { data, error } = await sb.from('bookings').insert({
+      ref: 'STAFF-' + crypto.randomUUID(), customer_name: name, phone,
+      service_id: slot.serviceId, starts_at: slot.startsAt,
+      booking_kind: $("bkNewKind").value, status: 'confirmed', amount: 0, deposit: 0,
+      user_id: null,
+      note: `Ажилтнаар бүртгэсэн: ${employee?.name || me?.full_name || me?.email || ''}. ${$("bkNewNote").value.trim()}`,
+    }).select().single();
+    if (error) throw error;
+    cache.bookings = [data, ...cache.bookings.filter(row => row.id !== data.id)];
+    bkSelectedSlot = null;
+    ['bkNewName','bkNewPhone','bkNewNote'].forEach(id => { $(id).value = ''; });
+    $("bkNewForm").hidden = true;
+    renderBookings();
+    renderOverview();
+  } catch (error) {
+    $("bkNewStatus").textContent = error.code === '23P01' ? 'Энэ цаг дөнгөж захиалагдлаа. Өөр сул цаг сонгоно уу.' : 'Хадгалж чадсангүй: ' + error.message;
+    const refreshed = await fetchAll(() => sb.from('bookings').select('*').order('id'));
+    if (!refreshed.error) { cache.bookings = refreshed.data || []; renderBookings(); }
+  } finally { button.disabled = false; }
 }
 
 /* ══════════════════════════════════════════════════════════════

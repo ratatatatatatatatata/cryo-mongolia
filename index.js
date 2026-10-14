@@ -187,7 +187,7 @@ function isUnavailable(start, finishWithBuffer) {
   const localBusy = bk.selections.some((item) => {
     if (Number(item.service.id) !== serviceId) return false;
     const occupiedStart = new Date(slotIso(item.dateKey, item.time)).getTime();
-    const occupiedEnd = occupiedStart + ((Number(item.service.duration_minutes) || 30) + 2) * 60000;
+    const occupiedEnd = occupiedStart + CryoSchedule.blockedMinutes(item.service.duration_minutes) * 60000;
     return start < occupiedEnd && finishWithBuffer > occupiedStart;
   });
   return remoteBusy || localBusy;
@@ -208,7 +208,7 @@ function buildTimeGrid() {
     const mm = String(minute % 60).padStart(2, "0");
     const time = `${hh}:${mm}`;
     const start = new Date(slotIso(bk.dateKey, time)).getTime();
-    const finishWithBuffer = start + (duration + 2) * 60000;
+    const finishWithBuffer = start + CryoSchedule.blockedMinutes(duration) * 60000;
     const busy = isUnavailable(start, finishWithBuffer);
     const slot = document.createElement("button");
     slot.type = "button";

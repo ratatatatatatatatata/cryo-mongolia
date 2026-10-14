@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import '../booking-time.js';
+const { blockedMinutes, overlaps } = globalThis.CryoSchedule;
+for (const duration of [3, 15, 20, 29, 30]) assert.equal(blockedMinutes(duration), 30);
+for (const duration of [31, 45, 60, 90]) assert.equal(blockedMinutes(duration), duration + 2);
+assert.equal(overlaps(0, 30, 30, 60), false, 'adjacent half hours are bookable');
+assert.equal(overlaps(0, 30, 15, 45), true, 'short service reserves whole half hour');
+assert.equal(overlaps(60, 90, 0, 62), true, 'long service retains reset buffer');
+assert.equal(overlaps(90, 120, 0, 62), false);
+console.log('13 booking timing tests passed');

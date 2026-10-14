@@ -634,13 +634,31 @@
           <div class="page-sub">Төлөв солих, дэлгэрэнгүй харах</div>
         </div>
         <div class="filters" id="bkFilters">
-          <select class="ctl sm" id="bkDevice" aria-label="Төхөөрөмжөөр шүүх"><option value="all">Бүх төхөөрөмж</option></select>
+          <select class="ctl sm" id="bkDevice" aria-label="Төхөөрөмжөөр шүүх" hidden><option value="all">Бүх төхөөрөмж</option></select>
           <button class="chip-btn on" data-status="all">Бүгд</button>
           <button class="chip-btn" data-status="pending">Хүлээгдэж буй</button>
           <button class="chip-btn" data-status="confirmed">Баталгаажсан</button>
           <button class="chip-btn" data-status="done">Биелсэн</button>
           <button class="chip-btn" data-status="cancelled">Цуцалсан</button>
         </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Төхөөрөмж сонгох</div>
+        <div class="booking-device-tabs" id="bkDeviceTabs"></div>
+        <div class="field"><label for="bkScheduleDate">Өдөр</label><input class="ctl" type="date" id="bkScheduleDate"></div>
+        <p class="page-sub" id="bkScheduleHint">Төхөөрөмж дээр дарж цагуудыг харна уу.</p>
+        <div class="booking-slot-grid" id="bkScheduleSlots"></div>
+      </div>
+      <div class="panel" id="bkNewForm" hidden>
+        <div class="panel-head"><div class="panel-title" id="bkNewTitle">Сул цагт захиалга бүртгэх</div></div>
+        <div class="form-grid">
+          <div class="field"><label for="bkNewName">Үйлчлүүлэгчийн нэр *</label><input class="ctl" id="bkNewName" maxlength="200" autocomplete="off"></div>
+          <div class="field"><label for="bkNewPhone">Утас *</label><input class="ctl" id="bkNewPhone" type="tel" maxlength="30"></div>
+          <div class="field"><label for="bkNewKind">Захиалгын төрөл</label><select class="ctl" id="bkNewKind"><option value="standard">Энгийн үйлчилгээ</option><option value="package">Багцын эрхээр</option></select></div>
+          <div class="field"><label for="bkNewNote">Тэмдэглэл</label><input class="ctl" id="bkNewNote" maxlength="1000"></div>
+        </div>
+        <p class="page-sub">Энэ нь зөвхөн цаг захиална. Төлбөр болон багцын ашиглалтыг тусад нь бүртгэнэ.</p>
+        <div class="form-actions"><button class="btn-sm primary" id="bkNewSave">Захиалга бүртгэх</button><button class="btn-sm ghost" id="bkNewCancel">Болих</button><span id="bkNewStatus" role="status"></span></div>
       </div>
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
