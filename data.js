@@ -53,6 +53,16 @@ window.cryoData = {
     }
   },
 
+  async saveBookings(rows) {
+    if (!sb) return { skipped: true };
+    if (!Array.isArray(rows) || !rows.length) return { error: new Error("Захиалгын үйлчилгээ сонгоогүй") };
+    try {
+      return await sb.from("bookings").insert(rows).select("id,ref,booking_group");
+    } catch (e) {
+      return { error: e };
+    }
+  },
+
   async saveMessage(row) {
     if (!sb) return { skipped: true };
     try {

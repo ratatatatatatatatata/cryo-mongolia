@@ -566,11 +566,15 @@
 
     <div class="step-panel active" id="step1">
       <h3 style="font-family:var(--ff-display);font-size:25px;font-weight:600;margin-bottom:6px;">Цаг захиалах</h3>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">Огноо болон цагаа сонгоно уу</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">Нэг эсвэл олон үйлчилгээний огноо, цагаа сонгоно уу</p>
       <div class="form-split">
         <div class="form-group"><label>Нэр</label><input type="text" id="b_name" placeholder="Таны нэр"/></div>
         <div class="form-group"><label>Утас</label><input type="tel" id="b_phone" placeholder="+976 ···· ····"/></div>
       </div>
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:14px;border:1px solid rgba(110,196,255,.22);border-radius:12px;background:rgba(63,160,220,.07);cursor:pointer">
+        <input type="checkbox" id="b_package" onchange="togglePackageBooking(this.checked)" style="margin-top:3px;accent-color:#58c6ff"/>
+        <span><b style="display:block;color:var(--text-primary);font-size:13px">Багцын эрхээр цаг авах</b><span style="font-size:11.5px;color:var(--text-muted)">Урьдчилгаа төлөхгүй. Админ таны нэр, утсаар багцын үлдэгдлийг шалгаж баталгаажуулна.</span></span>
+      </label>
       <div class="form-group">
         <label for="b_service">Төхөөрөмж / үйлчилгээ</label>
         <select id="b_service" onchange="pickService(this.value)">
@@ -578,7 +582,7 @@
         </select>
         <div id="bookingDurationHint" style="font-size:11.5px;color:var(--text-muted);margin-top:7px;">Эхлээд төхөөрөмжөө сонгоно уу</div>
       </div>
-      <div class="deposit-badge">
+      <div class="deposit-badge" id="bookingDepositBadge">
         <div class="dep-amount">₮100,000</div>
         <div class="dep-info"><div class="dep-title">Урьдчилгаа төлбөр</div><div class="dep-sub">Цаг баталгаажуулахад шаардлагатай.<br>Үлдэгдлийг ирэхдээ бэлнээр төлнө.</div></div>
       </div>
@@ -590,6 +594,8 @@
       </div>
       <label style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);display:block;margin-top:4px;">Цаг сонгох</label>
       <div class="time-grid" id="timeGrid" style="margin-top:8px;"></div>
+      <button type="button" class="btn btn-outline" id="addBookingService" style="width:100%;margin-top:14px;" onclick="addBookingSelection()">+ Сонгосон үйлчилгээг нэмэх</button>
+      <div id="bookingSelections" style="display:grid;gap:8px;margin-top:14px;"></div>
       <button class="btn btn-primary" style="width:100%;margin-top:22px;" onclick="goStep2()">Үргэлжлүүлэх →</button>
     </div>
 
@@ -597,10 +603,10 @@
       <h3 style="font-family:var(--ff-display);font-size:25px;font-weight:600;margin-bottom:6px;">Төлбөр</h3>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Банкаа сонгоод QR код авна уу</p>
       <div class="order-summary">
-        <div class="order-row"><span>Төхөөрөмж</span><span id="sum_service">–</span></div>
-        <div class="order-row"><span>Огноо</span><span id="sum_date">–</span></div>
-        <div class="order-row"><span>Цаг</span><span id="sum_time">–</span></div>
-        <div class="order-row"><span>Урьдчилгаа</span><span>₮100,000</span></div>
+        <div class="order-row"><span>Үйлчилгээ</span><span id="sum_service">–</span></div>
+        <div class="order-row"><span>Хуваарь</span><span id="sum_date">–</span></div>
+        <div class="order-row"><span>Нийт цаг</span><span id="sum_time">–</span></div>
+        <div class="order-row"><span>Урьдчилгаа</span><span id="sum_deposit">₮100,000</span></div>
       </div>
       <label style="font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:8px;">Банк сонгох</label>
       <div class="bank-grid">
@@ -615,7 +621,7 @@
       </div>
       <div style="display:flex;gap:10px;margin-top:22px;">
         <button class="btn btn-outline" style="flex:1;" onclick="goStepNum(1)">← Буцах</button>
-        <button class="btn btn-primary" style="flex:2;" onclick="showQR()">QR код авах →</button>
+        <button class="btn btn-primary" id="bookingPayButton" style="flex:2;" onclick="showQR()">QR код авах →</button>
       </div>
     </div>
 
@@ -637,7 +643,7 @@
             <rect x="80" y="70" width="5" height="5" fill="#333"/><rect x="73" y="80" width="5" height="5" fill="#333"/>
           </svg>
         </div>
-        <div class="qr-amount">Урьдчилгаа: <strong>₮100,000</strong></div>
+        <div class="qr-amount">Нийт захиалгын урьдчилгаа: <strong>₮100,000</strong></div>
         <div class="qr-timer">Хүчинтэй: <span id="qrTimer">09:59</span></div>
         <p class="qr-note">Банкны аппликейшнаа нээж QR кодыг уншуулна уу.<br>Төлбөр амжилттай болсны дараа захиалга баталгаажна.</p>
         <button class="btn-ghost" onclick="goStepNum(2)">← Өөр банк сонгох</button>

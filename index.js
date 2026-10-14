@@ -71,12 +71,12 @@ function toggleMenu() {
    BOOKING SYSTEM
 ════════════════════════════════════════ */
 
-const SLOT_STEP_MINUTES = 5;
+const SLOT_STEP_MINUTES = 30;
 const OPEN_MINUTES = 9 * 60;
 const CLOSE_MINUTES = 21 * 60;
 const WD = ["Ням", "Дав", "Мяг", "Лха", "Пүр", "Баа", "Бям"];
 
-let bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [] };
+let bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [], selections: [], packageBooking: false };
 let dateOffset = 0;
 const DATE_SHOW = 7;
 let qrInterval = null;
@@ -98,7 +98,7 @@ function slotIso(dateKey, time) {
   return `${dateKey}T${time}:00+08:00`;
 }
 function minutesLabel(n) {
-  return `${n} минут + 2 минутын төхөөрөмж бэлтгэх завсар`;
+  return `${n} минут · цагийн сонголт 30 минутын зайтай`;
 }
 function activeService() {
   return bk.services.find((s) => Number(s.id) === Number(bk.service?.id)) || bk.service;
@@ -178,11 +178,19 @@ async function pickDate(key, el) {
 }
 
 function isUnavailable(start, finishWithBuffer) {
-  return bk.blocks.some((block) => {
+  const serviceId = Number(activeService()?.id || 0);
+  const remoteBusy = bk.blocks.some((block) => {
     const occupiedStart = new Date(block.starts_at).getTime();
     const occupiedEnd = new Date(block.blocked_until || block.ends_at).getTime();
     return start < occupiedEnd && finishWithBuffer > occupiedStart;
   });
+  const localBusy = bk.selections.some((item) => {
+    if (Number(item.service.id) !== serviceId) return false;
+    const occupiedStart = new Date(slotIso(item.dateKey, item.time)).getTime();
+    const occupiedEnd = occupiedStart + ((Number(item.service.duration_minutes) || 30) + 2) * 60000;
+    return start < occupiedEnd && finishWithBuffer > occupiedStart;
+  });
+  return remoteBusy || localBusy;
 }
 
 function buildTimeGrid() {
@@ -219,6 +227,46 @@ function pickTime(time, el) {
   el.classList.add("selected");
 }
 
+function togglePackageBooking(checked) {
+  bk.packageBooking = !!checked;
+  const badge = document.getElementById("bookingDepositBadge");
+  if (badge) badge.style.display = checked ? "none" : "flex";
+  renderBookingSelections();
+}
+
+function addBookingSelection() {
+  const service = activeService();
+  if (!service) return showToast("Төхөөрөмж сонгоно уу");
+  if (!bk.dateKey) return showToast("Огноо сонгоно уу");
+  if (!bk.time) return showToast("Цаг сонгоно уу");
+  const duplicate = bk.selections.some((item) => Number(item.service.id) === Number(service.id) && item.dateKey === bk.dateKey && item.time === bk.time);
+  if (duplicate) return showToast("Энэ үйлчилгээ, цаг аль хэдийн нэмэгдсэн байна");
+  bk.selections.push({ service: { ...service }, dateKey: bk.dateKey, time: bk.time });
+  bk.time = "";
+  renderBookingSelections();
+  buildTimeGrid();
+}
+
+function removeBookingSelection(index) {
+  bk.selections.splice(index, 1);
+  renderBookingSelections();
+  buildTimeGrid();
+}
+
+function renderBookingSelections() {
+  const host = document.getElementById("bookingSelections");
+  if (!host) return;
+  if (!bk.selections.length) {
+    host.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px">Одоогоор үйлчилгээ нэмээгүй.</div>';
+    return;
+  }
+  host.innerHTML = bk.selections.map((item, index) => {
+    const d = new Date(item.dateKey + "T12:00:00");
+    const when = `${d.getMonth() + 1}/${d.getDate()} · ${item.time}`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid rgba(110,196,255,.2);border-radius:10px;background:rgba(255,255,255,.025)"><div><b style="display:block;font-size:12.5px;color:var(--text-primary)">${item.service.name}</b><span style="font-size:11.5px;color:var(--text-muted)">${when}</span></div><button type="button" class="btn-ghost" style="margin:0" onclick="removeBookingSelection(${index})">Хасах</button></div>`;
+  }).join("");
+}
+
 function setStepDots(active) {
   [1, 2, 3].forEach((i) => {
     const dot = document.getElementById("dot" + i);
@@ -242,13 +290,14 @@ function goStep2() {
   const phone = document.getElementById("b_phone")?.value.trim();
   if (!name) return shakeInput("b_name");
   if (!phone) return shakeInput("b_phone");
-  if (!bk.service) return showToast("Төхөөрөмж сонгоно уу");
-  if (!bk.dateKey) return showToast("Огноо сонгоно уу");
-  if (!bk.time) return showToast("Цаг сонгоно уу");
-  const d = new Date(bk.dateKey + "T00:00:00");
-  setText("sum_service", bk.service.name);
-  setText("sum_date", `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${WD[d.getDay()]})`);
-  setText("sum_time", `${bk.time} · ${minutesLabel(bk.service.duration_minutes)}`);
+  if (bk.service && bk.dateKey && bk.time) addBookingSelection();
+  if (!bk.selections.length) return showToast("Дор хаяж нэг үйлчилгээ, цаг нэмнэ үү");
+  setText("sum_service", `${bk.selections.length} үйлчилгээ`);
+  setText("sum_date", bk.selections.map((item) => `${item.dateKey.slice(5)} ${item.time}`).join(" · "));
+  setText("sum_time", `${bk.selections.reduce((sum, item) => sum + (Number(item.service.duration_minutes) || 30), 0)} минут`);
+  setText("sum_deposit", bk.packageBooking ? "Багцын эрхээр" : "₮100,000 (нийт нэг удаа)");
+  const payButton = document.getElementById("bookingPayButton");
+  if (payButton) payButton.textContent = bk.packageBooking ? "Захиалга баталгаажуулах →" : "QR код авах →";
   setStepDots(2);
   showPanel("step2");
 }
@@ -261,6 +310,7 @@ function selectBank(el, id, name) {
 }
 
 function showQR() {
+  if (bk.packageBooking) return doConfirm();
   if (!bk.bank) return showToast("Банкаа сонгоно уу");
   setText("qrBankName", bk.bankName.toUpperCase() + " — QPAY");
   setStepDots(2);
@@ -288,8 +338,7 @@ function startTimer() {
 
 async function doConfirm() {
   if (qrInterval) clearInterval(qrInterval);
-  const service = activeService();
-  if (!service || !bk.dateKey || !bk.time) return goStepNum(1);
+  if (!bk.selections.length) return goStepNum(1);
   const ref = "CRYO-" + Date.now().toString(36).toUpperCase();
   const name = document.getElementById("b_name")?.value || "";
   const phone = document.getElementById("b_phone")?.value || "";
@@ -298,18 +347,23 @@ async function doConfirm() {
     showToast("Захиалгын системтэй холбогдож чадсангүй");
     return goStepNum(1);
   }
-  const result = await window.cryoData.saveBooking({
-    ref,
+  const rows = bk.selections.map((item, index) => ({
+    ref: index ? `${ref}-${index + 1}` : ref,
+    booking_group: ref,
+    booking_kind: bk.packageBooking ? "package" : "standard",
     customer_name: name || "—",
     phone,
-    service_id: service.id,
-    starts_at: slotIso(bk.dateKey, bk.time),
-    amount: 100000,
-    deposit: 100000,
-    bank: bk.bankName || null,
+    service_id: item.service.id,
+    starts_at: slotIso(item.dateKey, item.time),
+    amount: bk.packageBooking ? 0 : (index === 0 ? 100000 : 0),
+    deposit: bk.packageBooking ? 0 : (index === 0 ? 100000 : 0),
+    bank: bk.packageBooking ? null : (bk.bankName || null),
+    package: bk.packageBooking ? "Багцын эрхээр — админ шалгана" : null,
+    note: `Нэгдсэн захиалга ${index + 1}/${bk.selections.length}`,
     status: "pending",
     user_id: userId,
-  });
+  }));
+  const result = await window.cryoData.saveBookings(rows);
   if (result?.error) {
     const conflict = result.error.code === "23P01" || /overlap|conflict/i.test(result.error.message || "");
     showToast(conflict ? "Энэ цаг дөнгөж захиалагдлаа. Өөр цаг сонгоно уу." : "Захиалга хадгалахад алдаа гарлаа.");
@@ -317,13 +371,12 @@ async function doConfirm() {
     await refreshAvailability();
     return;
   }
-  const d = new Date(bk.dateKey + "T00:00:00");
   setText("bookingRef", ref);
   const det = document.getElementById("confirmDetails");
   if (det) det.innerHTML =
     `<strong style="color:var(--text-primary)">${name}</strong> · ${phone}<br>` +
-    `❄ ${service.name}<br>📅 ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} · ⏰ ${bk.time}<br>` +
-    `<span style="color:var(--accent);font-size:12px;">✓ ₮100,000 — ${bk.bankName}</span>`;
+    bk.selections.map((item) => `❄ ${item.service.name} · ${item.dateKey} · ⏰ ${item.time}`).join("<br>") + "<br>" +
+    `<span style="color:var(--accent);font-size:12px;">✓ ${bk.packageBooking ? "Багцын эрхээр — админ үлдэгдлийг шалгана" : `₮100,000 — ${bk.bankName}`}</span>`;
   setStepDots(3);
   showPanel("step3");
 }
@@ -334,11 +387,15 @@ function openModal() {
 }
 
 async function openBookingModal() {
-  bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [] };
+  bk = { dateKey: "", time: "", bank: "", bankName: "", service: null, services: [], blocks: [], selections: [], packageBooking: false };
   dateOffset = 0;
   buildDateTabs();
   buildTimeGrid();
   document.querySelectorAll(".bank-btn").forEach((b) => b.classList.remove("selected"));
+  const packageToggle = document.getElementById("b_package");
+  if (packageToggle) packageToggle.checked = false;
+  togglePackageBooking(false);
+  renderBookingSelections();
   const prof = window.cryoAuth?.profile;
   const nameEl = document.getElementById("b_name");
   const phoneEl = document.getElementById("b_phone");
