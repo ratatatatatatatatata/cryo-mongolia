@@ -154,13 +154,18 @@ function fmtDate(v) {
   $("denyOut").addEventListener("click", () => sb.auth.signOut());
   $("refreshBtn").addEventListener("click", loadAll);
 
-  sb.auth.onAuthStateChange(() => route());
+  sb.auth.onAuthStateChange((event, session) => {
+    if (session && session.user.id === me?.id && ['SIGNED_IN','TOKEN_REFRESHED','INITIAL_SESSION'].includes(event)) return;
+    setTimeout(route, 0);
+  });
   await route();
 })();
 
 async function route() {
   const { data } = await sb.auth.getSession();
   const session = data.session;
+
+  if (session && session.user.id === me?.id && $("shell").style.display !== "none") return;
 
   if (!session) {
     me = null;

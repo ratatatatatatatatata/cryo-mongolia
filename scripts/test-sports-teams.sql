@@ -23,6 +23,22 @@ begin
  exception when raise_exception then rejected:=true; end;
  if not rejected then raise exception 'Wrong team member accepted'; end if;
  if (select count(*) from public.sports_team_visits where team_id=team.id)<>4 then raise exception 'Visit count incorrect'; end if;
+
+ request:=gen_random_uuid();
+ inserted:=public.record_sports_member_visit(team.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',45000),jsonb_build_object('service_id',service_ids[2],'price',0)),now(),employee,'Individual prices',request);
+ if inserted<>2 then raise exception 'Individual device visits missing'; end if;
+ if (select sum(price) from public.sports_team_visits where request_id=request)<>45000 then raise exception 'Prices not preserved'; end if;
+ if exists(select 1 from public.sports_team_visits where request_id=request and member_id<>member_ids[1]) then raise exception 'Wrong member received visit'; end if;
+ inserted:=public.record_sports_member_visit(team.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',45000)),now(),employee,'Retry',request);
+ if inserted<>0 then raise exception 'Individual retry duplicated'; end if;
+ rejected:=false;
+ begin perform public.record_sports_member_visit(team.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',-1)),now(),employee,'Negative',gen_random_uuid());
+ exception when raise_exception then rejected:=true; end;
+ if not rejected then raise exception 'Negative price accepted'; end if;
+ rejected:=false;
+ begin perform public.record_sports_member_visit(other.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',10)),now(),employee,'Wrong team',gen_random_uuid());
+ exception when raise_exception then rejected:=true; end;
+ if not rejected then raise exception 'Wrong individual team accepted'; end if;
  execute 'reset role';
  perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
  rejected:=false;
@@ -31,4 +47,4 @@ begin
  if not rejected then raise exception 'Nonemployee permitted'; end if;
 end $$;
 rollback;
-select 'Sports team creation, roster, batch visits, retry deduplication, membership and employee permissions passed; all tests rolled back' as result;
+select 'Sports team creation, roster, batch and individual priced visits, retry deduplication, membership and employee permissions passed; all tests rolled back' as result;

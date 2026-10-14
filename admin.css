@@ -176,6 +176,7 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 
 /* ── controls ── */
 .field{display:flex;flex-direction:column;gap:7px}
+#sportsTeamsPanel [hidden]{display:none!important}
 .field label{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
 input.ctl,select.ctl,textarea.ctl{
   background:rgba(3,6,12,.6);border:1px solid var(--border);color:var(--text-primary);

@@ -13,6 +13,7 @@ const todayKey = () => {
 let customers = [], packages = [], staff = [], leads = [], contracts = [], redemptions = [], services = [];
 let profile = {}, user = null, selectedContractId = null, packageSearch = "";
 let packageRequestId = crypto.randomUUID();
+let loadedUserId = null;
 const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
 
 function weekday(value) {
@@ -260,6 +261,7 @@ async function load() {
   profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = result[7].data || [];
   options();
   renderLeads();
+  loadedUserId = user.id;
 }
 
 async function saveVisit() {
@@ -326,6 +328,9 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pkgVisitSave").addEventListener("click", saveVisit);
   $("sharedStaffSelect")?.addEventListener("change", () => { options(); renderLeads(); });
   window.addEventListener("cryo:staff-changed", () => { options(); renderLeads(); });
-  sb.auth.onAuthStateChange((_event, session) => session && setTimeout(load, 0));
+  sb.auth.onAuthStateChange((_event, session) => {
+    if (!session) { loadedUserId=null; return; }
+    if (session.user.id !== loadedUserId) setTimeout(load, 0);
+  });
   load();
 });
