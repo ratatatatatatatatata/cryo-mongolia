@@ -238,12 +238,14 @@
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
           <button class="btn-sm primary" id="repSales">+ Борлуулалт бүртгэх</button>
+          <button class="btn-sm primary" id="repPackageSales" aria-controls="packageSalesOperations" aria-expanded="false">+ Багцын борлуулалт</button>
           <button class="btn-sm ghost" id="repCsv">↓ CSV татах</button>
           <button class="btn-sm ghost" id="repPrint">⎙ Хэвлэх</button>
         </div>
       </div>
 
-      <div id="packageSalesOperations"></div>
+      <div class="page-sub" id="packageSaleNotice" role="status"></div>
+      <div id="packageSalesOperations" hidden></div>
 
       <div class="panel" id="repFiltersPanel">
         <div class="filters" id="repFilters">

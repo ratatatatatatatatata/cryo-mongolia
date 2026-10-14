@@ -60,7 +60,6 @@ function panels() {
       </div>
     </div>
     <div id="pkgLeadPanel">
-      <div class="page-head" style="margin-top:26px"><div><div class="page-title">Багцын борлуулалт</div><div class="page-sub">Бүртгэсэн төлбөр өдрийн борлуулалтад орно</div></div></div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title">Багцын борлуулалт бүртгэх</div></div>
         <div class="form-grid">
@@ -76,13 +75,23 @@ function panels() {
           <div class="field"><label for="pkgSaleAmount">Бүртгэх дүн *</label><input class="ctl" type="number" min="1" step="1" id="pkgSaleAmount"></div>
           <div class="field"><label for="pkgLeadNotes">Тэмдэглэл</label><input class="ctl" id="pkgLeadNotes" maxlength="1000"></div>
         </div>
-        <div class="page-sub" id="pkgLeadStaff" style="margin-top:12px"></div><div class="form-actions"><button class="btn-sm primary" id="pkgLeadSave">Борлуулалт бүртгэх</button><span class="page-sub" id="pkgSaleStatus" role="status"></span></div>
+        <div class="page-sub" id="pkgLeadStaff" style="margin-top:12px"></div><div class="form-actions"><button class="btn-sm primary" id="pkgLeadSave">Борлуулалт бүртгэх</button><button class="btn-sm ghost" id="pkgSaleCancel">Болих</button><span class="page-sub" id="pkgSaleStatus" role="status"></span></div>
       </div>
       <details><summary>Өмнөх багцын худалдан авалт, сонирхлын бүртгэл</summary>
       <div class="panel" style="padding:0;overflow:hidden"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Авсан багц</th><th>Авах төлөвтэй</th><th>Ажилтан</th><th>Тэмдэглэл</th></tr></thead><tbody id="pkgLeadBody"></tbody></table></div></div>
       </details>
     </div>`);
   $("packageSalesOperations")?.appendChild($("pkgLeadPanel"));
+  $("repPackageSales")?.addEventListener("click", () => {
+    if ($("packageSaleNotice")) $("packageSaleNotice").textContent = '';
+    setPackageSaleOpen(true);
+    $("pkgSaleSearch").focus();
+  });
+  $("pkgSaleCancel").addEventListener("click", () => {
+    setPackageSaleOpen(false);
+    $("repPackageSales")?.focus();
+  });
+  $("repSales")?.addEventListener("click", () => setPackageSaleOpen(false));
   $("pkgVisitDate").value = todayKey();
   $("pkgSaleDate").value = todayKey();
   $("pkgSaleSearch").addEventListener("input", renderSaleCustomers);
@@ -95,6 +104,12 @@ function panels() {
     packageSearch = event.target.value.trim().toLowerCase();
     renderPackageCustomers();
   });
+}
+
+function setPackageSaleOpen(open) {
+  const host = $("packageSalesOperations");
+  if (host) host.hidden = !open;
+  $("repPackageSales")?.setAttribute('aria-expanded', String(open));
 }
 
 function used(contractId) {
@@ -251,6 +266,9 @@ async function saveLead() {
     ['pkgLeadCustomer','pkgLeadPurchased','pkgLeadNotes','pkgSaleSearch','pkgSaleBank','pkgSaleAmount'].forEach(id => { $(id).value = ''; });
     $("pkgSalePrice").value = '—';
     $("pkgSaleStatus").textContent = `Борлуулалт бүртгэгдлээ · ${money(amount)}`;
+    if ($("packageSaleNotice")) $("packageSaleNotice").textContent = $("pkgSaleStatus").textContent;
+    setPackageSaleOpen(false);
+    $("repPackageSales")?.focus();
     renderSaleCustomers();
   } catch (error) {
     alert("Борлуулалт хадгалж чадсангүй: " + error.message);
