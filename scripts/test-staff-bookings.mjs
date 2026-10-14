@@ -12,7 +12,7 @@ class Element {
   addEventListener() {}
   focus() {}
 }
-const ids=['bkDeviceTabs','bkScheduleDate','bkScheduleSlots','bkNewCancel','bkNewSave','bkNewForm','bkNewTitle','bkNewName','bkNewPhone','bkNewKind','bkNewNote','bkNewStatus','bkScheduleHint'];
+const ids=['bkFromDate','bkToDate','bkDeviceTabs','bkScheduleDate','bkScheduleSlots','bkNewCancel','bkNewSave','bkNewForm','bkNewTitle','bkNewName','bkNewPhone','bkNewKind','bkNewNote','bkNewStatus','bkScheduleHint'];
 const fields=Object.fromEntries(ids.map(id=>[id,new Element()]));
 fields.bkScheduleDate.value='2099-01-01';
 let inserted;
@@ -22,7 +22,7 @@ const context=vm.createContext({
   alert:message=>{throw new Error(message);},
   selectedSharedStaff:()=>({id:7,name:'Test employee'}), isSharedStaffAccount:()=>true,
   renderOverview(){},
-  sb:{from:table=>({insert:row=>{assert.equal(table,'bookings');inserted=row;return{select:()=>({single:async()=>({data:{id:9,...row,booked_date:'2099-01-01',blocked_until:'2099-01-01T10:00:00+08:00'},error:null})})};}})},
+  sb:{from:table=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:null})})}),insert:row=>{assert.equal(table,'bookings');inserted=row;return{select:()=>({single:async()=>({data:{id:9,...row,booked_date:'2099-01-01',blocked_until:'2099-01-01T10:00:00+08:00'},error:null})})};}})},
 });
 const source=fs.readFileSync(new URL('../admin.js',import.meta.url),'utf8');
 vm.runInContext(`let bkDevice='1',bkSelectedSlot=null,me={};let cache={services:[{id:1,name:'Short',active:true,duration_minutes:3},{id:2,name:'Long',active:true,duration_minutes:60}],bookings:[{id:1,service_id:1,customer_name:'Reserved',status:'confirmed',starts_at:'2099-01-01T09:00:00+08:00',blocked_until:'2099-01-01T09:30:00+08:00'}]};function renderBookings(){renderBookingSchedule();}`,context);

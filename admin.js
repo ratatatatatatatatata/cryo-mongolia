@@ -243,6 +243,8 @@ function setupBookingRealtime() {
       const result = await fetchAll(() => sb.from("bookings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }));
       if (!result.error) {
         cache.bookings = result.data || [];
+        const salesResult=await fetchAll(() => sb.from('sales').select('*').is('archived_at',null).order('id'));
+        if (!salesResult.error) { cache.sales=salesResult.data || []; renderReports(); renderLedger(); }
         renderBookings();
         renderOverview();
       }
@@ -374,6 +376,10 @@ function wireBookingFilters() {
       .forEach((x) => x.classList.remove("on"));
     b.classList.add("on");
     bkFilter = b.dataset.status;
+    if (me?.role==='staff') {
+      $("bkFromDate").value=bkFilter==='done' ? '' : bookingDateToday();
+      $("bkToDate").value='';
+    }
     renderBookings();
   });
 }
@@ -877,7 +883,10 @@ function renderBookings() {
   renderBookingSchedule();
   const rows = cache.bookings
     .filter((b) => bkFilter === "all" || b.status === bkFilter)
-    .filter((b) => bkDevice === "all" || (String(b.service_id || "") === bkDevice && b.booked_date === $("bkScheduleDate").value))
+    .filter(b => me?.role!=='staff' || bkFilter==='done' || b.booked_date>=bookingDateToday())
+    .filter(b => !$("bkFromDate").value || b.booked_date >= $("bkFromDate").value)
+    .filter(b => !$("bkToDate").value || b.booked_date <= $("bkToDate").value)
+    .filter((b) => bkDevice === "all" || String(b.service_id || "") === bkDevice)
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
@@ -917,19 +926,23 @@ function renderBookings() {
       if (b.status === k) o.selected = true;
       sel.appendChild(o);
     });
-    sel.disabled = !isAdminUser();
-    if (isAdminUser()) sel.addEventListener("change", async () => {
+    sel.addEventListener("change", async () => {
+      const employee = bookingEmployee();
+      if (!isAdminUser() && !employee) { sel.value=b.status; return alert('Бүртгэх ажилтны нэрээ сонгоно уу.'); }
       st.classList.add("saving");
-      const { error } = await sb.from("bookings").update({ status: sel.value }).eq("id", b.id);
+      sel.disabled=true;
+      const { data, error } = await sb.rpc('set_booking_status',{p_booking_id:b.id,p_status:sel.value,p_staff_id:employee?.id || null});
       st.classList.remove("saving");
+      sel.disabled=false;
       if (error) {
         alert("Хадгалж чадсангүй: " + error.message);
         sel.value = b.status;
         return;
       }
-      b.status = sel.value;
+      Object.assign(b,data.booking);
+      if (data.sale) window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:data.sale}));
       renderOverview();
-      renderBookingSchedule();
+      renderBookings();
     });
     st.appendChild(sel);
     tr.appendChild(st);
@@ -956,16 +969,24 @@ function bookingDateToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 }
 
+function bookingEmployee() {
+  return selectedSharedStaff() || cache.staff.find(item => item.active && (item.user_id===me?.id || (item.email && item.email.toLowerCase()===me?.email?.toLowerCase()))) || null;
+}
+
 function renderBookingSchedule() {
   const tabs = $("bkDeviceTabs"), date = $("bkScheduleDate"), grid = $("bkScheduleSlots");
   if (!tabs || !date || !grid) return;
   if (!date.value) date.value = bookingDateToday();
   if (!date.dataset.wired) {
     date.dataset.wired = '1';
+    $("bkFromDate").value=bookingDateToday();
+    ['bkFromDate','bkToDate'].forEach(id => $(id).addEventListener('change',renderBookings));
     date.addEventListener('change', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); });
     $("bkNewCancel").addEventListener('click', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; });
     $("bkNewSave").addEventListener('click', saveStaffBooking);
   }
+  date.min=me?.role==='staff' && bkFilter!=='done' ? bookingDateToday() : '';
+  if (date.min && date.value<date.min) date.value=date.min;
   tabs.replaceChildren();
   const devices = cache.services.filter(service => service.active && service.category !== 'legacy-import');
   [{id:'all', name:'Бүх захиалга'}, ...devices].forEach(service => {
@@ -981,7 +1002,7 @@ function renderBookingSchedule() {
   $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Сул цаг дээр дарж захиалга бүртгэнэ.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
   if (!service || !date.value) return;
   const duration = Number(service.duration_minutes) || 30;
-  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled');
+  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled' && (me?.role!=='staff' || row.booked_date>=bookingDateToday() || row.status==='done'));
   for (let minute = 9 * 60; minute + duration <= 21 * 60; minute += 30) {
     const time = `${String(Math.floor(minute / 60)).padStart(2,'0')}:${String(minute % 60).padStart(2,'0')}`;
     const startsAt = `${date.value}T${time}:00+08:00`, start = Date.parse(startsAt);
@@ -1012,7 +1033,7 @@ async function saveStaffBooking() {
   const name = $("bkNewName").value.trim(), phone = $("bkNewPhone").value.trim();
   if (!name || !phone) return alert('Үйлчлүүлэгчийн нэр, утсаа оруулна уу.');
   if (Date.parse(slot.startsAt) <= Date.now()) return alert('Өнгөрсөн цагт захиалга бүртгэх боломжгүй.');
-  const employee = selectedSharedStaff();
+  const employee = bookingEmployee();
   if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   button.disabled = true;
   try {
@@ -1020,11 +1041,14 @@ async function saveStaffBooking() {
       ref: 'STAFF-' + crypto.randomUUID(), customer_name: name, phone,
       service_id: slot.serviceId, starts_at: slot.startsAt,
       booking_kind: $("bkNewKind").value, status: 'confirmed', amount: 0, deposit: 0,
+      staff_id: employee?.id || null,
       user_id: null,
       note: `Ажилтнаар бүртгэсэн: ${employee?.name || me?.full_name || me?.email || ''}. ${$("bkNewNote").value.trim()}`,
     }).select().single();
     if (error) throw error;
     cache.bookings = [data, ...cache.bookings.filter(row => row.id !== data.id)];
+    const saleResult=await sb.from('sales').select('*').eq('booking_id',data.id).maybeSingle();
+    if (saleResult.data) window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:saleResult.data}));
     bkSelectedSlot = null;
     ['bkNewName','bkNewPhone','bkNewNote'].forEach(id => { $(id).value = ''; });
     $("bkNewForm").hidden = true;
@@ -1866,7 +1890,7 @@ let repSelectedYear = String(new Date().getFullYear());
 function rangeBounds(kind) {
   const now = new Date();
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (kind === "today") return [startOfDay(now), startOfDay(now)];
+  if (kind === "today") { const today=new Date(bookingDateToday()+'T00:00:00'); return [today,today]; }
   if (kind === "month") {
     return [new Date(now.getFullYear(), now.getMonth(), 1), startOfDay(now)];
   }
@@ -1950,8 +1974,27 @@ function reportRows() {
   };
 }
 
+function renderTodaySales() {
+  const body=$("repTodayBody");
+  if (!body) return;
+  const today=bookingDateToday(), employee=selectedSharedStaff();
+  const rows=cache.sales.filter(row=>row.sale_date===today && (!employee || saleBelongsToStaff(row,employee))).sort((a,b)=>Number(b.id)-Number(a.id));
+  $("repTodayTitle").textContent=`${today} · Өнөөдрийн борлуулалт · ${rows.length} бүртгэл`;
+  body.replaceChildren();
+  for (const row of rows) {
+    const tr=document.createElement('tr');
+    [today,row.customer_name || '—',row.services || '—',row.therapist || '—',money(rowTotal(row)),PAYS.filter(([key])=>Number(row[key])).map(([key,label])=>`${label}: ${money(row[key])}`).join(' · ') || '—'].forEach(value=>tr.appendChild(cell(value)));
+    const action=document.createElement('td'), button=document.createElement('button');
+    button.className='btn-sm ghost'; button.textContent='Засах';
+    button.onclick=()=>{switchView('ledger');openLedForm(row);};
+    action.appendChild(button);tr.appendChild(action);body.appendChild(tr);
+  }
+  if (!rows.length) body.innerHTML='<tr><td colspan="7"><div class="empty">Өнөөдөр борлуулалт бүртгэгдээгүй байна.</div></td></tr>';
+}
+
 function renderReports() {
   if (!$("repRange")) return;
+  renderTodaySales();
   fillYearSelect($("repYear"));
   if (![...$("repYear").options].some((option) => option.value === repSelectedYear)) {
     repSelectedYear = availableYears()[0] || "all";

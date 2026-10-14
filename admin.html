@@ -246,6 +246,10 @@
 
       <div class="page-sub" id="packageSaleNotice" role="status"></div>
       <div id="packageSalesOperations" hidden></div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title" id="repTodayTitle">Өнөөдрийн борлуулалтын бүртгэл</div></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ / багц</th><th>Ажилтан</th><th>Дүн</th><th>Төлбөр</th><th></th></tr></thead><tbody id="repTodayBody"></tbody></table></div>
+      </div>
 
       <div class="panel" id="repFiltersPanel">
         <div class="filters" id="repFilters">
@@ -647,6 +651,10 @@
       <div class="panel">
         <div class="panel-title">Төхөөрөмж сонгох</div>
         <div class="booking-device-tabs" id="bkDeviceTabs"></div>
+        <div class="form-grid">
+          <div class="field"><label for="bkFromDate">Захиалга шүүх — эхлэх өдөр</label><input class="ctl" type="date" id="bkFromDate"></div>
+          <div class="field"><label for="bkToDate">Дуусах өдөр</label><input class="ctl" type="date" id="bkToDate"></div>
+        </div>
         <div class="field"><label for="bkScheduleDate">Өдөр</label><input class="ctl" type="date" id="bkScheduleDate"></div>
         <p class="page-sub" id="bkScheduleHint">Төхөөрөмж дээр дарж цагуудыг харна уу.</p>
         <div class="booking-slot-grid" id="bkScheduleSlots"></div>
@@ -659,7 +667,7 @@
           <div class="field"><label for="bkNewKind">Захиалгын төрөл</label><select class="ctl" id="bkNewKind"><option value="standard">Энгийн үйлчилгээ</option><option value="package">Багцын эрхээр</option></select></div>
           <div class="field"><label for="bkNewNote">Тэмдэглэл</label><input class="ctl" id="bkNewNote" maxlength="1000"></div>
         </div>
-        <p class="page-sub">Энэ нь зөвхөн цаг захиална. Төлбөр болон багцын ашиглалтыг тусад нь бүртгэнэ.</p>
+        <p class="page-sub">Энгийн захиалга баталгаажихад төхөөрөмжийн үнээр борлуулалтын нэхэмжлэх үүснэ. Багцын ашиглалтыг тусад нь бүртгэнэ.</p>
         <div class="form-actions"><button class="btn-sm primary" id="bkNewSave">Захиалга бүртгэх</button><button class="btn-sm ghost" id="bkNewCancel">Болих</button><span id="bkNewStatus" role="status"></span></div>
       </div>
       <div class="panel" style="padding:0;overflow:hidden;">

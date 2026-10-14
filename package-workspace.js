@@ -12,6 +12,7 @@ const todayKey = () => {
 
 let customers = [], packages = [], staff = [], leads = [], contracts = [], redemptions = [], services = [];
 let profile = {}, user = null, selectedContractId = null, packageSearch = "";
+let packageRequestId = crypto.randomUUID();
 const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
 
 function weekday(value) {
@@ -69,6 +70,16 @@ function panels() {
           <div class="field"><label for="pkgLeadPurchased">Багц *</label><select class="ctl" id="pkgLeadPurchased"></select></div>
           <div class="field"><label for="pkgSalePrice">Багцын үнэ</label><input class="ctl" id="pkgSalePrice" readonly value="—"></div>
         </div>
+        <div id="pkgCustomForm" hidden>
+          <div class="form-sub">Багц үүсгэх</div>
+          <div class="field"><label for="pkgCustomName">Багцын нэр *</label><input class="ctl" id="pkgCustomName" maxlength="120" placeholder="Жишээ: Сэргээх 10 оролт"></div>
+          <div class="form-grid" id="pkgCustomDevices" style="margin-top:14px"></div>
+          <div class="form-grid" style="margin-top:14px">
+            <div class="field"><label for="pkgCustomBase">Үндсэн үнэ (₮) *</label><input class="ctl" id="pkgCustomBase" type="number" min="1" step="1"></div>
+            <div class="field"><label for="pkgCustomDiscount">Хөнгөлөлт (%)</label><input class="ctl" id="pkgCustomDiscount" type="number" min="0" max="100" step="0.01" value="0"></div>
+          </div>
+          <p class="page-sub" id="pkgCustomSummary" role="status"></p>
+        </div>
         <div class="form-sub">Төлбөр</div>
         <div class="form-grid">
           <div class="field"><label for="pkgSaleBank">Төлбөр хүлээн авах банк / хэлбэр *</label><select class="ctl" id="pkgSaleBank"><option value="">Сонгох</option><option value="golomt">Голомт</option><option value="khan">Хаан</option><option value="cash">Бэлэн</option><option value="invoice">Нэхэмжлэх</option><option value="barter">Barter</option></select></div>
@@ -96,14 +107,33 @@ function panels() {
   $("pkgSaleDate").value = todayKey();
   $("pkgSaleSearch").addEventListener("input", renderSaleCustomers);
   $("pkgLeadPurchased").addEventListener("change", () => {
+    const custom = $("pkgLeadPurchased").value === 'custom';
+    $("pkgCustomForm").hidden = !custom;
+    $("pkgSaleAmount").readOnly = custom;
+    if (custom) return updateCustomPackagePrice();
     const selected = packages.find(item => String(item.id) === $("pkgLeadPurchased").value);
     $("pkgSalePrice").value = selected ? money(selected.price) : '—';
     $("pkgSaleAmount").value = selected ? selected.price : '';
   });
+  ['pkgCustomBase','pkgCustomDiscount'].forEach(id => $(id).addEventListener('input', updateCustomPackagePrice));
   $("pkgCustomerSearch").addEventListener("input", (event) => {
     packageSearch = event.target.value.trim().toLowerCase();
     renderPackageCustomers();
   });
+}
+
+function customPackageItems() {
+  return [...$("pkgCustomDevices").querySelectorAll('input')].filter(input => Number(input.value)>0)
+    .map(input => ({ service_id:Number(input.dataset.serviceId), units:Number(input.value) }));
+}
+
+function updateCustomPackagePrice() {
+  const base=Number($("pkgCustomBase").value), discount=Number($("pkgCustomDiscount").value);
+  const valid=Number.isSafeInteger(base) && base>0 && Number.isFinite(discount) && discount>=0 && discount<=100;
+  const due=valid ? Math.round(base*(100-Math.round(discount*100)/100)/100) : null;
+  $("pkgSalePrice").value=due==null ? '—' : money(due);
+  $("pkgSaleAmount").value=due==null ? '' : due;
+  $("pkgCustomSummary").textContent=due==null ? 'Үндсэн үнэ болон 0–100% хөнгөлөлт оруулна уу.' : `Хөнгөлөлт: ${money(base-due)} · Одоо төлөх: ${money(due)}`;
 }
 
 function setPackageSaleOpen(open) {
@@ -150,6 +180,11 @@ function renderSelectedPackage() {
   const left = total == null ? null : Math.max(0, total - spent);
   $("pkgDetailName").textContent = contract.customer_label || "Нэргүй үйлчлүүлэгч";
   $("pkgDetailMeta").textContent = `${contract.package_label || "Багц"} · ${contract.purchased_on || "Эхэлсэн огноогүй"}${contract.expires_on ? ` → ${contract.expires_on}` : ""}`;
+  const items=contract.service_units || [];
+  $("pkgVisitServices").innerHTML=(items.length ? items.map(item => {
+    const spent=history.filter(row => Number(row.service_id)===Number(item.service_id)).reduce((sum,row)=>sum+Number(row.units),0);
+    return `<label class="staff-check"><input type="checkbox" value="${Number(item.service_id)}" ${spent>=item.units?'disabled':''}><span>${safe(item.service_name)} · ${spent}/${Number(item.units)} орсон · ${Math.max(0,item.units-spent)} үлдсэн</span></label>`;
+  }) : services.map(item=>`<label class="staff-check"><input type="checkbox" value="${item.id}"><span>${safe(item.name)}</span></label>`)).join('');
   $("pkgDetailKpis").innerHTML = [["Авсан багц", contract.package_label || "—", contract.status || "—"], ["Нийт орох эрх", total == null ? "—" : total, "үйлчилгээ"], ["Орсон", spent, `${history.length} бүртгэл`], ["Үлдсэн", left == null ? "—" : left, "үйлчилгээ"]].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${safe(label)}</div><div class="kpi-value">${safe(value)}</div><div class="kpi-note">${safe(note)}</div></div>`).join("");
   $("pkgVisitBody").innerHTML = history.length ? history.map((item) => {
     const employee = staff.find((person) => Number(person.id) === Number(item.staff_id));
@@ -172,9 +207,10 @@ function renderSaleCustomers() {
 function options() {
   renderSaleCustomers();
   const selectedPackage = $("pkgLeadPurchased").value;
-  const packageOptions = '<option value="">Сонгоогүй</option>' + packages.map((item) => `<option value="${item.id}">${safe(item.name)}</option>`).join("");
+  const packageOptions = '<option value="">Сонгоогүй</option><option value="custom">+ Багц үүсгэх</option>' + packages.map((item) => `<option value="${item.id}">${safe(item.name)}</option>`).join("");
   $("pkgLeadPurchased").innerHTML = packageOptions;
   $("pkgLeadPurchased").value = selectedPackage;
+  if (!$("pkgCustomDevices").children.length) $("pkgCustomDevices").innerHTML=services.map(item=>`<div class="field"><label for="pkgUnits${item.id}">${safe(item.name)} — орох тоо</label><input class="ctl" id="pkgUnits${item.id}" data-service-id="${item.id}" type="number" min="0" max="1000" step="1" value="0"></div>`).join('');
   $("pkgVisitServices").innerHTML = services.map((item) => `<label class="staff-check"><input type="checkbox" value="${item.id}"><span>${safe(item.name)}</span></label>`).join("");
   const employee = currentStaff();
   $("pkgLeadStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";
@@ -204,11 +240,11 @@ async function load() {
   user = session.user;
   const result = await Promise.all([
     allRows(() => sb.from("customers").select("id,full_name,phone").order("full_name").order("id")),
-    sb.from("packages").select("id,name,price").is("archived_at", null).eq("active", true).order("sort"),
+    sb.from("packages").select("id,name,price,service_units").is("archived_at", null).eq("active", true).order("sort"),
     sb.from("staff").select("id,name,email,user_id,active").eq("active", true).order("sort"),
     sb.from("package_sales_leads").select("*").order("created_at", { ascending: false }),
     sb.from("profiles").select("role").eq("id", user.id).maybeSingle(),
-    allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_label,total_units,status,purchased_on,expires_on,notes").order("customer_label").order("id")),
+    allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_label,total_units,status,purchased_on,expires_on,notes,service_units").order("customer_label").order("id")),
     allRows(() => sb.from("package_redemptions").select("id,contract_id,used_on,units,service_id,service_label,staff_id,notes,created_at").order("used_on", { ascending: false }).order("id")),
     sb.from("services").select("id,name,active,category").eq("active", true).neq("category", "legacy-import").order("sort"),
   ]);
@@ -252,24 +288,33 @@ async function saveLead() {
   const purchased = packages.find((item) => String(item.id) === $("pkgLeadPurchased").value);
   const employee = currentStaff();
   if (!customer) return alert("Үйлчлүүлэгчээ сонгоно уу.");
-  if (!purchased) return alert("Багцаа сонгоно уу.");
+  const custom=$("pkgLeadPurchased").value==='custom';
+  if (!purchased && !custom) return alert("Багцаа сонгоно уу.");
+  const items=custom ? customPackageItems() : [];
+  if (custom && (!$("pkgCustomName").value.trim() || !items.length || items.some(item=>!Number.isInteger(item.units)||item.units>1000))) return alert('Багцын нэр, төхөөрөмжийн оролтын тоогоо зөв оруулна уу.');
   const bank = $("pkgSaleBank").value, amount = Number($("pkgSaleAmount").value), date = $("pkgSaleDate").value;
-  if (!date || !['golomt','khan','cash','invoice','barter'].includes(bank) || !Number.isSafeInteger(amount) || amount <= 0) return alert("Огноо, төлбөрийн банк болон зөв дүн оруулна уу.");
+  if (!date || !['golomt','khan','cash','invoice','barter'].includes(bank) || !Number.isSafeInteger(amount) || amount < 0 || (!custom && amount===0)) return alert("Огноо, төлбөрийн банк болон зөв дүн оруулна уу.");
   if (!employee && !["owner", "admin"].includes(profile.role)) return alert("Бүртгэх ажилтны нэрийг сонгоно уу.");
   const button = $("pkgLeadSave");
   if (button.disabled) return;
   button.disabled = true;
   try {
-    const { data, error } = await sb.from("sales").insert({ sale_date: date, customer_id: customer.id, customer_name: customer.full_name, phone: customer.phone || null, services: `Багц: ${purchased.name}`, staff_id: employee?.id || null, therapist: employee?.name || null, [bank]: amount, source: 'manual', created_by: user.id, needs_review: false, note: $("pkgLeadNotes").value.trim() || null }).select().single();
+    const { data, error } = await sb.rpc('sell_customer_package',{p_request:{request_id:packageRequestId, customer_id:customer.id, package_id:purchased?.id || null, package_name:$("pkgCustomName").value.trim(), items, base_price:Number($("pkgCustomBase").value),discount_percent:Number($("pkgCustomDiscount").value),sale_date:date,staff_id:employee?.id || null,payment_method:bank,amount,note:$("pkgLeadNotes").value.trim() || null}});
     if (error) throw error;
-    window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data }));
+    window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data.sale }));
+    if (data.contract) contracts=[data.contract,...contracts.filter(row=>row.id!==data.contract.id)];
+    if (data.package) packages=[data.package,...packages.filter(row=>row.id!==data.package.id)];
+    packageRequestId=crypto.randomUUID();
+    $("pkgCustomForm").hidden=true;
+    $("pkgSaleAmount").readOnly=false;
     ['pkgLeadCustomer','pkgLeadPurchased','pkgLeadNotes','pkgSaleSearch','pkgSaleBank','pkgSaleAmount'].forEach(id => { $(id).value = ''; });
     $("pkgSalePrice").value = '—';
-    $("pkgSaleStatus").textContent = `Борлуулалт бүртгэгдлээ · ${money(amount)}`;
+    $("pkgSaleStatus").textContent = `Борлуулалт бүртгэгдлээ · ${money(data.sale.total)}`;
     if ($("packageSaleNotice")) $("packageSaleNotice").textContent = $("pkgSaleStatus").textContent;
     setPackageSaleOpen(false);
     $("repPackageSales")?.focus();
     renderSaleCustomers();
+    options();
   } catch (error) {
     alert("Борлуулалт хадгалж чадсангүй: " + error.message);
   } finally { button.disabled = false; }
