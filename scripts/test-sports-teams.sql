@@ -8,7 +8,8 @@ begin
  select array_agg(id) into service_ids from (select id from public.services where active and category<>'legacy-import' order by id limit 2) s;
  perform set_config('request.jwt.claim.sub',actor::text,true);
  execute 'set local role authenticated';
- team:=public.create_sports_team('QA rollback sports team',array['QA Бат','QA Сараа'],request);
+ team:=public.create_sports_team_priced('QA rollback sports team',array['QA Бат','QA Сараа'],request,jsonb_build_object(service_ids[1]::text,25000,service_ids[2]::text,0));
+ if (team.service_prices->>service_ids[1]::text)::bigint<>25000 or (team.service_prices->>service_ids[2]::text)::bigint<>0 then raise exception 'Team prices not saved'; end if;
  other:=public.create_sports_team('QA rollback sports team',array['QA Бат','QA Сараа'],request);
  if team.id<>other.id then raise exception 'Duplicate team created'; end if;
  select array_agg(id) into member_ids from public.sports_team_members where team_id=team.id;
@@ -46,6 +47,12 @@ begin
  begin perform public.record_sports_member_visit(other.id,member_ids[1],jsonb_build_array(jsonb_build_object('service_id',service_ids[1],'price',10)),now(),employee,'Wrong team',gen_random_uuid());
  exception when raise_exception then rejected:=true; end;
  if not rejected then raise exception 'Wrong individual team accepted'; end if;
+ update public.sports_teams set service_prices=jsonb_build_object(service_ids[1]::text,30000) where id=team.id;
+ if (select sum(price) from public.sports_team_visits where team_id=team.id)<>45000 then raise exception 'Team price change altered history'; end if;
+ rejected:=false;
+ begin update public.sports_teams set service_prices=jsonb_build_object(service_ids[1]::text,-1) where id=team.id;
+ exception when check_violation then rejected:=true; end;
+ if not rejected then raise exception 'Negative team price accepted'; end if;
  execute 'reset role';
  perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
  rejected:=false;
