@@ -488,6 +488,7 @@ function setupSharedStaffPicker() {
 function setSharedStaffSelection(value) {
   sharedStaffId = Number(value) || null;
   if (sharedStaffId) sessionStorage.setItem("cryo-active-staff", String(sharedStaffId));
+  else sessionStorage.removeItem("cryo-active-staff");
   if ($("sharedStaffSelect")) $("sharedStaffSelect").value = sharedStaffId ? String(sharedStaffId) : "";
   if ($("attSelfStaff")) $("attSelfStaff").value = sharedStaffId ? String(sharedStaffId) : "";
   if ($("ledForm")) $("ledForm").style.display = "none";
@@ -2563,26 +2564,66 @@ function renderAttendanceSelfService() {
   const employee = selectedSharedStaff() || cache.staff.find((staff) =>
     staff.active && (staff.user_id === me.id || String(staff.email || "").toLowerCase() === String(me.email || "").toLowerCase()),
   );
+  host.className = "attendance-name-picker";
+
+  if (isSharedStaffAccount()) {
+    const activeStaff = cache.staff.filter((staff) => staff.active);
+    const grid = document.createElement("div");
+    grid.className = "attendance-name-grid";
+    activeStaff.forEach((staff) => {
+      const staffRow = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(staff.id));
+      const label = document.createElement("label");
+      label.className = "attendance-name-option";
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "attendance_employee";
+      radio.value = String(staff.id);
+      radio.checked = Number(employee?.id) === Number(staff.id);
+      radio.addEventListener("change", () => setSharedStaffSelection(radio.value));
+      const name = document.createElement("span");
+      name.textContent = staff.name;
+      const status = document.createElement("span");
+      status.className = "attendance-name-status";
+      if (staffRow?.clock_out) {
+        status.textContent = "Гарсан";
+        status.classList.add("is-out");
+      } else if (staffRow?.clock_in) {
+        status.textContent = "Ирсэн";
+        status.classList.add("is-in");
+      } else {
+        status.textContent = "Бүртгээгүй";
+      }
+      label.append(radio, name, status);
+      grid.appendChild(label);
+    });
+    host.appendChild(grid);
+  }
+
   if (!employee) {
-    host.className = "attendance-name-picker";
-    host.innerHTML = '<div class="empty">Дээд хэсгээс өөрийн нэрийг сонгоод ирцээ бүртгэнэ үү.</div>';
-    $("attSelfStatus").textContent = "Ажилтан сонгоогүй";
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Өөрийн нэрийг сонгоод ирцээ бүртгэнэ үү.";
+    host.appendChild(empty);
+    const registered = cache.attendance.filter((item) => item.work_date === today && item.clock_in).length;
+    $("attSelfStatus").textContent = `Өнөөдөр ${registered} ажилтан ирсэн цагаа бүртгэсэн`;
     return;
   }
 
   const row = cache.attendance.find((item) => item.work_date === today && Number(item.staff_id) === Number(employee.id));
-  host.className = "attendance-work-session";
-  host.innerHTML = `<div class="attendance-session-date"></div><div class="attendance-session-names"></div><div class="attendance-session-timer" aria-live="polite">00:00:00</div><div class="attendance-session-caption"></div><button type="button" class="attendance-session-action"></button>`;
-  host.querySelector(".attendance-session-date").textContent = fmtDate(today);
-  host.querySelector(".attendance-session-names").textContent = employee.name;
-  const timer = host.querySelector(".attendance-session-timer");
-  const caption = host.querySelector(".attendance-session-caption");
-  const actionButton = host.querySelector(".attendance-session-action");
+  const session = document.createElement("div");
+  session.className = "attendance-work-session";
+  session.innerHTML = `<div class="attendance-session-date"></div><div class="attendance-session-names"></div><div class="attendance-session-timer" aria-live="polite">00:00:00</div><div class="attendance-session-caption"></div><button type="button" class="attendance-session-action"></button>`;
+  host.appendChild(session);
+  session.querySelector(".attendance-session-date").textContent = fmtDate(today);
+  session.querySelector(".attendance-session-names").textContent = employee.name;
+  const timer = session.querySelector(".attendance-session-timer");
+  const caption = session.querySelector(".attendance-session-caption");
+  const actionButton = session.querySelector(".attendance-session-action");
 
-  if (!row) {
+  if (!row || !row.clock_in) {
     caption.textContent = "Ажилдаа ирсэн үедээ доорх товчийг дарна.";
     actionButton.textContent = "Ирсэн цаг бүртгэх";
-    actionButton.addEventListener("click", () => startIndividualAttendance(employee, actionButton));
+    actionButton.addEventListener("click", () => startIndividualAttendance(employee, actionButton, row));
   } else if (!row.clock_out) {
     const refreshTimer = () => { timer.textContent = formatElapsedDuration(row.clock_in, new Date().toISOString()); };
     refreshTimer();
@@ -2601,23 +2642,37 @@ function renderAttendanceSelfService() {
   $("attSelfStatus").textContent = `${employee.name} · ирц тусдаа бүртгэгдэнэ`;
 }
 
-async function startIndividualAttendance(employee, button) {
+async function startIndividualAttendance(employee, button, row = null) {
   button.disabled = true;
   const today = localDateKey(new Date());
-  const result = await sb.from("attendance").insert({
-    work_date: today,
-    staff_id: employee.id,
-    staff_name: employee.name,
-    user_id: me.id,
-    workday_number: nextWorkdayNumber(employee.id),
-    clock_in: new Date().toISOString(),
-  }).select().maybeSingle();
+  if (!row) {
+    const created = await sb.from("attendance").insert({
+      work_date: today,
+      staff_id: employee.id,
+      staff_name: employee.name,
+      user_id: me.id,
+      workday_number: nextWorkdayNumber(employee.id),
+      clock_in: null,
+    }).select().maybeSingle();
+    if (created.error) {
+      button.disabled = false;
+      if (created.error.code === "23505") return loadAll();
+      return alert("Ирсэн цаг бүртгэж чадсангүй: " + created.error.message);
+    }
+    row = created.data;
+    if (row) cache.attendance.unshift(row);
+  }
+  const result = await sb.from("attendance")
+    .update({ clock_in: new Date().toISOString() })
+    .eq("id", row.id)
+    .select()
+    .maybeSingle();
   if (result.error) {
     button.disabled = false;
-    if (result.error.code === "23505") return loadAll();
     return alert("Ирсэн цаг бүртгэж чадсангүй: " + result.error.message);
   }
-  if (result.data) cache.attendance.unshift(result.data);
+  if (result.data) Object.assign(row, result.data);
+  if (isSharedStaffAccount()) return setSharedStaffSelection("");
   renderAttendance();
 }
 
@@ -2633,6 +2688,7 @@ async function finishIndividualAttendance(row, button) {
     return alert("Гарсан цаг бүртгэж чадсангүй: " + result.error.message);
   }
   if (result.data) Object.assign(row, result.data);
+  if (isSharedStaffAccount()) return setSharedStaffSelection("");
   renderAttendance();
 }
 

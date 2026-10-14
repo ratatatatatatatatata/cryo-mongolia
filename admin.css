@@ -131,6 +131,10 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .attendance-name-picker{display:flex;flex-direction:column;gap:14px;margin-top:12px}
 .attendance-name-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px}
 .attendance-name-option{display:flex;align-items:center;min-height:48px;padding:0 14px;border:1px solid var(--border);border-radius:12px;background:rgba(3,6,12,.52);color:var(--text-secondary);font-size:13px;font-weight:800;cursor:pointer;transition:all var(--ease)}
+.attendance-name-option span:first-of-type{flex:1;min-width:0}
+.attendance-name-status{margin-left:auto;padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.05);color:var(--text-muted);font-size:9px;font-weight:900;letter-spacing:.04em;white-space:nowrap}
+.attendance-name-status.is-in{background:rgba(80,220,160,.12);color:#8ceec2}
+.attendance-name-status.is-out{background:rgba(88,198,255,.12);color:var(--ice-200)}
 .attendance-name-option:hover{border-color:rgba(88,198,255,.45);color:var(--ice-100)}
 .attendance-name-option:has(input:checked){border-color:rgba(88,198,255,.7);background:rgba(88,198,255,.14);color:var(--ice-100);box-shadow:0 0 22px rgba(40,150,255,.1)}
 .attendance-name-option input{width:17px;height:17px;margin:0 10px 0 0;accent-color:#58c6ff}
@@ -138,6 +142,7 @@ table.tbl tbody tr:hover td{background:rgba(88,198,255,.04)}
 .attendance-confirm-selection:hover:not(:disabled),.attendance-session-action:hover:not(:disabled){transform:translateY(-1px);border-color:var(--ice-300);box-shadow:0 8px 24px rgba(35,150,255,.15)}
 .attendance-confirm-selection:disabled,.attendance-session-action:disabled{cursor:default;opacity:.65}
 .attendance-work-session{display:flex;flex-direction:column;align-items:center;gap:11px;margin-top:14px;padding:22px;border:1px solid rgba(88,198,255,.28);border-radius:16px;background:rgba(2,8,16,.46);text-align:center}
+.attendance-name-picker .attendance-work-session{width:100%}
 .attendance-session-date{font-size:11px;font-weight:800;letter-spacing:.11em;color:var(--text-muted)}
 .attendance-session-names{font-size:14px;font-weight:900;color:var(--ice-100)}
 .attendance-session-timer{font-size:clamp(34px,5vw,58px);font-weight:900;line-height:1;letter-spacing:.07em;color:var(--ice-200);font-variant-numeric:tabular-nums;text-shadow:0 0 30px rgba(88,198,255,.2)}
