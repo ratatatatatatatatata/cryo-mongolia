@@ -68,6 +68,7 @@ let attendanceYear = "all";
 let attendanceStaff = "all";
 let selectedAttendanceDate = localDateKey(new Date());
 let sharedStaffId = null;
+let paymentBooking = null;
 
 window.addEventListener("cryo:sale-saved", ({ detail: sale }) => {
   if (!sale?.id) return;
@@ -230,6 +231,9 @@ async function route() {
   $("navReports").lastChild.textContent = me.role === "staff" ? " Өнөөдрийн борлуулалт" : " Борлуулалт, тайлан";
   $("repTitle").textContent = me.role === "staff" ? "Өнөөдрийн борлуулалт" : "Тайлан";
   show($("repFiltersPanel"), isAdmin);
+  document.body.classList.toggle('staff-readonly-reports', !isAdmin);
+  if (!isAdmin) $("navReports").parentElement.insertBefore($("navReports"), document.querySelector('.side-foot'));
+  else $("navReports").parentElement.insertBefore($("navReports"), $("navLedger"));
 
   if (!isAdmin) {
     switchView("reports");
@@ -521,6 +525,7 @@ function setSharedStaffSelection(value) {
   if ($("attSelfStaff")) $("attSelfStaff").value = sharedStaffId ? String(sharedStaffId) : "";
   if ($("ledForm")) $("ledForm").style.display = "none";
   ledEditing = null;
+  paymentBooking = null;
   ledLimit = 100;
   renderReports();
   renderLedger();
@@ -896,7 +901,7 @@ function renderBookings() {
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="7"><div class="empty">Захиалга алга байна.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="8"><div class="empty">Захиалга алга байна.</div></td></tr>';
     return;
   }
 
@@ -952,6 +957,19 @@ function renderBookings() {
     });
     st.appendChild(sel);
     tr.appendChild(st);
+    const payment = document.createElement('td');
+    const pay = document.createElement('select');
+    pay.className = 'ctl sm';
+    pay.setAttribute('aria-label', `Төлөлт ${b.ref}`);
+    pay.innerHTML = '<option value="pending">Хүлээгдэж байгаа</option><option value="paid">Төлбөр төлсөн</option>';
+    pay.value = b.payment_status || 'pending';
+    pay.disabled = b.payment_status === 'paid' || b.status === 'cancelled' || b.booking_kind === 'package';
+    if (b.booking_kind === 'package') pay.title = 'Багцын ашиглалтад давхар төлбөр авахгүй';
+    pay.addEventListener('change', () => {
+      if (pay.value === 'paid') openBookingPayment(b);
+      pay.value = b.payment_status || 'pending';
+    });
+    payment.appendChild(pay);tr.appendChild(payment);
     tr.appendChild(cell(b.note || b.notes || "—", "record-note"));
 
     body.appendChild(tr);
@@ -1981,6 +1999,10 @@ function wireReports() {
   if (pr) pr.addEventListener("click", () => window.print());
 }
 
+function isReportableSale(row) {
+  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)>0;
+}
+
 function reportRows() {
   const [from, to] = rangeBounds(me?.role === "staff" ? "today" : repRange);
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999);
@@ -1990,7 +2012,7 @@ function reportRows() {
     to: end,
     rows: cache.sales.filter((b) => {
       const d = new Date(b.sale_date + "T00:00:00");
-      return d >= from && d <= end && (!activeStaff || saleBelongsToStaff(b, activeStaff));
+      return isReportableSale(b) && d >= from && d <= end && (!activeStaff || saleBelongsToStaff(b, activeStaff));
     }),
   };
 }
@@ -1999,7 +2021,7 @@ function renderTodaySales() {
   const body=$("repTodayBody");
   if (!body) return;
   const today=bookingDateToday(), employee=selectedSharedStaff();
-  const rows=cache.sales.filter(row=>row.sale_date===today && (!employee || saleBelongsToStaff(row,employee))).sort((a,b)=>Number(b.id)-Number(a.id));
+  const rows=cache.sales.filter(row=>isReportableSale(row) && row.sale_date===today && (!employee || saleBelongsToStaff(row,employee))).sort((a,b)=>Number(b.id)-Number(a.id));
   $("repTodayTitle").textContent=`${today} · Өнөөдрийн борлуулалт · ${rows.length} бүртгэл`;
   body.replaceChildren();
   for (const row of rows) {
@@ -2009,7 +2031,7 @@ function renderTodaySales() {
     const action=document.createElement('td'), button=document.createElement('button');
     button.className='btn-sm ghost'; button.textContent='Засах';
     button.onclick=()=>{switchView('ledger');openLedForm(row);};
-    action.appendChild(button);tr.appendChild(action);body.appendChild(tr);
+    if (isAdminUser()) action.appendChild(button);tr.appendChild(action);body.appendChild(tr);
   }
   if (!rows.length) body.innerHTML='<tr><td colspan="8"><div class="empty">Өнөөдөр борлуулалт бүртгэгдээгүй байна.</div></td></tr>';
 }
@@ -2288,6 +2310,7 @@ function wireLedger() {
   $("ledCancel").addEventListener("click", () => {
     $("ledForm").style.display = "none";
     ledEditing = null;
+    paymentBooking = null;
   });
   $("ledSave").addEventListener("click", saveLedger);
   $("ledCsv").addEventListener("click", exportLedgerCsv);
@@ -2406,6 +2429,11 @@ function updateFormTotal() {
 }
 
 function openLedForm(row) {
+  paymentBooking = null;
+  $("ledgerFormHome").after($("ledForm"));
+  $("ledSave").textContent = 'Хадгалах';
+  $("f_date").readOnly = false;
+  ['f_invoice','f_refund'].forEach(id => $(id).disabled = false);
   ledEditing = row;
   $("ledFormTitle").textContent = row ? "Борлуулалт засах" : "Шинэ борлуулалт";
   $("f_date").value = row ? row.sale_date : new Date().toISOString().slice(0, 10);
@@ -2449,6 +2477,24 @@ function openLedForm(row) {
   updateFormTotal();
   $("ledForm").style.display = "";
   $("ledForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function openBookingPayment(booking) {
+  const employee=bookingEmployee();
+  if (!isAdminUser() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
+  openLedForm(null);
+  paymentBooking=booking;
+  const service=cache.services.find(row=>Number(row.id)===Number(booking.service_id));
+  $("bookingPaymentHost").appendChild($("ledForm"));
+  $("ledFormTitle").textContent=`Төлбөр бүртгэх · ${booking.ref}`;
+  $("ledSave").textContent='Төлсөн';
+  $("f_date").value=bookingDateToday();$("f_date").readOnly=true;
+  $("f_name").value=booking.customer_name || '';
+  $("f_svc").value=service?.name || booking.service || '';
+  $("f_note").value=booking.note || '';
+  ['f_invoice','f_refund'].forEach(id => {$(id).value=0;$(id).disabled=true;});
+  $("ledFormTotal").textContent=`Үйлчилгээний үнэ: ${money(service?.price || booking.amount || 0)} · Төлсөн дүнгээ оруулна уу`;
+  $("ledForm").scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3071,6 +3117,7 @@ function renderInventory() {
 
 async function saveLedger() {
   const btn = $("ledSave");
+  if (btn.disabled) return;
   const v = (id) => Number($(id).value) || 0;
   const patch = {
     sale_date: $("f_date").value,
@@ -3090,6 +3137,21 @@ async function saveLedger() {
 
   if (!patch.sale_date) return alert("Огноо оруулна уу.");
 
+  if (paymentBooking) {
+    if (patch.golomt+patch.khan+patch.cash+patch.barter<=0) return alert('Төлсөн дүнгээ оруулна уу.');
+    btn.disabled=true;
+    try {
+      const {data,error}=await sb.rpc('pay_booking',{p_booking_id:paymentBooking.id,p_sale:patch});
+      if (error) throw error;
+      Object.assign(paymentBooking,data.booking);
+      window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:data.sale}));
+      paymentBooking=null;ledEditing=null;$("ledForm").style.display='none';
+      renderBookings();renderReports();switchView('reports');
+    } catch(error) { alert('Төлбөр хадгалж чадсангүй: '+error.message); }
+    finally { btn.disabled=false; }
+    return;
+  }
+  if (!isAdminUser()) return alert('Борлуулалтыг захиалгын төлөлтөөс бүртгэнэ үү.');
   btn.disabled = true;
   const res = ledEditing
     ? await sb.from("sales").update(patch).eq("id", ledEditing.id).select().maybeSingle()
