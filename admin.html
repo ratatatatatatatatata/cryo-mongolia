@@ -240,14 +240,11 @@
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
           <button class="btn-sm primary" id="repSales">+ Борлуулалт бүртгэх</button>
-          <button class="btn-sm primary" id="repPackageSales" aria-controls="packageSalesOperations" aria-expanded="false">+ Багцын борлуулалт</button>
           <button class="btn-sm ghost" id="repCsv">↓ CSV татах</button>
           <button class="btn-sm ghost" id="repPrint">⎙ Хэвлэх</button>
         </div>
       </div>
 
-      <div class="page-sub" id="packageSaleNotice" role="status"></div>
-      <div id="packageSalesOperations" hidden></div>
       <div class="panel">
         <div class="panel-head"><div class="panel-title" id="repTodayTitle">Өнөөдрийн борлуулалтын бүртгэл</div></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ / багц</th><th>Ажилтан</th><th>Дүн</th><th>Төлбөр</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="repTodayBody"></tbody></table></div>
@@ -432,6 +429,7 @@
         </div>
       </div>
 
+      <div id="ledgerFormHome"></div>
       <!-- add / edit form -->
       <div class="panel" id="ledForm" style="display:none;">
         <div class="panel-head"><div class="panel-title" id="ledFormTitle">Шинэ борлуулалт</div></div>
@@ -670,14 +668,15 @@
           <div class="field"><label for="bkNewKind">Захиалгын төрөл</label><select class="ctl" id="bkNewKind"><option value="standard">Энгийн үйлчилгээ</option><option value="package">Багцын эрхээр</option></select></div>
           <div class="field"><label for="bkNewNote">Тэмдэглэл</label><input class="ctl" id="bkNewNote" maxlength="1000"></div>
         </div>
-        <p class="page-sub">Энгийн захиалга баталгаажихад төхөөрөмжийн үнээр борлуулалтын нэхэмжлэх үүснэ. Багцын ашиглалтыг тусад нь бүртгэнэ.</p>
+        <p class="page-sub">Төлөлтөөс «Төлбөр төлсөн» сонгож, мэдээллээ хадгалахад өдрийн борлуулалтад бүртгэгдэнэ.</p>
         <div class="form-actions"><button class="btn-sm primary" id="bkNewSave">Захиалга бүртгэх</button><button class="btn-sm ghost" id="bkNewCancel">Болих</button><span id="bkNewStatus" role="status"></span></div>
       </div>
+      <div id="bookingPaymentHost"></div>
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr>
             <th>Дугаар</th><th>Үйлчлүүлэгч</th><th>Төхөөрөмж</th>
-            <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th><th>Нэмэлт тэмдэглэл</th>
+            <th>Огноо / цаг</th><th>Дүн</th><th>Төлөв</th><th>Төлөлт</th><th>Нэмэлт тэмдэглэл</th>
           </tr></thead>
           <tbody id="bkBody"></tbody>
         </table></div>
@@ -719,6 +718,11 @@
     <!-- ── PACKAGES ── -->
     <section class="view" data-panel="sportsTeams" id="sportsTeamsPanel"></section>
     <section class="view" data-panel="packages">
+      <div class="page-head"><div class="page-title">Багц</div>
+          <button class="btn-sm primary" id="repPackageSales" aria-controls="packageSalesOperations" aria-expanded="false">+ Багцын борлуулалт</button>
+      </div>
+      <div class="page-sub" id="packageSaleNotice" role="status"></div>
+      <div id="packageSalesOperations" hidden></div>
       <div id="packageOperations"></div>
       <div class="page-head">
         <div>
