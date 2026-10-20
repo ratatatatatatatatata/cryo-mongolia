@@ -20,6 +20,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 import XLSX from "xlsx";
+import { readPackages as parsePackages } from "./package-workbook.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,7 +34,7 @@ if (!FILE) {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(root, "supabase", "local", "import-attendance-packages.sql");
 
-const wb = XLSX.readFile(FILE, { cellDates: true });
+const wb = XLSX.readFile(FILE, { cellDates: false, cellStyles: true, cellNF: true, sheetStubs: true });
 const grid = (n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: null, raw: false });
 const q = (v) =>
   v == null || String(v).trim() === "" ? "null" : "'" + String(v).trim().replace(/'/g, "''") + "'";
@@ -159,67 +160,7 @@ function readAttendance(sheet, year) {
 }
 
 /* ══════════════ БАГЦ ══════════════ */
-function readPackages(sheet, year) {
-  const rows = grid(sheet);
-  const hi = rows.findIndex((r) => r && r.some((c) => String(c || "").includes("ХАРИЛЦАГЧ")));
-  if (hi < 0) return { contracts: [], redemptions: [] };
-  const H = rows[hi].map(clean);
-
-  const nameCol = H.findIndex((c) => c.includes("ХАРИЛЦАГЧ"));
-  const descCol = H.findIndex((c) => c.includes("Багцын тоо"));
-  const startCol = H.findIndex((c) => c.includes("эхэлсэн"));
-
-  /* every other labelled column after the start date opens a service block */
-  const blocks = [];
-  H.forEach((label, i) => {
-    if (i > startCol && label && !/notice/i.test(label)) blocks.push({ label, from: i });
-  });
-  blocks.forEach((b, i) => {
-    b.to = i + 1 < blocks.length ? blocks[i + 1].from - 1 : H.length - 1;
-  });
-
-  const contracts = [];
-  const redemptions = [];
-
-  rows.slice(hi + 1).forEach((r, k) => {
-    if (!r) return;
-    const excelRow = hi + 2 + k;
-    const customer = clean(r[nameCol]);
-    if (!customer || /^total/i.test(customer)) return;
-
-    const desc = clean(r[descCol]);
-    const start = toDate(r[startCol], year);
-
-    blocks.forEach((b) => {
-      const used = [];
-      for (let c = b.from; c <= b.to; c++) {
-        datesIn(r[c], year).forEach((d, n) =>
-          used.push({ date: d, key: `${sheet}:${excelRow}:${c}:${n}` }),
-        );
-      }
-      if (!used.length) return;
-
-      const capacity = (b.label.match(/(\d+)\s*$/) || [])[1];
-      const total = capacity ? +capacity : null;
-      const key = `${sheet}:${excelRow}:${b.from}`;
-
-      contracts.push({
-        key,
-        customer,
-        label: b.label,
-        start,
-        total,
-        status: total && used.length < total ? "active" : "completed",
-        notes: desc || null,
-        sheet,
-        row: excelRow,
-      });
-      used.forEach((u) => redemptions.push({ contractKey: key, ...u }));
-    });
-  });
-
-  return { contracts, redemptions };
-}
+function readPackages(sheet, year) { return parsePackages(wb, sheet, year); }
 
 /* ══════════════ ЦАЛИН ══════════════
    "Denis salary" is a commission ledger, not a table: a block per pay
