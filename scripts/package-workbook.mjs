@@ -38,6 +38,14 @@ export function isRed(cell) {
  const [r,g,b]=rgb.match(/../g).map(x=>parseInt(x,16));
  return r>150 && r-g>25 && r-b>25 && Math.abs(g-b)<60;
 }
+export function isWhite(cell) {
+ if (!cell) return true; // An unstyled blank inside a bounded service block is white.
+ if (!cell.s || cell.s.patternType === 'none') return true;
+ const rgb=cell.s.fgColor?.rgb?.slice(-6);
+ if (!rgb) return cell.s.fgColor?.theme === 0;
+ const channels=rgb.match(/../g).map(x=>parseInt(x,16));
+ return Math.min(...channels)>=235 && Math.max(...channels)-Math.min(...channels)<=5;
+}
 export function readPackages(wb,sheet,year) {
  const ws=wb.Sheets[sheet], range=XLSX.utils.decode_range(ws['!ref']);
  const cell=(r,c)=>ws[XLSX.utils.encode_cell({r,c})];
@@ -52,7 +60,7 @@ export function readPackages(wb,sheet,year) {
     const id=serviceId(label); if(!id) return;
     const merge=merges.find(m=>m.s.r===r&&m.s.c===c);
     const count=+(label.match(/(\d+)\s*$/)||[])[1];
-    blocks.push({label,from:c,to:merge?.e.c ?? (c+(count||10)-1),serviceId:id});
+    blocks.push({label,from:c,to:Math.min(range.e.c, merge?.e.c ?? (count ? c+count-1 : c)),serviceId:id});
    });
    layout={nameCol,descCol:row.findIndex(v=>/Багцын тоо|Мэдээлэл/.test(v)),startCol:row.findIndex(v=>v.includes('эхэлсэн')),blocks}; continue;
   }
@@ -70,7 +78,7 @@ export function readPackages(wb,sheet,year) {
     if(merge && (merge.s.r!==r || merge.s.c!==c)) continue;
     const dates=datesInCell(v,year);
     dates.forEach((date,n)=>used.push({date,key:`${sheet}:${r+1}:${c}:${n}`,serviceId:b.serviceId,label:b.label}));
-    if(!dates.length && !clean(v?.v) && !merge) remaining++;
+    if(!dates.length && !clean(v?.v) && !merge && isWhite(v)) remaining++;
     else if(!dates.length && clean(v?.v)) warnings.push(`${sheet}!${XLSX.utils.encode_cell({r,c})}: note, not a session`);
    }
    const total=used.length+remaining;if(!total)continue;
