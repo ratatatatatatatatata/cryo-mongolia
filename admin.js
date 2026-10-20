@@ -902,7 +902,7 @@ function renderBookings() {
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty">Захиалга алга байна.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="9"><div class="empty">Захиалга алга байна.</div></td></tr>';
     return;
   }
 
@@ -971,6 +971,32 @@ function renderBookings() {
       pay.value = b.payment_status || 'pending';
     });
     payment.appendChild(pay);tr.appendChild(payment);
+    const providerCell = document.createElement('td');
+    const provider = document.createElement('select');
+    provider.className = 'ctl sm';
+    provider.setAttribute('aria-label', `Үйлчилгээ үзүүлсэн ажилтан ${b.ref}`);
+    provider.appendChild(new Option('Ажилтан сонгох', ''));
+    cache.staff.filter(person => person.active || Number(person.id) === Number(b.performed_by)).forEach(person => {
+      const option = new Option(person.name, String(person.id));
+      option.disabled = !person.active; provider.appendChild(option);
+    });
+    provider.value = b.performed_by ? String(b.performed_by) : '';
+    provider.disabled = b.status === 'cancelled';
+    provider.addEventListener('change', async () => {
+      if (!provider.value) { provider.value = b.performed_by ? String(b.performed_by) : ''; return; }
+      provider.disabled = true;
+      try {
+        const {data,error} = await sb.rpc('record_booking_provider', {p_booking_id:b.id,p_staff_id:Number(provider.value)});
+        if (error) throw error;
+        Object.assign(b,data); renderBookings(); renderOverview();
+      } catch (error) {
+        provider.value = b.performed_by ? String(b.performed_by) : '';
+        alert('Хадгалж чадсангүй: ' + error.message);
+      } finally { provider.disabled = b.status === 'cancelled'; }
+    });
+    providerCell.appendChild(provider);
+    if (b.performed_at) { const hint=document.createElement('small'); hint.textContent='Үйлчилгээ үзүүлсэн'; providerCell.appendChild(hint); }
+    tr.appendChild(providerCell);
     tr.appendChild(cell(b.note || b.notes || "—", "record-note"));
 
     body.appendChild(tr);
