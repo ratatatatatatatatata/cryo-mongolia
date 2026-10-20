@@ -59,7 +59,8 @@ let cache = {
 };
 let bkFilter = "all";
 let bkDevice = "all";
-let bkSelectedSlot = null;
+let bkSelectedSlots = [];
+let bkTeams = [];
 let cpkSearch = "";
 let cpkStatus = "all";
 let cpkPkg = "all";
@@ -1013,8 +1014,9 @@ function renderBookingSchedule() {
       renderBookings();
     });
     ['bkFromDate','bkToDate'].forEach(id => $(id).addEventListener('change',renderBookings));
-    date.addEventListener('change', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); });
-    $("bkNewCancel").addEventListener('click', () => { bkSelectedSlot = null; $("bkNewForm").hidden = true; });
+    date.addEventListener('change', renderBookings);
+    $("bkNewCancel").addEventListener('click', () => { bkSelectedSlots = []; renderBookingSelection(); renderBookings(); });
+    $("bkNewRecipient").addEventListener('change', renderBookingSelection);
     $("bkNewSave").addEventListener('click', saveStaffBooking);
   }
   if (date.dataset.filterRole !== me?.role) {
@@ -1032,12 +1034,12 @@ function renderBookingSchedule() {
     button.className = 'chip-btn' + (String(service.id) === bkDevice ? ' on' : '');
     button.textContent = service.name;
     button.setAttribute('aria-pressed', String(String(service.id) === bkDevice));
-    button.onclick = () => { bkDevice = String(service.id); bkSelectedSlot = null; $("bkNewForm").hidden = true; renderBookings(); };
+    button.onclick = () => { bkDevice = String(service.id); renderBookings(); };
     tabs.appendChild(button);
   });
   grid.replaceChildren();
   const service = devices.find(item => String(item.id) === bkDevice);
-  $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Сул цаг дээр дарж захиалга бүртгэнэ.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
+  $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Нэг буюу олон сул цаг сонгоно уу. Төхөөрөмж, өдөр солиход сонголт хадгалагдана.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
   if (!service || !date.value) return;
   const duration = Number(service.duration_minutes) || 30;
   const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled' && (me?.role!=='staff' || row.booked_date>=bookingDateToday() || row.status==='done'));
@@ -1048,52 +1050,86 @@ function renderBookingSchedule() {
     const occupied = bookings.find(row => CryoSchedule.overlaps(start, end, Date.parse(row.starts_at), Date.parse(row.blocked_until || row.ends_at)));
     const past = start < Date.now();
     const button = document.createElement('button');
-    button.className = 'booking-slot';
+    const selected = bkSelectedSlots.some(slot => slot.serviceId === service.id && slot.startsAt === startsAt);
+    button.className = 'booking-slot' + (selected ? ' selected' : '');
+    button.setAttribute('aria-pressed', String(selected));
     button.disabled = !!occupied || past;
     const label = document.createElement('strong'), detail = document.createElement('small');
     label.textContent = time;
     detail.textContent = occupied ? `Захиалгатай · ${occupied.customer_name || ''}` : past ? 'Өнгөрсөн цаг' : 'Сул · Бүртгэх';
     button.append(label, detail);
     button.onclick = () => {
-      bkSelectedSlot = { serviceId: service.id, startsAt };
-      $("bkNewTitle").textContent = `${service.name} · ${date.value} ${time}`;
+      if (selected) bkSelectedSlots = bkSelectedSlots.filter(slot => !(slot.serviceId === service.id && slot.startsAt === startsAt));
+      else {
+        if (bkSelectedSlots.some(slot => slot.serviceId === service.id && CryoSchedule.overlaps(start, end, Date.parse(slot.startsAt), Date.parse(slot.startsAt) + CryoSchedule.blockedMinutes(duration) * 60000))) {
+          return alert('Сонгосон цагтай давхцаж байна. Өөр цаг сонгоно уу.');
+        }
+        bkSelectedSlots.push({ serviceId: service.id, startsAt, ref: 'STAFF-' + crypto.randomUUID() });
+      }
       $("bkNewStatus").textContent = '';
-      $("bkNewForm").hidden = false;
-      $("bkNewName").focus();
+      renderBookingSelection();
+      renderBookingSchedule();
     };
     grid.appendChild(button);
   }
 }
 
+function renderBookingSelection() {
+  $("bkNewForm").hidden = !bkSelectedSlots.length;
+  $("bkNewTitle").textContent = `Сонгосон ${bkSelectedSlots.length} цагт захиалга бүртгэх`;
+  const teamMode = $("bkNewRecipient").value === 'team';
+  $("bkNewName").closest('.field').hidden = teamMode;
+  $("bkNewTeamField").hidden = !teamMode;
+  const list = $("bkSelectedTimes"); list.replaceChildren();
+  bkSelectedSlots.forEach(slot => {
+    const button = document.createElement('button'); button.className = 'chip-btn';
+    button.textContent = `${cache.services.find(s => s.id === slot.serviceId)?.name || ''} · ${slot.startsAt.slice(0,10)} ${slot.startsAt.slice(11,16)} ×`;
+    button.title = 'Сонголтоос хасах';
+    button.onclick = () => { bkSelectedSlots = bkSelectedSlots.filter(s => s !== slot); renderBookingSelection(); renderBookingSchedule(); };
+    list.appendChild(button);
+  });
+  if (teamMode) loadBookingTeams();
+}
+
+async function loadBookingTeams() {
+  const select = $("bkNewTeam"), previous = select.value;
+  const {data,error} = await sb.from('sports_teams').select('id,name').is('archived_at',null).order('name');
+  if (error) { $("bkNewStatus").textContent = 'Багуудыг татаж чадсангүй: ' + error.message; return; }
+  bkTeams = data || [];
+  select.replaceChildren(new Option('Багаа сонгоно уу', ''));
+  bkTeams.forEach(team => select.add(new Option(team.name, String(team.id))));
+  select.value = previous;
+}
+
 async function saveStaffBooking() {
-  const button = $("bkNewSave"), slot = bkSelectedSlot;
-  if (button.disabled || !slot) return;
-  const name = $("bkNewName").value.trim(), phone = $("bkNewPhone").value.trim();
-  if (!name || !phone) return alert('Үйлчлүүлэгчийн нэр, утсаа оруулна уу.');
-  if (Date.parse(slot.startsAt) <= Date.now()) return alert('Өнгөрсөн цагт захиалга бүртгэх боломжгүй.');
+  const button = $("bkNewSave"), slots = [...bkSelectedSlots];
+  if (button.disabled || !slots.length) return;
+  const teamMode = $("bkNewRecipient").value === 'team';
+  const team = teamMode ? bkTeams.find(t => String(t.id) === $("bkNewTeam").value) : null;
+  const name = teamMode ? team?.name : $("bkNewName").value.trim(), phone = $("bkNewPhone").value.trim();
+  if (!name || !phone) return alert('Үйлчлүүлэгч эсвэл багаа сонгож, холбоо барих утсаа оруулна уу.');
+  if (slots.some(slot => Date.parse(slot.startsAt) <= Date.now())) return alert('Өнгөрсөн цагийг сонголтоос хасна уу.');
   const employee = bookingEmployee();
   if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   button.disabled = true;
   try {
-    const { data, error } = await sb.from('bookings').insert({
-      ref: 'STAFF-' + crypto.randomUUID(), customer_name: name, phone,
-      service_id: slot.serviceId, starts_at: slot.startsAt,
+    const group = crypto.randomUUID();
+    // One insert statement: a conflict rolls back every selected slot.
+    const { data, error } = await sb.from('bookings').insert(slots.map(slot => ({
+      ref: slot.ref, booking_group: group, customer_name: teamMode ? `Баг: ${name}` : name, phone,
+      team_id: team?.id || null, service_id: slot.serviceId, starts_at: slot.startsAt,
       booking_kind: $("bkNewKind").value, status: 'confirmed', amount: 0, deposit: 0,
-      staff_id: employee?.id || null,
-      user_id: null,
+      staff_id: employee?.id || null, user_id: null,
       note: `Ажилтнаар бүртгэсэн: ${employee?.name || me?.full_name || me?.email || ''}. ${$("bkNewNote").value.trim()}`,
-    }).select().single();
+    }))).select();
     if (error) throw error;
-    cache.bookings = [data, ...cache.bookings.filter(row => row.id !== data.id)];
-    const saleResult=await sb.from('sales').select('*').eq('booking_id',data.id).maybeSingle();
-    if (saleResult.data) window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:saleResult.data}));
-    bkSelectedSlot = null;
+    const ids = new Set(data.map(row => row.id));
+    cache.bookings = [...data, ...cache.bookings.filter(row => !ids.has(row.id))];
+    bkSelectedSlots = [];
     ['bkNewName','bkNewPhone','bkNewNote'].forEach(id => { $(id).value = ''; });
-    $("bkNewForm").hidden = true;
-    renderBookings();
-    renderOverview();
+    renderBookingSelection(); renderBookings(); renderOverview();
   } catch (error) {
-    $("bkNewStatus").textContent = error.code === '23P01' ? 'Энэ цаг дөнгөж захиалагдлаа. Өөр сул цаг сонгоно уу.' : 'Хадгалж чадсангүй: ' + error.message;
+    $("bkNewStatus").textContent = error.code === '23P01' ? 'Сонгосон цагийн аль нэг нь захиалагдсан эсвэл давхцсан байна. Аль ч цаг хадгалагдаагүй. Сонголтоо засна уу.' : 'Хадгалж чадсангүй: ' + error.message;
     const refreshed = await fetchAll(() => sb.from('bookings').select('*').order('id'));
     if (!refreshed.error) { cache.bookings = refreshed.data || []; renderBookings(); }
   } finally { button.disabled = false; }
