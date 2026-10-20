@@ -662,7 +662,10 @@
       </div>
       <div class="panel" id="bkNewForm" hidden>
         <div class="panel-head"><div class="panel-title" id="bkNewTitle">Сул цагт захиалга бүртгэх</div></div>
+        <div class="booking-device-tabs" id="bkSelectedTimes"></div>
         <div class="form-grid">
+          <div class="field"><label for="bkNewRecipient">Хэнд захиалах вэ?</label><select class="ctl" id="bkNewRecipient"><option value="person">Нэг үйлчлүүлэгч</option><option value="team">Спортын баг</option></select></div>
+          <div class="field" id="bkNewTeamField" hidden><label for="bkNewTeam">Спортын баг *</label><select class="ctl" id="bkNewTeam"><option value="">Багаа сонгоно уу</option></select></div>
           <div class="field"><label for="bkNewName">Үйлчлүүлэгчийн нэр *</label><input class="ctl" id="bkNewName" maxlength="200" autocomplete="off"></div>
           <div class="field"><label for="bkNewPhone">Утас *</label><input class="ctl" id="bkNewPhone" type="tel" maxlength="30"></div>
           <div class="field"><label for="bkNewKind">Захиалгын төрөл</label><select class="ctl" id="bkNewKind"><option value="standard">Энгийн үйлчилгээ</option><option value="package">Багцын эрхээр</option></select></div>
