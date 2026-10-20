@@ -1,3 +1,5 @@
+// One-time initialization of legacy workbook package balances.
+// Refuses a second run after device entitlements have been initialized.
 // Packages-only reconciliation. No sales, attendance or payroll changes.
 // npm install --no-save xlsx@0.18.5
 // node scripts/import-package-balances.mjs source.xlsx
@@ -16,18 +18,23 @@ const sql=`begin;
 lock table public.customer_package_contracts, public.package_redemptions in share row exclusive mode;
 create temporary table incoming_contracts on commit drop as select * from jsonb_to_recordset(${quote(JSON.stringify(contracts))}::jsonb) as x(key text,customer text,label text,start date,total int,remaining int,status text,notes text,"serviceId" bigint);
 create temporary table incoming_visits on commit drop as select * from jsonb_to_recordset(${quote(JSON.stringify(redemptions))}::jsonb) as x("contractKey" text,date date,key text,"serviceId" bigint,label text);
+do $$ begin
+ if exists(select 1 from public.customer_package_contracts where source_key in(select key from incoming_contracts) and jsonb_array_length(service_units)>0) then raise exception 'Color-aware import already initialized; use an incremental reconciliation'; end if;
+end $$;
 create temporary table manual_before on commit drop as select * from public.package_redemptions where source_key is null or source_key !~ '^Багц [0-9]{4}:';
 -- Stable contract IDs preserve all employee-recorded visits and references.
-update public.customer_package_contracts c set customer_label=i.customer,package_label=i.label,purchased_on=i.start,total_units=i.total,notes=i.notes,
- service_units=jsonb_build_array(jsonb_build_object('service_id',i."serviceId",'service_name',s.name,'units',i.total))
+update public.customer_package_contracts c set customer_label=i.customer,package_label=i.label,purchased_on=i.start,total_units=i.total,notes=i.notes
 from incoming_contracts i join public.services s on s.id=i."serviceId" where c.source_key=i.key;
-insert into public.customer_package_contracts(customer_label,package_label,purchased_on,total_units,status,source_key,notes,service_units)
-select i.customer,i.label,i.start,i.total,i.status,i.key,i.notes,jsonb_build_array(jsonb_build_object('service_id',i."serviceId",'service_name',s.name,'units',i.total))
+insert into public.customer_package_contracts(customer_label,package_label,purchased_on,total_units,status,source_key,notes)
+select i.customer,i.label,i.start,i.total,i.status,i.key,i.notes
 from incoming_contracts i join public.services s on s.id=i."serviceId" where not exists(select 1 from public.customer_package_contracts c where c.source_key=i.key);
 -- Refresh only cells from the imported sheets; manual entries remain untouched.
 delete from public.package_redemptions where split_part(source_key,':',1) in (${sheets.map(quote).join(',')});
 insert into public.package_redemptions(contract_id,used_on,units,source_key,service_id,service_label)
 select c.id,i.date,1,i.key,i."serviceId",s.name from incoming_visits i join public.customer_package_contracts c on c.source_key=i."contractKey" join public.services s on s.id=i."serviceId";
+-- Initialize device limits after loading historical visits into legacy contracts.
+update public.customer_package_contracts c set service_units=jsonb_build_array(jsonb_build_object('service_id',i."serviceId",'service_name',s.name,'units',i.total))
+from incoming_contracts i join public.services s on s.id=i."serviceId" where c.source_key=i.key;
 update public.customer_package_contracts c set status=case when c.total_units>(select coalesce(sum(r.units),0) from public.package_redemptions r where r.contract_id=c.id) then 'active' else 'completed' end
 where c.source_key in(select key from incoming_contracts) and c.status not in('cancelled','expired');
 -- Obsolete workbook-only records are retained as cancelled, never hard-deleted.
