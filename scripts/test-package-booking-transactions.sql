@@ -31,14 +31,22 @@ begin
   insert into public.bookings(ref,customer_name,service_id,starts_at,status,staff_id)
     values('QA-'||gen_random_uuid(),'QA rollback booking',service.id,'2099-12-01 10:00+08','pending',employee_id) returning id into booking_id;
   result:=public.set_booking_status(booking_id,'confirmed',employee_id);
-  if (result#>>'{sale,invoice}')::bigint<>service.price then raise exception 'Booking price failed'; end if;
-  if (result#>>'{sale,sale_date}')::date<>(now() at time zone 'Asia/Ulaanbaatar')::date then raise exception 'Confirmation date failed'; end if;
-  again:=public.set_booking_status(booking_id,'confirmed',employee_id);
-  if again#>>'{sale,id}'<>result#>>'{sale,id}' then raise exception 'Duplicate booking sale'; end if;
-  again:=public.set_booking_status(booking_id,'cancelled',employee_id);
-  if (again#>>'{sale,total}')::bigint<>0 then raise exception 'Cancelled unpaid invoice was not cleared'; end if;
-  again:=public.set_booking_status(booking_id,'confirmed',employee_id);
-  if (again#>>'{sale,total}')::bigint<>service.price then raise exception 'Reconfirmation failed'; end if;
+  if exists(select 1 from public.sales where sales.booking_id=qa.booking_id) then raise exception 'Confirmation created unpaid sale'; end if;
+  request:=jsonb_build_object('staff_id',employee_id,'customer_name','QA paid customer','services',service.name,'cash',service.price,'note','QA payment note');
+  denied:=false;
+  begin perform public.pay_booking(booking_id,request||jsonb_build_object('cash',0));
+  exception when raise_exception then denied:=true; end;
+  if not denied then raise exception 'Zero payment accepted'; end if;
+  result:=public.pay_booking(booking_id,request);
+  if result#>>'{booking,payment_status}'<>'paid' or (result#>>'{sale,cash}')::bigint<>service.price then raise exception 'Payment failed'; end if;
+  if (result#>>'{sale,sale_date}')::date<>(now() at time zone 'Asia/Ulaanbaatar')::date then raise exception 'Payment date failed'; end if;
+  again:=public.pay_booking(booking_id,request);
+  if again#>>'{sale,id}'<>result#>>'{sale,id}' then raise exception 'Duplicate payment'; end if;
+  if (select count(*) from public.sales where sales.booking_id=qa.booking_id)<>1 then raise exception 'Duplicate sales rows'; end if;
+  denied:=false;
+  begin update public.bookings set payment_status='pending' where id=booking_id;
+  exception when insufficient_privilege then denied:=true; end;
+  if (select payment_status from public.bookings where id=booking_id)<>'paid' then raise exception 'Direct payment change accepted'; end if;
   perform public.set_booking_status(booking_id,'done',employee_id);
   insert into public.bookings(ref,customer_name,service_id,starts_at,status,staff_id,booking_kind)
     values('QA-'||gen_random_uuid(),'QA package booking',service.id,'2099-12-02 10:00+08','confirmed',employee_id,'package') returning id into booking_id;
