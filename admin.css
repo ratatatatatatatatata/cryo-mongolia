@@ -364,3 +364,22 @@ tr.review td{background:rgba(255,180,80,.05)}
 .staff-readonly-reports [data-panel="reports"] button { display:none !important; }
 
 .booking-slot.selected { border:2px solid var(--accent, #169f90); background:#d9f5ee; color:#123d36; }
+
+/* In-page handbook; native dialog contains keyboard focus and supports Escape. */
+.guide-launcher { position:fixed; right:20px; bottom:calc(20px + env(safe-area-inset-bottom, 0px)); z-index:90; border:1px solid #c9dedb; border-radius:28px; padding:13px 20px; background:#143e37; color:white; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 4px 18px #0002; }
+.guide-launcher:focus-visible { outline:3px solid #54b9a7; outline-offset:3px; }
+.admin-guide { width:min(640px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); padding:0; border:1px solid #d5e3df; border-radius:18px; background:#fff; color:#203b35; box-shadow:0 20px 80px #0003; }
+.admin-guide::backdrop { background:rgb(12 27 24 / .45); }
+.guide-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:24px 24px 12px; }
+.guide-head h2 { font-size:21px; margin:0 0 6px; }
+.guide-head p { margin:0; font-size:13px; color:#62756e; }
+.guide-head button { flex-shrink:0; }
+.guide-search { padding:8px 24px 18px; }
+.guide-search label { display:block; font-size:13px; margin-bottom:6px; }
+.guide-content { padding:0 24px 24px; }
+.guide-content details { border-top:1px solid #e1eae6; }
+.guide-content details[hidden] { display:none; }
+.guide-content summary { cursor:pointer; padding:16px 2px; font-size:15px; font-weight:600; line-height:1.5; }
+.guide-content p { margin:0 0 18px; font-size:14px; line-height:1.85; color:#41574e; }
+.guide-empty { padding:0 24px 24px; font-size:14px; }
+@media(max-width:600px) { .guide-launcher { right:12px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); padding:11px 15px; } .guide-head { padding:18px 16px 10px; } .guide-head h2 { font-size:18px; } .guide-search,.guide-content { padding-left:16px; padding-right:16px; } }
