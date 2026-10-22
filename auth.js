@@ -11,6 +11,16 @@ const sb = CFG.url && CFG.anonKey ? createClient(CFG.url, CFG.anonKey) : null;
 
 const $ = (id) => document.getElementById(id);
 const money = (n) => "₮" + Number(n || 0).toLocaleString("en-US");
+const publicText = (text) => window.CryoI18n?.t(text) ?? text;
+function authError(error) {
+  const message = String(error?.message || "");
+  if (/invalid login credentials/i.test(message)) return "Нэвтрэх мэдээлэл буруу байна.";
+  if (/email not confirmed/i.test(message)) return "И-мэйл хаягаа эхлээд баталгаажуулна уу.";
+  if (/already registered/i.test(message)) return "Энэ и-мэйл хаягаар бүртгэл үүссэн байна.";
+  if (/password.*(6|short|least)/i.test(message)) return "Нууц үг хамгийн багадаа 6 тэмдэгттэй байна.";
+  if (/rate.limit|too many|seconds/i.test(message)) return "Хүсэлт хэт олон байна. Түр хүлээгээд дахин оролдоно уу.";
+  return "Үйлдлийг гүйцэтгэж чадсангүй. Түр хүлээгээд дахин оролдоно уу.";
+}
 const STATUS_MN = {
   pending: "Хүлээгдэж буй",
   confirmed: "Баталгаажсан",
@@ -261,7 +271,7 @@ function wireAuth() {
       const redirectTo = `${window.location.origin}${window.location.pathname}`;
       const { error } = await sb.auth.signInWithOAuth({ provider, options: { redirectTo } });
       button.disabled = false;
-      if (error) note("err", "Facebook нэвтрэлтийг Meta App болон Supabase дээр идэвхжүүлэх шаардлагатай: " + error.message);
+      if (error) note("err", "Facebook нэвтрэлт одоогоор ажиллахгүй байна. И-мэйлээр нэвтэрнэ үү.");
     });
   });
 
@@ -279,14 +289,14 @@ function wireAuth() {
         options: { data: { full_name: $("c_name").value.trim() } },
       });
       btn.disabled = false;
-      if (error) return note("err", error.message);
+      if (error) return note("err", authError(error));
       note("ok", "Бүртгэл үүслээ. И-мэйл баталгаажуулалт шаардвал шуудангаа шалгана уу.");
       return;
     }
 
     const { error } = await sb.auth.signInWithPassword({ email, password });
     btn.disabled = false;
-    if (error) return note("err", error.message);
+    if (error) return note("err", authError(error));
     closeAuth();
   });
 
@@ -351,7 +361,7 @@ async function openMine() {
     list.innerHTML = "";
     const d = document.createElement("div");
     d.className = "auth-note err";
-    d.textContent = error.message;
+    d.textContent = authError(error);
     list.appendChild(d);
     return;
   }
@@ -392,14 +402,14 @@ async function openMine() {
       cancel.style.margin = "0";
       cancel.textContent = "Цуцлах";
       cancel.addEventListener("click", async () => {
-        if (!confirm("Энэ захиалгыг цуцлах уу?")) return;
+        if (!confirm(publicText("Энэ захиалгыг цуцлах уу?"))) return;
         cancel.disabled = true;
         const { error: e2 } = await sb
           .from("bookings")
           .update({ status: "cancelled" })
           .eq("id", b.id);
         if (e2) {
-          alert("Цуцалж чадсангүй: " + e2.message);
+          alert(publicText("Цуцалж чадсангүй. Түр хүлээгээд дахин оролдоно уу."));
           cancel.disabled = false;
           return;
         }

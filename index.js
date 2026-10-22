@@ -373,10 +373,26 @@ async function doConfirm() {
   }
   setText("bookingRef", ref);
   const det = document.getElementById("confirmDetails");
-  if (det) det.innerHTML =
-    `<strong style="color:var(--text-primary)">${name}</strong> · ${phone}<br>` +
-    bk.selections.map((item) => `❄ ${item.service.name} · ${item.dateKey} · ⏰ ${item.time}`).join("<br>") + "<br>" +
-    `<span style="color:var(--accent);font-size:12px;">✓ ${bk.packageBooking ? "Багцын эрхээр — админ үлдэгдлийг шалгана" : `₮100,000 — ${bk.bankName}`}</span>`;
+  if (det) {
+    const customer = document.createElement("strong");
+    customer.id = "confirmCustomer";
+    customer.setAttribute("translate", "no");
+    customer.textContent = `${name} · ${phone}`;
+    det.replaceChildren(customer, document.createElement("br"));
+    bk.selections.forEach((item) => {
+      const service = document.createElement("span");
+      service.textContent = item.service.name;
+      det.append("❄ ", service, ` · ${item.dateKey} · ⏰ ${item.time}`, document.createElement("br"));
+    });
+    const status = document.createElement("span");
+    if (bk.packageBooking) {
+      status.textContent = "Багцын эрхээр — админ үлдэгдлийг шалгана";
+    } else {
+      status.textContent = bk.bankName;
+      det.append("₮100,000 — ");
+    }
+    det.append("✓ ", status);
+  }
   setStepDots(3);
   showPanel("step3");
 }
