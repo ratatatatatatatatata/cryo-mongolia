@@ -1,0 +1,14 @@
+/* Scoped to the public language control; no shared or ERP style changes. */
+.public-language{display:inline-flex;align-items:center;gap:2px;border:1px solid rgba(132,177,205,.4);border-radius:9px;padding:3px;flex-shrink:0;background:#091a28;color:#eaf6ff;vertical-align:middle}
+.public-language button{appearance:none;border:0;background:transparent;color:inherit;font:600 12px/1.3 Manrope,system-ui,sans-serif;padding:9px 10px;min-height:36px;cursor:pointer;border-radius:6px;white-space:nowrap}
+.public-language button[aria-pressed="true"]{background:#b8e9ff;color:#07121d}
+.public-language button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#navbar>.public-language{margin-left:12px}
+.topnav>.public-language{margin-left:auto}
+main>.public-language{display:flex;width:max-content;margin:0 0 24px auto}
+.modal>.public-language{margin:0 40px 18px 0}
+html[lang="en"] #navbar .nav-links{gap:20px}
+html[lang="en"] #navbar .nav-actions{gap:10px}
+@media(min-width:901px) and (max-width:1250px){#navbar{padding-left:20px;padding-right:20px}#navbar .nav-links{gap:14px}#navbar .nav-actions .nav-cta{padding:11px 15px}#navbar .nav-logo small{font-size:8px}#navbar .nav-logo b{font-size:17px}}
+@media(max-width:900px){#navbar>.public-language{margin-left:auto;margin-right:12px}.public-language button{min-height:40px;padding:8px;font-size:11px}.topnav{gap:10px;flex-wrap:wrap}.topnav>.public-language{margin-left:auto}.topnav .nav-logo small{font-size:7px}}
+@media(max-width:420px){#navbar{padding-left:12px;padding-right:12px;gap:6px}#navbar .nav-logo b{font-size:14px}#navbar .nav-logo small{font-size:6px;letter-spacing:1px}#navbar .nav-logo img{width:30px;height:30px}#navbar>.public-language{margin-left:auto;margin-right:5px}.public-language button{padding:7px;min-height:40px}.topnav>.public-language{margin-left:0}.topnav .back-btn{font-size:12px}}
