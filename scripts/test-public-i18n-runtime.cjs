@@ -6,9 +6,17 @@ const root = path.resolve(__dirname, '..');
 function fixture(url='https://example.test/?lang=en', blocked=false) {
   let observerOptions;
   const store = new Map();
+  const textarea = {
+    tagName:'TEXTAREA', value:'Хэрэглэгчийн бичсэн мэдээлэл',
+    attrs:{placeholder:'Асуулт эсвэл хүсэлтээ бичнэ үү...'},
+    closest(selector){return selector.split(',').includes('textarea') ? this : null},
+    hasAttribute(key){return Object.hasOwn(this.attrs,key)},
+    getAttribute(key){return this.attrs[key]},
+    setAttribute(key,value){this.attrs[key]=value},
+  };
   const document = {
     documentElement: {lang:'mn'},
-    querySelector(){return null}, querySelectorAll(){return []},
+    querySelector(){return null}, querySelectorAll(selector){return selector.includes('meta[content]') ? [textarea] : []},
     createTreeWalker(){return {nextNode(){return null}}},
     dispatchEvent(){}, addEventListener(){},
   };
@@ -21,7 +29,7 @@ function fixture(url='https://example.test/?lang=en', blocked=false) {
     CustomEvent:class{}, queueMicrotask,
   });
   for(const f of ['public-copy.js','public-device-copy.js','public-ui-copy.js','public-i18n.js']) vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),context);
-  return {context,store,document,get observerOptions(){return observerOptions}};
+  return {context,store,document,textarea,get observerOptions(){return observerOptions}};
 }
 const f=fixture();
 const i=f.context.window.CryoI18n;
@@ -37,8 +45,11 @@ for(const [mn,en] of [
   ['test@example.invalid','test@example.invalid']
 ]) assert.equal(i.t(mn),en,mn);
 assert.equal(f.document.documentElement.lang,'en');
+assert.equal(f.textarea.attrs.placeholder,'Write your question or request...');
+assert.equal(f.textarea.value,'Хэрэглэгчийн бичсэн мэдээлэл');
 assert.equal(f.store.get('cryo-public-language'),'en');
 i.setLanguage('mn');assert.equal(i.t('Үйлчилгээ'),'Үйлчилгээ');
+assert.equal(f.textarea.attrs.placeholder,'Асуулт эсвэл хүсэлтээ бичнэ үү...');
 assert.equal(i.t('RECOVERY CENTER'),'НӨХӨН СЭРГЭЭХ ТӨВ');
 i.setLanguage('invalid');assert.equal(i.language,'mn');
 i.setLanguage('en');assert.equal(i.t('RECOVERY CENTER'),'RECOVERY CENTER');

@@ -14,6 +14,8 @@
   const records = new WeakMap();
   const attributes = ['alt', 'title', 'placeholder', 'aria-label', 'label'];
   const excluded = 'script,style,noscript,textarea,code,pre,[translate="no"],[data-no-translate],.acct-name,.acct-mail,.my-ref,.my-when,#myLead,#confirmCustomer';
+  // Translate a textarea's UI labels, never its user-entered content.
+  const attributeExcluded = excluded.replace('textarea,', '');
   const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
   const insensitive = new Map(Object.entries(copy).map(([key, value]) => [key.toLocaleLowerCase('mn'), value]));
 
@@ -102,7 +104,7 @@
       renderValue(node, 'text', node.data, next => { textNode.data = next; });
     }
     document.querySelectorAll('[alt],[title],[placeholder],[aria-label],[label],meta[content]').forEach(el => {
-      if (el.closest(excluded)) return;
+      if (el.closest(attributeExcluded)) return;
       for (const attr of attributes) {
         if (el.hasAttribute(attr)) renderValue(el, attr, el.getAttribute(attr), next => el.setAttribute(attr, next));
       }
