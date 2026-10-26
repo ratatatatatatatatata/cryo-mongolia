@@ -9,6 +9,8 @@ const output = path.join(root, "_site");
 const publicFiles = [
   "index.html",
   "skinbolic.html",
+  "skinbolic.js",
+  "skinbolic-translations.js",
   "index.css",
   "index.js",
   "public-copy.js",
