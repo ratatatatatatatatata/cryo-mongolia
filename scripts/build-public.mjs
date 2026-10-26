@@ -1,3 +1,4 @@
+import { buildSkinbolic } from './build-skinbolic.mjs';
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +56,8 @@ fs.cpSync(path.join(root, "photos"), path.join(output, "photos"), {
     return /\.(png|webp|jpe?g)$/i.test(source);
   },
 });
+
+await buildSkinbolic(output);
 
 const forbidden = ["supabase", "scripts", ".git", ".github", ".private-backup", "node_modules"];
 for (const relativePath of forbidden) {
