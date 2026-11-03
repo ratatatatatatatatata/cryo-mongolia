@@ -14,6 +14,8 @@ const publicFiles = [
   "index.css",
   "index.js",
   "device-shelf.js",
+  "anatomy-viewer.js",
+  "anatomy-viewer.css",
   "device-shelf.css",
   "public-copy.js",
   "public-device-copy.js",

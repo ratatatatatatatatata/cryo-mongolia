@@ -2,6 +2,21 @@
 (function () {
   'use strict';
   const copy = `
+Хүний биеийн бүтэц	Human anatomy
+Нэр дээр дарж томруулна уу.	Select a label to zoom in.
+Хүний биеийн анатомийн зураг	Human anatomy illustration
+Биеийн хэсэг сонгох	Choose a body region
+Бүтэн бие ↗	Full body ↗
+Толгой	Head
+Мөр	Shoulder
+Цээж	Chest
+Хэвлий	Abdomen
+Гар	Hand
+Өвдөг	Knee
+Шилбэ	Lower leg
+Нэрийг сонгоход зураг тухайн хэсэг рүү ойртоно.	Choose a label to zoom into that region.
+Томруулах	Zoom
+Танилцуулгын дүрслэл	Illustration
 Эргүүлж сонгоод, дэлгэрэнгүйтэй танилцаарай.	Turn to choose a device and explore the details.
 Төхөөрөмжийн төрөл	Device category
 Дараах төхөөрөмж	Next device

@@ -29,6 +29,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Geologica:slnt,wght@-12..0,300..800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="index.css"/>
   <link rel="stylesheet" href="device-shelf.css"/>
+  <link rel="stylesheet" href="anatomy-viewer.css"/>
   <link rel="icon" type="image/svg+xml" href="logo.svg"/>
   <noscript><style>.reveal,.stagger>*{opacity:1 !important;transform:none !important}.hero-chip,.hero-sub,.hero-actions,.hero-trust,.hero-scroll-hint{opacity:1 !important;animation:none !important}</style></noscript>
 <link rel="stylesheet" href="public-i18n.css"/>
@@ -122,15 +123,16 @@
 <!-- ══════════ ABOUT ══════════ -->
 <section class="section alt" id="about">
   <div class="about">
-    <div class="about-visual reveal">
-      <div class="about-card-main">
-        <img class="about-anatomy" src="photos/about-anatomy-3d.webp"
-          alt="Хүний булчин, судас ба мэдрэлийн тогтолцооны 3D анатомийн дүрслэл" loading="lazy"/>
+    <div class="about-visual reveal anatomy-panel">
+      <div class="anatomy-head"><span>CRYO / HUMAN ANATOMY</span><h3>Хүний биеийн бүтэц</h3><p>Нэр дээр дарж томруулна уу.</p></div>
+      <div class="anatomy-preview">
+        <svg viewBox="0 0 900 1350" role="img" aria-label="Хүний биеийн анатомийн зураг">
+          <image href="photos/about-anatomy-3d.webp" width="900" height="1350"/>
+          <g class="anatomy-leaders" aria-hidden="true"></g>
+        </svg>
+        <div class="anatomy-labels" aria-label="Биеийн хэсэг сонгох"></div>
       </div>
-      <div class="about-float-badge">
-        <div class="fb-num">100%</div>
-        <div class="fb-label">Аюулгүй технологи</div>
-      </div>
+      <button class="anatomy-full" type="button">Бүтэн бие ↗</button>
     </div>
     <div class="reveal">
       <div class="section-chip">Бидний тухай</div>
@@ -526,6 +528,7 @@
 <script type="module" src="auth.js"></script>
 <script src="cryo3d.js"></script>
 <script src="device-shelf.js"></script>
+<script src="anatomy-viewer.js"></script>
 <script>
 async function handleContact(e){
   e.preventDefault();
