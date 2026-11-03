@@ -1,3 +1,4 @@
+import { previousCustomers } from "./booking-packages.js";
 import { bookingGroups, bookingUsage } from "./booking-groups.js";
 /* ══════════════════════════════════════════════════════════════
    °CRYO Mongolia — admin dashboard
@@ -140,7 +141,7 @@ function fmtDate(v) {
   for (const [nameId,phoneId] of [['bkNewName','bkNewPhone'],['f_name','f_phone'],['cpk_customer','cpk_phone'],['pay_customer','pay_phone']]) {
     const input=$(nameId); if(!input) continue;
     if(!$(phoneId)){const field=document.createElement('div');field.className='field';const label=document.createElement('label');label.htmlFor=phoneId;label.textContent='Утас';const phone=document.createElement('input');phone.id=phoneId;phone.type='tel';phone.className='ctl';phone.required=true;phone.readOnly=['cpk_phone','pay_phone'].includes(phoneId);field.append(label,phone);input.closest('.field').after(field);}
-    customerPicker(input,()=>cache.customers,c=>{$(phoneId).value=c?.phone||'';input.dataset.customerId=c?String(c.id):'';});
+    customerPicker(input,()=>previousCustomers(cache.customers,cache.bookings,cache.sales),c=>{$(phoneId).value=c?.phone||'';input.dataset.customerId=c?.id?String(c.id):'';});
   }
   wireStaff();
   wireAttendance();

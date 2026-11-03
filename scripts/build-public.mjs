@@ -35,6 +35,7 @@ const publicFiles = [
   "customer-picker.js",
   "booking-time.js",
   "booking-groups.js",
+  "booking-packages.js",
   "sports-teams.js",
   "excel-export.js",
   "cabin.html",
