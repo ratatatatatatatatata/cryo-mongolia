@@ -383,3 +383,9 @@ tr.review td{background:rgba(255,180,80,.05)}
 .guide-content p { margin:0 0 18px; font-size:14px; line-height:1.85; color:#41574e; }
 .guide-empty { padding:0 24px 24px; font-size:14px; }
 @media(max-width:600px) { .guide-launcher { right:12px; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); padding:11px 15px; } .guide-head { padding:18px 16px 10px; } .guide-head h2 { font-size:18px; } .guide-search,.guide-content { padding-left:16px; padding-right:16px; } }
+
+.customer-suggestions{max-height:240px;overflow:auto;border:1px solid var(--border,#ccd6e0);border-radius:8px;background:var(--surface,#fff);margin-top:5px;grid-column:1/-1}
+.customer-suggestions[hidden]{display:none}
+.customer-suggestion{display:block;width:100%;text-align:left;padding:11px 12px;border:0;border-bottom:1px solid #8899aa30;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.customer-suggestion:hover,.customer-suggestion:focus{background:#5ab8df22;outline:2px solid #55aacc}
+.customer-suggestions p{padding:10px;font-size:12px}

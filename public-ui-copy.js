@@ -1,6 +1,16 @@
 (function () {
   'use strict';
   const copy = `
+Дараагийн багцад 10% хөнгөлөлт	10% off your next package
+Биеийн анализ 2 удаа үнэгүй · 2 сар дараалан авбал дараагийн сар ₮1,700,000	Two complimentary body analyses · after two consecutive months, the next month is ₮1,700,000
+Арьсны оношилгоо + гэрийн арчилгааны зөвлөмж · дараагийн гоо сайхны багцад 10%	Skin assessment and home care guidance · 10% off your next beauty package
+Нийт төлбөр	Total payment
+Олон үйлчилгээ, олон цагаа сонгоод	Select multiple services and times,
+нэг удаа нийлбэр дүнгээр төлнө.	then pay the combined total once.
+Сонгосон бүх үйлчилгээний нийт дүн. Төлбөрийг төвийн ажилтан шалгаж баталгаажуулна.	Total for all selected services. A staff member will verify your payment.
+Нэгдсэн захиалга илгээх →	Submit combined booking →
+Таны захиалгын хүсэлт бүртгэгдлээ.	Your booking request has been received.
+Төлбөр, цагийг баталгаажуулахаар бид холбогдоно.	We will contact you to confirm payment and your appointment.
 Нууцлалын бодлого — CRYO Mongolia	Privacy policy — CRYO Mongolia
 Сүүлд шинэчилсэн: 2026 оны 9 сарын 30	Last updated: 30 September 2026
 CRYO Mongolia нь хэрэглэгчийн хувийн мэдээллийг хүндэтгэж, зөвхөн үйлчилгээ үзүүлэх, цаг захиалга удирдах болон бүртгэлийн аюулгүй байдлыг хангахад шаардлагатай хэмжээнд боловсруулна.	CRYO Mongolia respects your personal information and processes it only as needed to provide services, manage appointments and keep accounts secure.

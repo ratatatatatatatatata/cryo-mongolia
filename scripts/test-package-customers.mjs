@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {packageCustomerGroups,packageState} from '../package-customers.js';
+const customers=[{id:1,full_name:'Бат',phone:'99112233'},{id:2,full_name:'Дорж',phone:'88112233'},{id:3,full_name:'Дорж',phone:'77112233'}];
+const contracts=[{id:1,customer_label:'Бат',status:'active'},{id:2,customer_label:' Бат ',status:'completed'},{id:3,customer_label:'Бат',status:'cancelled'},{id:4,customer_id:2,customer_label:'Дорж',status:'active'},{id:5,customer_id:3,customer_label:'Дорж',status:'completed'},{id:6,customer_label:'Дорж',status:'active'}];
+const groups=packageCustomerGroups(contracts,customers);
+assert.equal(groups.length,4);assert.equal(groups.find(g=>g.key==='id:1').contracts.length,2);assert.equal(groups.find(g=>g.key==='id:1').phone,'99112233');assert(groups.find(g=>g.key==='legacy:дорж').ambiguous);
+assert.equal(packageState({status:'active',total_units:6},6,'2026-11-03'),'completed');
+assert.equal(packageState({status:'active',total_units:6,expires_on:'2026-11-02'},2,'2026-11-03'),'expired');
+assert.equal(packageState({status:'active',total_units:6},2,'2026-11-03'),'active');
+assert.equal(packageState({status:'completed',total_units:null},0,'2026-11-03'),'completed');
+console.log('PASS one customer row, phone, history, cancelled exclusion, same-name separation and package states');

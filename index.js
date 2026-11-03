@@ -225,6 +225,7 @@ function pickTime(time, el) {
   bk.time = time;
   document.querySelectorAll(".time-slot").forEach((s) => s.classList.remove("selected"));
   el.classList.add("selected");
+  addBookingSelection();
 }
 
 function togglePackageBooking(checked) {
@@ -253,7 +254,10 @@ function removeBookingSelection(index) {
   buildTimeGrid();
 }
 
+function bookingTotal() { return bk.selections.reduce((sum,item)=>sum+Number(item.service.price||0),0); }
+
 function renderBookingSelections() {
+  setText("bookingTotalPrice", "₮"+bookingTotal().toLocaleString("en-US"));
   const host = document.getElementById("bookingSelections");
   if (!host) return;
   if (!bk.selections.length) {
@@ -289,15 +293,15 @@ function goStep2() {
   const name = document.getElementById("b_name")?.value.trim();
   const phone = document.getElementById("b_phone")?.value.trim();
   if (!name) return shakeInput("b_name");
-  if (!phone) return shakeInput("b_phone");
+  if (!/^\+?\d[\d\s-]{6,18}$/.test(phone)) return shakeInput("b_phone");
   if (bk.service && bk.dateKey && bk.time) addBookingSelection();
   if (!bk.selections.length) return showToast("Дор хаяж нэг үйлчилгээ, цаг нэмнэ үү");
   setText("sum_service", `${bk.selections.length} үйлчилгээ`);
   setText("sum_date", bk.selections.map((item) => `${item.dateKey.slice(5)} ${item.time}`).join(" · "));
   setText("sum_time", `${bk.selections.reduce((sum, item) => sum + (Number(item.service.duration_minutes) || 30), 0)} минут`);
-  setText("sum_deposit", bk.packageBooking ? "Багцын эрхээр" : "₮100,000 (нийт нэг удаа)");
+  setText("sum_deposit", bk.packageBooking ? "Багцын эрхээр" : "₮"+bookingTotal().toLocaleString("en-US")+" (нийт нэг удаа)");
   const payButton = document.getElementById("bookingPayButton");
-  if (payButton) payButton.textContent = bk.packageBooking ? "Захиалга баталгаажуулах →" : "QR код авах →";
+  if (payButton) payButton.textContent = bk.packageBooking ? "Захиалга баталгаажуулах →" : "Нэгдсэн захиалга илгээх →";
   setStepDots(2);
   showPanel("step2");
 }
@@ -310,15 +314,8 @@ function selectBank(el, id, name) {
 }
 
 function showQR() {
-  if (bk.packageBooking) return doConfirm();
-  if (!bk.bank) return showToast("Банкаа сонгоно уу");
-  setText("qrBankName", bk.bankName.toUpperCase() + " — QPAY");
-  setStepDots(2);
-  showPanel("step2b");
-  startTimer();
-  setTimeout(() => {
-    if (document.getElementById("step2b")?.classList.contains("active")) doConfirm();
-  }, 6000);
+  // Payment is verified by staff; never simulate a gateway confirmation.
+  return doConfirm();
 }
 
 function startTimer() {
@@ -337,9 +334,10 @@ function startTimer() {
 }
 
 async function doConfirm() {
+  if(bk.saving || bk.saved) return;
   if (qrInterval) clearInterval(qrInterval);
   if (!bk.selections.length) return goStepNum(1);
-  const ref = "CRYO-" + Date.now().toString(36).toUpperCase();
+  const ref = bk.ref || (bk.ref="CRYO-" + crypto.randomUUID());
   const name = document.getElementById("b_name")?.value || "";
   const phone = document.getElementById("b_phone")?.value || "";
   const userId = window.cryoAuth?.user?.id || null;
@@ -355,15 +353,19 @@ async function doConfirm() {
     phone,
     service_id: item.service.id,
     starts_at: slotIso(item.dateKey, item.time),
-    amount: bk.packageBooking ? 0 : (index === 0 ? 100000 : 0),
-    deposit: bk.packageBooking ? 0 : (index === 0 ? 100000 : 0),
+    amount: bk.packageBooking ? 0 : Number(item.service.price||0),
+    deposit: 0,
     bank: bk.packageBooking ? null : (bk.bankName || null),
     package: bk.packageBooking ? "Багцын эрхээр — админ шалгана" : null,
     note: `Нэгдсэн захиалга ${index + 1}/${bk.selections.length}`,
     status: "pending",
     user_id: userId,
   }));
-  const result = await window.cryoData.saveBookings(rows);
+  bk.saving=true;
+  let result;
+  try { result=await window.cryoData.saveBookings(rows); }
+  catch(error) { result={error}; }
+  finally { bk.saving=false; }
   if (result?.error) {
     const conflict = result.error.code === "23P01" || /overlap|conflict/i.test(result.error.message || "");
     showToast(conflict ? "Энэ цаг дөнгөж захиалагдлаа. Өөр цаг сонгоно уу." : "Захиалга хадгалахад алдаа гарлаа.");
@@ -371,6 +373,7 @@ async function doConfirm() {
     await refreshAvailability();
     return;
   }
+  bk.saved=true;
   setText("bookingRef", ref);
   const det = document.getElementById("confirmDetails");
   if (det) {
@@ -388,10 +391,10 @@ async function doConfirm() {
     if (bk.packageBooking) {
       status.textContent = "Багцын эрхээр — админ үлдэгдлийг шалгана";
     } else {
-      status.textContent = bk.bankName;
-      det.append("₮100,000 — ");
+      status.textContent = "Нэгтгэсэн төлбөр хүлээгдэж байна. Төвтэй холбогдож нийт дүнгээр төлнө үү.";
+      det.append("₮"+bookingTotal().toLocaleString("en-US")+" — ");
     }
-    det.append("✓ ", status);
+    det.append(status);
   }
   setStepDots(3);
   showPanel("step3");

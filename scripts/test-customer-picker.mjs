@@ -1,0 +1,17 @@
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+const require=createRequire(process.env.TEST_NODE_MODULES ? process.env.TEST_NODE_MODULES+'/package.json' : import.meta.url);
+const {JSDOM}=require('jsdom');
+const dom=new JSDOM('<input id="search">');globalThis.document=dom.window.document;
+const {customerPicker}=await import('../customer-picker.js');
+let selected;const input=document.querySelector('input');
+const rows=[{id:1,full_name:'Бат',phone:'99112233'},{id:2,full_name:'Бат',phone:'88112233'}];
+customerPicker(input,()=>rows,c=>selected=c);
+input.focus();assert.equal(document.querySelectorAll('.customer-suggestion').length,2);
+input.value='8811';input.dispatchEvent(new dom.window.Event('input'));
+assert.equal(document.querySelectorAll('.customer-suggestion').length,1);
+assert.match(document.querySelector('button').textContent,/Бат · 88112233/);
+document.querySelector('button').click();assert.equal(selected.id,2);assert.equal(input.value,'Бат');
+assert(document.querySelector('.customer-suggestions').hidden);
+input.value='none';input.dispatchEvent(new dom.window.Event('input'));assert.equal(selected,null);assert.equal(document.querySelectorAll('button').length,0);
+console.log('PASS name/phone suggestions, duplicate names, selection, stale selection reset');

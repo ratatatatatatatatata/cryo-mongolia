@@ -32,3 +32,7 @@ el('bkNewPhone').value='99999999';el('bkNewRecipient').value='team';el('bkNewTea
 await vm.runInContext('saveStaffBooking()',context);assert.equal(vm.runInContext('bkSelectedSlots.length',context),2);assert(el('bkNewStatus').textContent.includes('Аль ч цаг'));
 fail=false;await vm.runInContext('saveStaffBooking()',context);assert(inserted.every(r=>r.team_id===8&&r.customer_name==='Баг: Team'));
 console.log('PASS multi-slot selection across devices/dates, person/team assignment, atomic request, conflict retains selection');
+el('bkScheduleDate').value='2000-01-03';vm.runInContext("bkDevice='1';bkSelectedSlots=[];renderBookingSchedule()",context);
+assert.equal(el('bkScheduleSlots').children[0].disabled,false);
+context.isAdminUser=()=>false;vm.runInContext('renderBookingSchedule()',context);assert.equal(el('bkScheduleSlots').children[0].disabled,true);
+console.log('PASS past empty slots enabled for admin, disabled for staff');
