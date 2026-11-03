@@ -34,6 +34,7 @@ const PAYS = [
   ["cash", "Бэлэн", "f_cash"],
   ["invoice", "Нэхэмжлэх", "f_invoice"],
   ["barter", "Barter", "f_barter"],
+  ["internal_amount", "Дотоод", "f_internal_amount"],
   ["refund", "Буцаалт", "f_refund"],
 ];
 
@@ -70,6 +71,7 @@ let attendanceStaff = "all";
 let selectedAttendanceDate = localDateKey(new Date());
 let sharedStaffId = null;
 let paymentBooking = null;
+window.addEventListener('cryo:booking-updated',({detail})=>{const row=cache.bookings.find(b=>b.id===detail?.id);if(row)Object.assign(row,detail);renderBookings();});
 
 window.addEventListener("cryo:sale-saved", ({ detail: sale }) => {
   if (!sale?.id) return;
@@ -2062,7 +2064,7 @@ function wireReports() {
 }
 
 function isReportableSale(row) {
-  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)>0;
+  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)+Number(row.internal_amount||0)>0;
 }
 
 function reportRows() {
@@ -2492,6 +2494,7 @@ function updateFormTotal() {
 
 function openLedForm(row) {
   paymentBooking = null;
+  if($('bookingPackageCheckout')) $('bookingPackageCheckout').hidden=true;
   $("ledgerFormHome").after($("ledForm"));
   $("ledSave").textContent = 'Хадгалах';
   $("f_date").readOnly = false;
@@ -2549,6 +2552,10 @@ function openBookingPayment(booking) {
   const service=cache.services.find(row=>Number(row.id)===Number(booking.service_id));
   $("bookingPaymentHost").appendChild($("ledForm"));
   $("ledFormTitle").textContent=`Төлбөр бүртгэх · ${booking.ref}`;
+  let packageButton=$('bookingPackageCheckout');
+  if(!packageButton){packageButton=document.createElement('button');packageButton.id='bookingPackageCheckout';packageButton.className='btn-sm primary';packageButton.type='button';$('ledFormTitle').after(packageButton);}
+  packageButton.hidden=false;packageButton.textContent='Багц сонгох / авсан багцаа ашиглах';
+  packageButton.onclick=()=>{switchView('packages');$('ledForm').style.display='none';window.dispatchEvent(new CustomEvent('cryo:package-checkout',{detail:booking}));};
   $("ledSave").textContent='Төлсөн';
   $("f_date").value=bookingDateToday();$("f_date").readOnly=true;
   $("f_name").value=booking.customer_name || '';
@@ -3195,12 +3202,13 @@ async function saveLedger() {
     source: ledEditing ? ledEditing.source : "manual",
   };
   PAYS.forEach(([k, , id]) => (patch[k] = v(id)));
+  patch.is_internal = patch.is_internal || patch.internal_amount > 0;
   DEVICES.forEach(([k, , id]) => (patch[k] = v(id)));
 
   if (!patch.sale_date) return alert("Огноо оруулна уу.");
 
   if (paymentBooking) {
-    if (patch.golomt+patch.khan+patch.cash+patch.barter<=0) return alert('Төлсөн дүнгээ оруулна уу.');
+    if (patch.golomt+patch.khan+patch.cash+patch.barter+patch.internal_amount<=0) return alert('Төлсөн эсвэл дотоод дүнгээ оруулна уу.');
     btn.disabled=true;
     try {
       const {data,error}=await sb.rpc('pay_booking',{p_booking_id:paymentBooking.id,p_sale:patch});

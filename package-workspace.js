@@ -14,6 +14,7 @@ let customers = [], packages = [], staff = [], leads = [], contracts = [], redem
 let profile = {}, user = null, selectedContractId = null, packageSearch = "";
 let packageRequestId = crypto.randomUUID();
 let loadedUserId = null;
+let accountSales=[], accountEvents=[], checkoutBooking=null;
 const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
 
 function weekday(value) {
@@ -94,7 +95,20 @@ function panels() {
       </details>
     </div>`);
   $("packageSalesOperations")?.appendChild($("pkgLeadPanel"));
+  $('pkgSaleBank').add(new Option('Дотоод (орлогод нэмэгдэхгүй)','internal'));
+  $('pkgSaleAmount').min='0';
+  $('pkgSaleAmount').insertAdjacentHTML('afterend','<small>Хэсэгчлэн төлөх бол зөвхөн энэ удаа төлсөн дүнгээ оруулна. Үлдэгдлийг багцын дэлгэрэнгүйгээс төлнө.</small><p id="pkgPaymentBalance" class="page-sub"></p>');
+  const updateBalance=()=>{const pkg=packages.find(p=>String(p.id)===$('pkgLeadPurchased').value);$('pkgPaymentBalance').textContent=pkg?`Үлдэгдэл: ${money(Number(pkg.price)-Number($('pkgSaleAmount').value||0))}`:'';};
+  $('pkgSaleAmount').addEventListener('input',updateBalance);$('pkgLeadPurchased').addEventListener('change',()=>setTimeout(updateBalance,0));
+  $('pkgCustomForm').insertAdjacentHTML('beforeend','<p class="page-sub">Энд зөвхөн багцын загвар үүсгэнэ. Үйлчлүүлэгч, төлбөр шаардахгүй.</p>');
+  $('pkgLeadPanel').insertAdjacentHTML('afterbegin','<div class="panel" id="pkgBookingLink" hidden><p id="pkgBookingLabel"></p><div class="field"><label for="pkgExistingContract">Авсан багцаа ашиглах — дахин төлбөр авахгүй</label><select class="ctl" id="pkgExistingContract"></select></div><button class="btn-sm primary" id="pkgLinkBooking">Захиалгыг багцтай холбох</button><p class="page-sub">Шинээр авах бол доорх багцын борлуулалтыг бөглөнө. Ашигласан оролтыг үйлчлүүлсэн өдөр нь багцын дэлгэрэнгүйд бүртгэнэ.</p></div>');
+  $('pkgLinkBooking').onclick=async()=>{const button=$('pkgLinkBooking');if(button.disabled||!checkoutBooking)return;button.disabled=true;try{const r=await sb.rpc('package_checkout',{p:{action:'link',request_id:packageRequestId,contract_id:Number($('pkgExistingContract').value),booking_id:checkoutBooking.id,staff_id:currentStaff()?.id||null}});if(r.error)throw r.error;window.dispatchEvent(new CustomEvent('cryo:booking-updated',{detail:r.data.booking}));packageRequestId=crypto.randomUUID();checkoutBooking=null;setPackageSaleOpen(false);alert('Захиалга багцтай холбогдлоо. Давхар төлбөр авахгүй.');}catch(e){alert(e.message);}finally{button.disabled=false;}};
+  const templateButton=document.createElement('button');templateButton.className='btn-sm ghost';templateButton.textContent='+ Багцын загвар үүсгэх';templateButton.type='button';$('repPackageSales')?.after(templateButton);
+  templateButton.onclick=()=>{checkoutBooking=null;setPackageSaleOpen(true);$('pkgLeadPurchased').value='custom';$('pkgLeadPurchased').dispatchEvent(new Event('change'));$('pkgCustomName').focus();};
+  window.addEventListener('cryo:package-checkout',async({detail})=>{await load();checkoutBooking=detail;setPackageSaleOpen(true);$('pkgLeadPurchased').value='';$('pkgLeadPurchased').dispatchEvent(new Event('change'));$('pkgSaleSearch').value=detail.customer_name;renderSaleCustomers();const customer=customers.find(c=>c.full_name===detail.customer_name && (!detail.phone||c.phone===detail.phone))||customers.find(c=>c.full_name===detail.customer_name);$('pkgLeadCustomer').value=customer?String(customer.id):'';$('pkgBookingLabel').textContent=`Захиалга: ${detail.ref} · ${detail.customer_name}`;$('pkgExistingContract').innerHTML='<option value="">Багц сонгох</option>'+activeContracts().filter(c=>c.customer_label===detail.customer_name).map(c=>`<option value="${c.id}">${safe(c.package_label)} · ${c.id}</option>`).join('');$('pkgBookingLink').hidden=false;});
   $("repPackageSales")?.addEventListener("click", () => {
+    checkoutBooking=null;
+    $('pkgLeadPurchased').value='';$('pkgLeadPurchased').dispatchEvent(new Event('change'));
     if ($("packageSaleNotice")) $("packageSaleNotice").textContent = '';
     setPackageSaleOpen(true);
     $("pkgSaleSearch").focus();
@@ -110,7 +124,9 @@ function panels() {
   $("pkgLeadPurchased").addEventListener("change", () => {
     const custom = $("pkgLeadPurchased").value === 'custom';
     $("pkgCustomForm").hidden = !custom;
-    $("pkgSaleAmount").readOnly = custom;
+    $("pkgSaleAmount").readOnly = false;
+    ['pkgLeadCustomer','pkgSaleSearch','pkgSaleDate','pkgSaleBank','pkgSaleAmount','pkgLeadNotes'].forEach(id=>$(id).closest('.field').hidden=custom);
+    $('pkgLeadSave').textContent=custom?'Багцын загвар хадгалах':'Борлуулалт бүртгэх';
     if (custom) return updateCustomPackagePrice();
     const selected = packages.find(item => String(item.id) === $("pkgLeadPurchased").value);
     $("pkgSalePrice").value = selected ? money(selected.price) : '—';
@@ -141,6 +157,7 @@ function setPackageSaleOpen(open) {
   const host = $("packageSalesOperations");
   if (host) host.hidden = !open;
   $("repPackageSales")?.setAttribute('aria-expanded', String(open));
+  if($('pkgBookingLink')) $('pkgBookingLink').hidden=!open||!checkoutBooking;
 }
 
 function used(contractId) {
@@ -188,6 +205,7 @@ function renderSelectedPackage() {
     return `<label class="staff-check"><input type="checkbox" value="${Number(item.service_id)}" ${spent>=item.units?'disabled':''}><span>${safe(item.service_name)} · ${spent}/${Number(item.units)} орсон · ${Math.max(0,item.units-spent)} үлдсэн</span></label>`;
   }) : services.map(item=>`<label class="staff-check"><input type="checkbox" value="${item.id}"><span>${safe(item.name)}</span></label>`)).join('');
   $("pkgDetailKpis").innerHTML = [["Авсан багц", contract.package_label || "—", contract.status || "—"], ["Нийт орох эрх", total == null ? "—" : total, "үйлчилгээ"], ["Орсон", spent, `${history.length} бүртгэл`], ["Үлдсэн", left == null ? "—" : left, "үйлчилгээ"]].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${safe(label)}</div><div class="kpi-value">${safe(value)}</div><div class="kpi-note">${safe(note)}</div></div>`).join("");
+  renderAccount(contract);
   $("pkgVisitBody").innerHTML = history.length ? history.map((item) => {
     const employee = staff.find((person) => Number(person.id) === Number(item.staff_id));
     return `<tr><td class="t-mono">${safe(item.used_on)}</td><td class="t-strong">${safe(item.service_label || "—")}</td><td>${safe(item.units || 1)}</td><td>${safe(employee?.name || "—")}</td><td class="record-note">${safe(item.notes || "—")}</td></tr>`;
@@ -246,9 +264,11 @@ async function load() {
     sb.from("staff").select("id,name,email,user_id,active").eq("active", true).order("sort"),
     sb.from("package_sales_leads").select("*").order("created_at", { ascending: false }),
     sb.from("profiles").select("role").eq("id", user.id).maybeSingle(),
-    allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_label,total_units,status,purchased_on,expires_on,notes,service_units").order("customer_label").order("id")),
+    allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_id,package_label,total_units,status,purchased_on,expires_on,notes,service_units,agreed_price,opening_paid").order("customer_label").order("id")),
     allRows(() => sb.from("package_redemptions").select("id,contract_id,used_on,units,service_id,service_label,staff_id,notes,created_at").order("used_on", { ascending: false }).order("id")),
     sb.from("services").select("id,name,active,category").eq("active", true).neq("category", "legacy-import").order("sort"),
+    sb.rpc('package_payment_history'),
+    allRows(()=>sb.from('package_account_events').select('id,contract_id,action,detail,created_at').order('id')),
   ]);
   if (result.some(item => item.error)) {
     $("pkgSaleStatus").textContent = "Мэдээлэл ачаалж чадсангүй. Хуудсаа дахин ачаална уу.";
@@ -260,6 +280,7 @@ async function load() {
   $("pkgVisitSave").disabled = false;
   customers = result[0].data || []; packages = result[1].data || []; staff = result[2].data || []; leads = result[3].data || [];
   profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = result[7].data || [];
+  accountSales=result[8].data||[];accountEvents=result[9].data||[];
   options();
   renderLeads();
   loadedUserId = user.id;
@@ -290,21 +311,25 @@ async function saveLead() {
   const customer = customers.find((item) => String(item.id) === $("pkgLeadCustomer").value);
   const purchased = packages.find((item) => String(item.id) === $("pkgLeadPurchased").value);
   const employee = currentStaff();
-  if (!customer) return alert("Үйлчлүүлэгчээ сонгоно уу.");
   const custom=$("pkgLeadPurchased").value==='custom';
+  if (!custom && !customer) return alert("Үйлчлүүлэгчээ сонгоно уу.");
   if (!purchased && !custom) return alert("Багцаа сонгоно уу.");
   const items=custom ? customPackageItems() : [];
   if (custom && (!$("pkgCustomName").value.trim() || !items.length || items.some(item=>!Number.isInteger(item.units)||item.units>1000))) return alert('Багцын нэр, төхөөрөмжийн оролтын тоогоо зөв оруулна уу.');
   const bank = $("pkgSaleBank").value, amount = Number($("pkgSaleAmount").value), date = $("pkgSaleDate").value;
-  if (!date || !['golomt','khan','cash','invoice','barter'].includes(bank) || !Number.isSafeInteger(amount) || amount < 0 || (!custom && amount===0)) return alert("Огноо, төлбөрийн банк болон зөв дүн оруулна уу.");
+  if (!custom && (!date || !['golomt','khan','cash','invoice','barter','internal'].includes(bank) || !Number.isSafeInteger(amount) || amount < 0 || amount>Number(purchased.price))) return alert("Огноо, төлбөрийн хэлбэр болон багцын үнээс хэтрэхгүй дүн оруулна уу.");
   if (!employee && !["owner", "admin"].includes(profile.role)) return alert("Бүртгэх ажилтны нэрийг сонгоно уу.");
   const button = $("pkgLeadSave");
   if (button.disabled) return;
   button.disabled = true;
   try {
-    const { data, error } = await sb.rpc('sell_customer_package',{p_request:{request_id:packageRequestId, customer_id:customer.id, package_id:purchased?.id || null, package_name:$("pkgCustomName").value.trim(), items, base_price:Number($("pkgCustomBase").value),discount_percent:Number($("pkgCustomDiscount").value),sale_date:date,staff_id:employee?.id || null,payment_method:bank,amount,note:$("pkgLeadNotes").value.trim() || null}});
+    const { data, error } = await sb.rpc('package_checkout',{p:{action:custom?'template':'sell',request_id:packageRequestId, customer_id:customer?.id || null, package_id:purchased?.id || null, booking_id:custom?null:checkoutBooking?.id, package_name:$("pkgCustomName").value.trim(), items, base_price:Number($("pkgCustomBase").value),discount_percent:Number($("pkgCustomDiscount").value),sale_date:date,staff_id:employee?.id || null,payment_method:bank,amount,note:$("pkgLeadNotes").value.trim() || null}});
     if (error) throw error;
+    if(custom){packages=[data.package,...packages];packageRequestId=crypto.randomUUID();options();$('pkgLeadPurchased').value=String(data.package.id);$('pkgLeadPurchased').dispatchEvent(new Event('change'));$('pkgSaleStatus').textContent='Багцын загвар хадгалагдлаа. Борлуулахдаа үйлчлүүлэгчээ сонгоно уу.';return;}
     window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data.sale }));
+    if(data.booking) window.dispatchEvent(new CustomEvent('cryo:booking-updated',{detail:data.booking}));
+    checkoutBooking=null;
+    if(data.sale) accountSales.push(data.sale);
     if (data.contract) contracts=[data.contract,...contracts.filter(row=>row.id!==data.contract.id)];
     if (data.package) packages=[data.package,...packages.filter(row=>row.id!==data.package.id)];
     packageRequestId=crypto.randomUUID();
@@ -312,7 +337,7 @@ async function saveLead() {
     $("pkgSaleAmount").readOnly=false;
     ['pkgLeadCustomer','pkgLeadPurchased','pkgLeadNotes','pkgSaleSearch','pkgSaleBank','pkgSaleAmount'].forEach(id => { $(id).value = ''; });
     $("pkgSalePrice").value = '—';
-    $("pkgSaleStatus").textContent = `Борлуулалт бүртгэгдлээ · ${money(data.sale.total)}`;
+    $("pkgSaleStatus").textContent = `Багц бүртгэгдлээ · Энэ удаа ${money(amount)} · Үлдэгдэл ${money(Number(purchased.price)-amount)}`;
     if ($("packageSaleNotice")) $("packageSaleNotice").textContent = $("pkgSaleStatus").textContent;
     setPackageSaleOpen(false);
     $("repPackageSales")?.focus();
@@ -321,6 +346,28 @@ async function saveLead() {
   } catch (error) {
     alert("Борлуулалт хадгалж чадсангүй: " + error.message);
   } finally { button.disabled = false; }
+}
+
+function renderAccount(contract){
+ let panel=$('pkgAccount');if(!panel){panel=document.createElement('div');panel.id='pkgAccount';panel.className='panel';$('pkgDetailKpis').after(panel);}
+ const rows=accountSales.filter(s=>Number(s.package_contract_id)===Number(contract.id));
+ const paid=Number(contract.opening_paid||0)+rows.reduce((sum,s)=>sum+Number(s.total||0)+Number(s.internal_amount||0),0);
+ const known=contract.agreed_price!=null,balance=known?Number(contract.agreed_price)-paid:null;
+ const methods='<option value="khan">Хаан</option><option value="golomt">Голомт</option><option value="cash">Бэлэн</option><option value="invoice">Нэхэмжлэх</option><option value="barter">Бартер</option><option value="internal">Дотоод</option>';
+ const events=accountEvents.filter(e=>Number(e.contract_id)===Number(contract.id)&&['change','transfer','opening'].includes(e.action));
+ panel.innerHTML=`<h3>Багцын төлбөр, үлдэгдэл</h3><p>${known?`Тохирсон үнэ: ${money(contract.agreed_price)} · Бүртгэсэн төлөлт/тооцоо: ${money(paid)} · Үлдэгдэл: <b>${money(balance)}</b>`:'Хуучин багцын үнэ, өмнөх төлөлт баталгаажаагүй. Админ эхний үлдэгдлийг баталгаажуулна.'}</p><p class="page-sub">Банк/бэлэн, бартер, нэхэмжлэх, дотоод хэлбэрүүд тусдаа хадгалагдана. Дотоод дүн мөнгөн орлогод нэмэгдэхгүй. Зөвхөн энэ удаа төлсөн дүнгээ оруулна.</p>
+ ${known&&balance>0?`<div class="form-grid"><div class="field"><label>Төлөлтийн огноо</label><input class="ctl" id="pkgPayDate" type="date" value="${todayKey()}"></div><div class="field"><label>Төлбөрийн хэлбэр</label><select class="ctl" id="pkgPayMethod">${methods}</select></div><div class="field"><label>Энэ удаа төлөх</label><input class="ctl" id="pkgPayAmount" type="number" min="1" max="${balance}" value="${balance}"></div></div><button class="btn-sm primary" id="pkgPayMore">Төлөлт нэмэх</button>`:''}
+ <details><summary>Төлөлтийн түүх</summary><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Хэлбэр</th><th>Дүн</th><th>Тэмдэглэл</th></tr></thead><tbody>${rows.map(s=>`<tr><td>${safe(s.sale_date)}</td><td>${['golomt','khan','cash','invoice','barter','internal_amount'].filter(k=>Number(s[k])>0).map(k=>({golomt:'Голомт',khan:'Хаан',cash:'Бэлэн',invoice:'Нэхэмжлэх',barter:'Бартер',internal_amount:'Дотоод'}[k])).join(', ')}</td><td>${money(Number(s.total)+Number(s.internal_amount||0))}</td><td>${safe(s.note||'')}</td></tr>`).join('')||'<tr><td colspan="4">Төлөлтийн мөр алга</td></tr>'}</tbody></table></div></details>
+ <details><summary>Багц солих / өөр үйлчлүүлэгчид шилжүүлэх</summary><p class="page-sub">Багц солиход өмнөх төлөлт ба ашигласан оролт хэвээр үлдэнэ. Шинэ багцын үнээс өмнөх төлөлтийг хасаж үлдэгдэл гаргана. Шилжүүлэхэд хуучин түүх устахгүй.</p><div class="field"><label>Шинэ багц</label><select class="ctl" id="pkgChangeTarget"><option value="">Багц сонгох</option>${packages.map(p=>`<option value="${p.id}">${safe(p.name)} · ${money(p.price)}</option>`).join('')}</select></div><button class="btn-sm ghost" id="pkgChange" ${known?'':'disabled'}>Багц солих</button><div class="field"><label>Шилжүүлэн авах үйлчлүүлэгч</label><input class="ctl" id="pkgTransferSearch" type="search" placeholder="Нэрээр хайх"><select class="ctl" id="pkgTransferTarget"></select></div><div class="field"><label>Шалтгаан / тэмдэглэл</label><input class="ctl" id="pkgAccountNote" maxlength="500"></div><button class="btn-sm ghost" id="pkgTransfer">Үйлчлүүлэгчид шилжүүлэх</button></details>
+ ${!known&&['owner','admin'].includes(profile.role)?'<details><summary>Хуучин багцын эхний үлдэгдлийг баталгаажуулах</summary><p>Өмнөх борлуулалтыг дахин орлогод нэмэхгүй.</p><label>Тохирсон нийт үнэ<input class="ctl" id="pkgOpeningPrice" type="number" min="0"></label><label>Өмнө төлсөн нийт дүн<input class="ctl" id="pkgOpeningPaid" type="number" min="0"></label><label>Нотлох тэмдэглэл<input class="ctl" id="pkgOpeningNote" maxlength="500"></label><button class="btn-sm ghost" id="pkgOpening">Баталгаажуулах</button></details>':''}
+ <details><summary>Өөрчлөлтийн түүх</summary>${events.map(e=>`<p>${safe(e.created_at.slice(0,10))} · ${safe({change:'Багц сольсон',transfer:'Үйлчлүүлэгч шилжүүлсэн',opening:'Эхний үлдэгдэл баталгаажуулсан'}[e.action])} · ${safe(e.detail.before?.package_label||'')} → ${safe(e.detail.contract?.package_label||'')} · ${safe(e.detail.before?.customer_label||'')} → ${safe(e.detail.contract?.customer_label||'')} · ${safe(e.detail.note||'')}</p>`).join('')||'<p>Өөрчлөлт алга.</p>'}</details>`;
+ const filterCustomers=()=>{const query=$('pkgTransferSearch').value;$('pkgTransferTarget').innerHTML='<option value="">Үйлчлүүлэгч сонгох</option>'+customers.filter(c=>c.id!==contract.customer_id&&matchesName(c.full_name,query)).map(c=>`<option value="${c.id}">${safe(c.full_name)} · ${safe(c.phone||'')}</option>`).join('');};filterCustomers();$('pkgTransferSearch').oninput=filterCustomers;
+ let request=crypto.randomUUID();
+ const act=async(button,action,extra)=>{if(button.disabled)return;button.disabled=true;try{const r=await sb.rpc('package_checkout',{p:{action,request_id:request,contract_id:contract.id,staff_id:currentStaff()?.id||null,...extra}});if(r.error)throw r.error;if(r.data.sale)window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:r.data.sale}));request=crypto.randomUUID();await load();alert('Хадгалагдлаа.');}catch(e){alert(e.message);button.disabled=false;}};
+ $('pkgPayMore')?.addEventListener('click',e=>act(e.currentTarget,'pay',{amount:Number($('pkgPayAmount').value),payment_method:$('pkgPayMethod').value,sale_date:$('pkgPayDate').value,note:'Багцын үлдэгдэл төлөлт'}));
+ $('pkgChange').onclick=e=>{const target=packages.find(p=>String(p.id)===$('pkgChangeTarget').value);if(!target)return alert('Багцаа сонгоно уу.');if(confirm(`${target.name} багц руу солих уу? Шинэ үнэ ${money(target.price)}, өмнөх төлөлт ${money(paid)}, шинэ үлдэгдэл ${money(target.price-paid)}.`))act(e.currentTarget,'change',{package_id:target.id});};
+ $('pkgTransfer').onclick=e=>{const target=customers.find(c=>String(c.id)===$('pkgTransferTarget').value);if(!target)return alert('Үйлчлүүлэгч сонгоно уу.');if(confirm(`${contract.customer_label}-ийн багцыг ${target.full_name}-д шилжүүлэх үү? Үлдэгдэл төлбөр мөн шилжинэ.`))act(e.currentTarget,'transfer',{customer_id:target.id,note:$('pkgAccountNote').value.trim()});};
+ $('pkgOpening')?.addEventListener('click',e=>act(e.currentTarget,'opening',{agreed_price:Number($('pkgOpeningPrice').value),opening_paid:Number($('pkgOpeningPaid').value),note:$('pkgOpeningNote').value.trim()}));
 }
 
 document.addEventListener("DOMContentLoaded", () => {
