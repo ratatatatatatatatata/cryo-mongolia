@@ -12,3 +12,20 @@ html[lang="en"] #navbar .nav-actions{gap:10px}
 @media(min-width:901px) and (max-width:1250px){#navbar{padding-left:20px;padding-right:20px}#navbar .nav-links{gap:14px}#navbar .nav-actions .nav-cta{padding:11px 15px}#navbar .nav-logo small{font-size:8px}#navbar .nav-logo b{font-size:17px}}
 @media(max-width:900px){#navbar>.public-language{margin-left:auto;margin-right:12px}.public-language button{min-height:40px;padding:8px;font-size:11px}.topnav{gap:10px;flex-wrap:wrap}.topnav>.public-language{margin-left:auto}.topnav .nav-logo small{font-size:7px}}
 @media(max-width:420px){#navbar{padding-left:12px;padding-right:12px;gap:6px}#navbar .nav-logo b{font-size:14px}#navbar .nav-logo small{font-size:6px;letter-spacing:1px}#navbar .nav-logo img{width:30px;height:30px}#navbar>.public-language{margin-left:auto;margin-right:5px}.public-language button{padding:7px;min-height:40px}.topnav>.public-language{margin-left:0}.topnav .back-btn{font-size:12px}}
+
+/* Keep back navigation, branding and language controls in distinct columns. */
+.topnav{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:24px;flex-wrap:nowrap}
+.topnav>.back-btn{justify-self:start;white-space:nowrap;min-height:44px}
+.topnav>.nav-logo{justify-self:center;gap:10px}
+.topnav>.nav-logo b{display:flex;gap:.25em;align-items:baseline}
+.topnav>.public-language{justify-self:end;margin:0}
+@media(max-width:700px){
+ .topnav{grid-template-columns:44px minmax(0,1fr) auto;column-gap:10px;padding-inline:16px}
+ .topnav>.back-btn{font-size:0;padding:0;justify-content:center;width:44px;gap:0}
+ .topnav>.back-btn::before{font-size:22px}
+ .topnav>.nav-logo{justify-self:start;gap:8px}
+ .topnav>.nav-logo img{width:28px;height:28px;flex-shrink:0}
+ .topnav>.nav-logo b{font-size:12px}
+ .topnav>.nav-logo small{font-size:6px;letter-spacing:.08em}
+ .topnav>.public-language button{padding:6px;min-height:40px;font-size:10px}
+}
