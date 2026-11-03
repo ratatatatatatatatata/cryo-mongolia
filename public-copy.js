@@ -5,9 +5,9 @@
 (function () {
   'use strict';
   const copy = `
-Монголын анхны мэргэжлийн крио сэргээн засах үйлчилгээний төв. −200°C хүйтний хүчээр биеийг нөхөн сэргээ.	Mongolia’s first professional cryotherapy recovery centre. Recover with the power of cold at −200°C.
+Монголын анхны мэргэжлийн крио сэргээн засах үйлчилгээний төв. −160°C хүйтний хүчээр биеийг нөхөн сэргээ.	Mongolia’s first professional cryotherapy recovery centre. Recover with the power of cold at −160°C.
 CRYO Mongolia – Эрүүл мэндийн төв	CRYO Mongolia – Recovery & Wellness Centre
-Монголын анхны крио сэргээн засах үйлчилгээний төв. −200°C хүйтний хүчээр биеийг нөхөн сэргээ.	Mongolia’s first cryotherapy recovery centre. Recover with the power of cold at −200°C.
+Монголын анхны крио сэргээн засах үйлчилгээний төв. −160°C хүйтний хүчээр биеийг нөхөн сэргээ.	Mongolia’s first cryotherapy recovery centre. Recover with the power of cold at −160°C.
 Cryo Mongolia Recovery Center — Нүүр	Cryo Mongolia Recovery Center — Home
 Бидний тухай	About us
 Үйлчилгээ	Services
@@ -20,7 +20,7 @@ Cryo Mongolia Recovery Center — Нүүр	Cryo Mongolia Recovery Center — Hom
 Цэс нээх	Open menu
 Цэс хаах	Close menu
 Админ нэвтрэх	Staff sign-in
-−200°C хүйтний цэвэр хүчээр биеэ нөхөн сэргээ. Эрүүл мэнд, фитнес, гоо сайхны шинэ хэмжээнд хүр — гурван минутын дотор.	Restore your body with the power of cold at −200°C. Explore a new level of wellness, fitness and beauty — in just three minutes.
+−160°C хүйтний цэвэр хүчээр биеэ нөхөн сэргээ. Эрүүл мэнд, фитнес, гоо сайхны шинэ хэмжээнд хүр — гурван минутын дотор.	Restore your body with the power of cold at −160°C. Explore a new level of wellness, fitness and beauty — in just three minutes.
 Үйлчилгээ үзэх	Explore services
 Хамгийн	The
 хүйтэн	coldest
@@ -38,7 +38,7 @@ CRYO Mongolia нь дэлхийн тэргүүлэгч CTN компанитай 
 чанартай амьдрал, гүн амралт, эрч хүч, удаан хугацааны гоо үзэсгэлэнг	quality of life, deep relaxation, vitality and lasting beauty
 дэмжинэ.	.
 Хамгийн хүйтэн	Coldest temperature
-−200°C хүртэл хүйтэн сэргээн засах үйлчилгээ, дэлхийд хамгийн дэвшилтэт	Advanced cold recovery technology at temperatures down to −200°C
+−160°C хүртэл хүйтэн сэргээн засах үйлчилгээ, дэлхийд хамгийн дэвшилтэт	Advanced cold recovery technology at temperatures down to −160°C
 Аюулгүй	Safe
 Цэвэр агаарын технологи, лицензтэй эмч нарын хяналтан дор	Clean-air technology under the supervision of licensed doctors
 Хувийн хандлага	Personalised care
@@ -52,7 +52,7 @@ CRYO Mongolia нь дэлхийн тэргүүлэгч CTN компанитай 
 Гоо сайхан	Beauty
 Тайвшрал	Relaxation
 CryoCabin™ — Бүх биеийн криотерапи	CryoCabin™ — Whole-body cryotherapy
-−200°C хүртэл хэт хүйтэнд 3 минут. Сэргэлт, цусны эргэлт, дархлаа идэвхжүүлнэ.	Three minutes in extreme cold down to −200°C, supporting recovery, circulation and immunity.
+−160°C хүртэл хэт хүйтэнд 3 минут. Сэргэлт, цусны эргэлт, дархлаа идэвхжүүлнэ.	Three minutes in extreme cold down to −160°C, supporting recovery, circulation and immunity.
 Дэлгэрэнгүй →	Learn more →
 X°Cryo™ — Хэсэгчилсэн крио	X°Cryo™ — Local cryotherapy
 Нүүр, мөр, өвдөг зэрэг тодорхой хэсэгт чиглэсэн локал крио. Шууд мэдрэгдэх үр дүн.	Targeted local cryotherapy for areas such as the face, shoulders and knees. Results you can feel.
@@ -61,7 +61,7 @@ OxyPro™ — Хүчилтөрөгчийн камер	OxyPro™ — Oxygen chamb
 Хөнгөн даралтын камер. Тархины цусан хангамж, эд эсийн нөхөн төлжилтийг дэмжинэ.	A mild-pressure chamber that supports blood flow to the brain and tissue recovery.
 30 мин	30 min
 LedPro™ — Улаан гэрлийн сэргээн засах үйлчилгээ	LedPro™ — Red-light recovery
-28,515 LED. Арьсны нөхөн төлжилт, коллаген үүсэлт, гэрэлтсэн байдал.	28,515 LEDs for skin renewal, collagen production and radiance.
+28,512 LED. Арьсны нөхөн төлжилт, коллаген үүсэлт, гэрэлтсэн байдал.	28,512 LEDs for skin renewal, collagen production and radiance.
 15 мин	15 min
 ZeroBody™ хуурай хөвөх сэргээн засах үйлчилгээ	ZeroBody™ dry-float recovery
 ZeroBody™ — Хуурай хөвөх	ZeroBody™ — Dry flotation
@@ -84,9 +84,9 @@ CTN-ийн	CTN’s
 жинхэнэ технологи	original technology
 Финландын CTN-аас шууд нийлүүлсэн эх төхөөрөмжүүд. Эргүүлж, ойртож, дэлгэрэнгүйг нь үз.	Original equipment supplied directly by CTN in Finland. Rotate, zoom in and explore the details.
 Крио Кабин	Cryo Cabin
-−200°C · Бүхэл бие	−200°C · Whole body
+−160°C · Бүхэл бие	−160°C · Whole body
 Локал крио · 1–3 мин	Local cryo · 1–3 min
-28,515 LED · Улаан гэрэл	28,515 LEDs · Red light
+28,512 LED · Улаан гэрэл	28,512 LEDs · Red light
 1.4 ATA · Хүчилтөрөгч	1.4 ATA · Oxygen
 Цахилгаан · Автомат	Electric · Automatic
 Өмнөх төхөөрөмж	Previous device

@@ -2,6 +2,122 @@
 (function () {
   'use strict';
   const copy = `
+1 л/мин	1 L/min
+1.4 ATA даралтаар ажилладаг mild hyperbaric хүчилтөрөгчийн камер. Биеийн байгалийн эдгэрэлтийн процессыг дэмжиж, эрүүл мэндийг сайжруулна.	A mild hyperbaric oxygen chamber operating at 1.4 ATA to support recovery and wellbeing.
+1.4 ATA даралтаар ажилладаг. Бие махбодийн хүчилтөрөгчийн шингээлтийг оновчтой сайжруулдаг.	Operates at 1.4 ATA to support oxygen delivery.
+Өргөн зайтай дотор тал, тухтай матрас болон тохируулж болох суудал. Нэг хүний зөөлөн камертай загвар.	A spacious interior with a comfortable mattress and adjustable seating. Single-person softshell model.
+Даралт ~40 кПа хүртэл нэмэгднэ. Хамрандаа хоолой зүүж болно. Үйлчилгээний хугацааг мэргэжилтэн тохируулна.	Pressure increases to approximately 40 kPa above ambient. A nasal cannula may be used. Session duration is set by a professional.
+Өвдөлтгүй, бүх төрлийн арьсанд тохиромжтой, тав тухтай сэргээн засах үйлчилгээ.	A comfortable, non-invasive recovery service suitable for all skin types.
+Хаалгыг нээж, хүссэн хугацааг тохируулна (15 минут). START дарж хэвтнэ.	Open the lid and set a 15-minute session. Press START and lie down.
+Каталогт заасан нэвтрэлтийн гүн: 20 мм хүртэл.	Penetration depth stated in the catalogue: up to 20 mm.
+Улаан гэрэл: 650 нм	Red light: 650 nm
+Ойрын инфраулаан: 940 нм	Near-infrared: 940 nm
+Өвдөлтгүй үйлчилгээ	Non-invasive service
+Каталогийн техникийн үзүүлэлтээр шинэчилсэн.	Updated to the supplied product catalogue specifications.
+Ажиллах температур	Operating temperature
+−80°C-аас −160°C хүртэл	−80°C to −160°C
+Үргэлжлэх хугацаа	Session duration
+60–180 секунд	60–180 seconds
+Хөргөх материал	Cooling medium
+Шингэн азот (LN₂)	Liquid nitrogen (LN₂)
+Азотын зарцуулалт	Nitrogen consumption
+1 л/мин хүртэл бууруулсан	Reduced to 1 L/min
+Удирдлагын дэлгэц	Control display
+1 × 12 инч + 1 × 24 инч HD	1 × 12-inch + 1 × 24-inch HD
+Цахилгаан	Power supply
+120 В / 230 В	120 V / 230 V
+Эрчим хүчний зарцуулалт	Power consumption
+1500 Вт	1500 W
+Хэмжээ (өргөн × гүн × өндөр)	Dimensions (W × D × H)
+880 × 1320 × 2590 мм	880 × 1320 × 2590 mm
+Жин	Weight
+300 кг	300 kg
+Өнгөний сонголт	Colour options
+Цагаан, саарал	White, grey
+Хөргөх арга	Cooling method
+Бүрэн цахилгаан, шингэн азотгүй	Fully electric; no liquid nitrogen
+Температур / хугацаа	Temperature / duration
+−130°C / 3 минут	−130°C / 3 minutes
+Мэдрэгч	Sensors
+6 мэдрэгч	6 sensors
+24 инч UHD мэдрэгчтэй дэлгэц	24-inch UHD touchscreen
+Медиа дэлгэцүүд	Media displays
+2 × 27 инч + 1 × 34 инч (16:9)	2 × 27-inch + 1 × 34-inch (16:9)
+220 В / 60 Гц / 16 A	220 V / 60 Hz / 16 A
+Эрчим хүч — каталогийн утга	Power — catalogue values
+2.5 кВА / 3500 Вт	2.5 kVA / 3500 W
+650 кг	650 kg
+1660 × 880 × 2400 мм	1660 × 880 × 2400 mm
+Дэлгэц	Display
+8 инч мэдрэгчтэй дэлгэц	8-inch touchscreen
+Үйлчилгээний хугацаа	Session duration
+1–3 минут	1–3 minutes
+220 В / 50 Гц / 16 A	220 V / 50 Hz / 16 A
+Эрчим хүчний хэрэглээ	Power consumption
+1 кВА / 1000 Вт	1 kVA / 1000 W
+85 кг	85 kg
+Хэмжээ (өндөр × өргөн × гүн)	Dimensions (H × W × D)
+730 × 440 × 750 мм	730 × 440 × 750 mm
+Загвар	Model
+OxyPro™ Softshell — 1 хүн	OxyPro™ Softshell — 1 person
+Даралт	Pressure
+1.4 ATA	1.4 ATA
+Материал	Material
+TPU — термопластик полиуретан	TPU — thermoplastic polyurethane
+Камерын хэмжээ (урт × өргөн × өндөр)	Chamber dimensions (L × W × H)
+2300 × 1000 × 1200 мм	2300 × 1000 × 1200 mm
+Камерын жин	Chamber weight
+46 кг	46 kg
+Компрессорын хэмжээ	Compressor dimensions
+766 × 350 × 750 мм	766 × 350 × 750 mm
+Компрессорын жин	Compressor weight
+110 кг	110 kg
+1100 Вт · 110 В/60 Гц эсвэл 220 В/50 Гц	1100 W · 110 V/60 Hz or 220 V/50 Hz
+LedPro™ — хэвтээ	LedPro™ — horizontal
+LED тоо	LED count
+28,512 ширхэг	28,512 LEDs
+Гэрлийн долгионы урт	Light wavelengths
+650 нм улаан / 940 нм NIR	650 nm red / 940 nm NIR
+11.5 инч HD мэдрэгчтэй дэлгэц	11.5-inch HD touchscreen
+240 В / 50 Гц	240 V / 50 Hz
+Нийт чадал	Total power
+3000 Вт (1500 Вт улаан + 1500 Вт NIR)	3000 W (1500 W red + 1500 W NIR)
+15 минут · 7 хоногт дээд тал нь 3 удаа	15 minutes · maximum 3 sessions per week
+Хэмжээ (урт × өргөн × өндөр)	Dimensions (L × W × H)
+1920 × 850 × 950 мм	1920 × 850 × 950 mm
+90 кг	90 kg
+Каталогийн нэмэлт загвар	Additional catalogue model
+OxyPro™ Hardshell — 1–4 хүн	OxyPro™ Hardshell — 1–4 people
+1.5 ATA	1.5 ATA
+Зэвэрдэггүй ган	Stainless steel
+VH1 хэмжээ / жин	VH1 dimensions / weight
+1820 × 1200 × 1753 мм / 380 кг	1820 × 1200 × 1753 mm / 380 kg
+VH2 хэмжээ / жин	VH2 dimensions / weight
+2070 × 1606 × 1753 мм / 480 кг	2070 × 1606 × 1753 mm / 480 kg
+VH3 хэмжээ / жин	VH3 dimensions / weight
+2500 × 1606 × 1753 мм / 600 кг	2500 × 1606 × 1753 mm / 600 kg
+Хэмжээний дараалал	Dimension order
+Урт × өргөн × өндөр	Length × width × height
+Компрессорын хэмжээ / жин	Compressor dimensions / weight
+1720 × 350 × 650 мм / 95 кг	1720 × 350 × 650 mm / 95 kg
+1250 Вт · 110 В/60 Гц эсвэл 220 В/50 Гц	1250 W · 110 V/60 Hz or 220 V/50 Hz
+Концентраторын хэмжээ / жин	Concentrator dimensions / weight
+350 × 320 × 570 мм / 25 кг нэгж бүр	350 × 320 × 570 mm / 25 kg per unit
+LedPro™ Vertical — босоо	LedPro™ Vertical
+840 улаан + 840 NIR	840 red + 840 NIR
+Нэмэлт технологи	Additional technology
+Чичиргээ болон Nogier дууны долгион	Vibration and Nogier sound technology
+24 инч Full HD LCD мэдрэгчтэй дэлгэц	24-inch Full HD LCD touchscreen
+230 В / 50 Гц · 3000 Вт	230 V / 50 Hz · 3000 W
+2240 × 860 × 1200 мм	2240 × 860 × 1200 mm
+250 кг	250 kg
+Active Vortex Circulation™ — азотын урсгалын удирдлага	Active Vortex Circulation™ — controlled nitrogen flow
+Хүний багтаамж	Person capacity
+Нэг хүний зөөлөн камертай загвар.	Single-person softshell chamber.
+Үйлчилгээний хугацааг мэргэжилтэн тохируулна.	Session duration is set by a professional.
+20 мм хүртэл · NIR (940 nm)	Up to 20 mm · NIR (940 nm)
+Каталогт: 20 мм хүртэл	Catalogue: up to 20 mm
+Нэвтрэлтийн гүн — каталогийн мэдээлэл	Penetration depth — catalogue information
 Бүтэн бие	Full body
 Биеийн хэсэг	Body region
 Танилцуулга видео	Introduction videos
@@ -32,8 +148,8 @@
 Бүх төхөөрөмж үзэх →	View all devices →
 Төхөөрөмжүүдийн мэдээлэл үзэх →	Explore our equipment →
 Хаах ×	Close ×
-−200°C · 3 минут	−200°C · 3 minutes
-28,515 LED · 15 минут	28,515 LEDs · 15 minutes
+−160°C · 3 минут	−160°C · 3 minutes
+28,512 LED · 15 минут	28,512 LEDs · 15 minutes
 1.4 ATA · 30 минут	1.4 ATA · 30 minutes
 Цахилгаан · Автомат	Electric · Automatic
 Хөнгөн даралтын хүчилтөрөгчийн камер.	Mild-pressure oxygen chamber.
@@ -46,14 +162,14 @@
 Дэлгэрэнгүй мэдээлэл	More information
 Төхөөрөмж сонгох	Choose a device
 Бүхэл бие	Whole body
-Шингэн азотаар ажилладаг бүхэл биеийн хүйтний сэргээн засах үйлчилгээ — −200°C хүртэл	Liquid-nitrogen whole-body cold recovery — down to −200°C
+Шингэн азотаар ажилладаг бүхэл биеийн хүйтний сэргээн засах үйлчилгээ — −160°C хүртэл	Liquid-nitrogen whole-body cold recovery — down to −160°C
 3 минут	3 minutes
 Дэлгэрэнгүй үзэх →	Explore details →
 Улаан гэрэл	Red light
-Улаан болон инфра улаан гэрлийн сэргээн засах үйлчилгээ — 28,515 LED	Red and infrared light recovery — 28,515 LEDs
+Улаан болон инфра улаан гэрлийн сэргээн засах үйлчилгээ — 28,512 LED	Red and infrared light recovery — 28,512 LEDs
 15 минут	15 minutes
 Хүчилтөрөгч	Oxygen
-Өндөр даралттай хүчилтөрөгчийн сэргээн засах үйлчилгээ — 1.4 ATA	Hyperbaric oxygen recovery — 1.4 ATA
+Зөөлөн даралтат хүчилтөрөгчийн үйлчилгээ — 1.4 ATA	Hyperbaric oxygen recovery — 1.4 ATA
 1–2 цаг	1–2 hours
 Локал крио	Local cryo
 Биеийн тодорхой хэсгийн локал криотерапи — 1–3 минут	Targeted local cryotherapy — 1–3 minutes
@@ -66,10 +182,10 @@
 Бүх бие	Whole body
 Улаанбаатар хот · info@cryomongolia.mn	Ulaanbaatar · info@cryomongolia.mn
 Бүхэл биеийн криотерапи	Whole-body cryotherapy
-CTN Cryo°CabinTM · Шингэн азот · −200°C	CTN Cryo°CabinTM · Liquid nitrogen · −200°C
+CTN CRYO°CABIN™ · Шингэн азот · −160°C	CTN CRYO°CABIN™ · Liquid nitrogen · −160°C
 Крио	Cryo
 Кабин	Cabin
-Шингэн азотаар ажилладаг бүхэл биеийн крио сэргээн засах систем. −200°C хүртэл температурт 3 минут байснаар биеийг гүнзгий сэргээнэ.	A liquid-nitrogen whole-body cryotherapy system. A three-minute session at temperatures down to −200°C supports deep recovery.
+Шингэн азотаар ажилладаг бүхэл биеийн крио сэргээн засах систем. −160°C хүртэл температурт 3 минут байснаар биеийг гүнзгий сэргээнэ.	A liquid-nitrogen whole-body cryotherapy system. A three-minute session at temperatures down to −160°C supports deep recovery.
 Үйлчилгээний хугацаа	Session duration
 Калори шатаана	Calories burned
 Цэвэр агаар	Clean air
@@ -141,7 +257,7 @@ CTN Cryo°CabinTM · Шингэн азот · −200°C	CTN Cryo°CabinTM · Liq
 Эхлээд Exit дарж дараа нь Shutdown дарна. Дэлгэц бүрэн хар болсны дараа кабины унтраалгыг OFF болгоно.	Select Exit, then Shutdown. Once the screen is completely black, turn the cabin switch OFF.
 Техникийн үзүүлэлт	Technical specifications
 Хэрэглэх температур	Operating temperature
-−200°C хүртэл (3 түвшин)	Down to −200°C (3 levels)
+−160°C хүртэл (3 түвшин)	Down to −160°C (3 levels)
 Хөргөх хугацаа	Cooling time
 3–4 минут (+20° → −110°C)	3–4 minutes (+20° → −110°C)
 Хөргөх материал	Coolant
@@ -177,7 +293,7 @@ e°Cabin — цахилгаан	e°Cabin — electric
 — азотын нийлүүлэлт шаардлагагүй	— no nitrogen supply needed
 Байршуулахад хялбар	Easy to install
 — тусгай агааржуулалт шаардлагагүй	— no special ventilation required
-Cryo°CabinTM-тэй ижил	The same as Cryo°CabinTM:
+CRYO°CABIN™-тэй ижил	The same as CRYO°CABIN™:
 үр дүн, үйлчилгээний чанар	results and session quality
 Хөргөх арга	Cooling method
 Цахилгаан компрессор	Electric compressor
@@ -305,7 +421,7 @@ X°CRYO-ийн давуу тал	Benefits of X°CRYO
 75 × 44 × 73 см	75 × 44 × 73 cm
 X°CRYO сэргээн засах үйлчилгээ туршихад бэлэн үү?	Ready to try X°CRYO?
 Локал криотерапиар өвдөлт, гэмтэл, үрэвслийг хурдан арилга	Explore local cryotherapy for pain, injuries and inflammation
-Өндөр даралттай хүчилтөрөгчийн сэргээн засах үйлчилгээ	Hyperbaric oxygen recovery
+Зөөлөн даралтат хүчилтөрөгчийн үйлчилгээ	Hyperbaric oxygen recovery
 1.35–1.4 ATA даралтаар ажилладаг mild hyperbaric хүчилтөрөгчийн камер. Биеийн байгалийн эдгэрэлтийн процессыг дэмжиж, эрүүл мэндийг сайжруулна.	A mild hyperbaric oxygen chamber operating at 1.35–1.4 ATA. Supports the body’s natural healing process and wellbeing.
 Даралт	Pressure
 Сессийн хугацаа	Session duration
@@ -391,22 +507,22 @@ AIO нэгжийн жин	AIO unit weight
 OxyPro сэргээн засах үйлчилгээ туршихад бэлэн үү?	Ready to try OxyPro?
 Хүчилтөрөгчийн сэргээн засах үйлчилгээгээр биеийн эдгэрэлтийг дэмж	Support your body’s recovery with oxygen sessions
 Улаан гэрлийн сэргээн засах үйлчилгээ	Red-light recovery
-28,515 LED ашиглан улаан болон ойрын инфра улаан гэрлийн спектрийг ялгаруулж арьс, булчин, эдийн эрүүл мэндийг сайжруулдаг дэвшилтэт под.	An advanced pod with 28,515 LEDs emitting red and near-infrared light to support skin, muscle and tissue health.
+28,512 LED ашиглан улаан болон ойрын инфра улаан гэрлийн спектрийг ялгаруулж арьс, булчин, эдийн эрүүл мэндийг сайжруулдаг дэвшилтэт под.	An advanced pod with 28,512 LEDs emitting red and near-infrared light to support skin, muscle and tissue health.
 LED тоо	LED count
 нанометр	nanometres
 Хүч чадал	Power
 CTN LedPro™ нь фотобиомодуляцийн хүчийг ашигладаг. Хоёр төрлийн гэрлийн долгион биеийн янз бүрийн гүнд нэвтэрч үйлчилдэг.	CTN LedPro™ uses photobiomodulation. Two types of light penetrate the body at different depths.
-Улаан гэрэл — 630–660 нанометр	Red light — 630–660 nanometres
+Улаан гэрэл — 650 нанометр	Red light — 650 nanometres
 Арьсны гадаргын давхаргад нэвтэрч эсийн энергийн үйлдвэрлэл (ATP) болон митохондрийг идэвхжүүлдэг. Коллаген нэмэгдэж эдгэрэлт хурдасна.	Penetrates surface skin layers and stimulates cellular energy production (ATP) and mitochondria, supporting collagen and healing.
-Ойрын инфра улаан (NIR) — 700–1100 нанометр	Near-infrared (NIR) — 700–1100 nanometres
+Ойрын инфра улаан (NIR) — 940 нанометр	Near-infrared (NIR) — 940 nanometres
 Биеийн гүн рүү нэвтэрч булчин, мэдрэл, ясанд нөлөөлдөг. Эсийн засвар болон цусны эргэлтийг сайжруулдаг.	Penetrates deeper to reach muscles, nerves and bones, supporting cellular repair and circulation.
 Биеийн давхаргад нэвтрэх гүн	Penetration depth
 Эпидермис	Epidermis
 ~ 0.1 мм	~ 0.1 mm
 Дермис · Коллаген	Dermis · Collagen
-1–4 мм · Улаан гэрэл (630–660 nm)	1–4 mm · Red light (630–660 nm)
+1–4 мм · Улаан гэрэл (650 nm)	1–4 mm · Red light (650 nm)
 Булчин · Эс · Цусны судас	Muscle · Cells · Blood vessels
-5–40 мм · Ойрын инфра улаан (700–940 nm)	5–40 mm · Near-infrared (700–940 nm)
+5–40 мм · Ойрын инфра улаан (940 nm)	5–40 mm · Near-infrared (940 nm)
 Гүн эд · Яс · Мэдрэл	Deep tissue · Bone · Nerves
 40+ мм	40+ mm
 Улаан гэрэл нь арьсны гадаргын давхаргад нэвтэрч	Red light penetrates surface skin layers and activates
@@ -464,7 +580,7 @@ Bluetooth хөгжим	Bluetooth music
 Дараа	Afterwards
 Үйлчилгээний дараа шүршүүрт орох. Биеийн дулааралтыг мэдэрнэ — энэ хэвийн.	Shower after the session. A warm sensation in the body is normal.
 Төрөл	Type
-28,515 ширхэг (Epistar)	28,515 (Epistar)
+28,512 ширхэг (Epistar)	28,512 (Epistar)
 Гэрлийн давтамж	Light wavelength
 Хүчдэл	Voltage
 Нийт хүч	Total power
