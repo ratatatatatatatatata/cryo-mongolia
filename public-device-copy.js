@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const copy = `
+Алгасах →	Skip →
 Хүний биеийн бүтэц	Human anatomy
 Нэр дээр дарж томруулна уу.	Select a label to zoom in.
 Хүний биеийн анатомийн зураг	Human anatomy illustration
