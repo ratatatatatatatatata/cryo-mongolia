@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   const copy = `
+Бүтэн бие	Full body
+Биеийн хэсэг	Body region
 Танилцуулга видео	Introduction videos
 Видео удахгүй	Video coming soon
 Сэргээн засах үйлчилгээ	Recovery services
