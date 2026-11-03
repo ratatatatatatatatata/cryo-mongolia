@@ -16,6 +16,7 @@ const publicFiles = [
   "public-typography.css",
   "site-intro.css",
   "site-intro.js",
+  "anatomy-viewer.js",
   "anatomy-viewer.css",
   "home-layout.css",
   "public-copy.js",
