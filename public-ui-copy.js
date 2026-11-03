@@ -1,6 +1,10 @@
 (function () {
   'use strict';
   const copy = `
+Арьс, судас болон биеийн дотоод бүтцийг 3D орчинд үзээрэй.	Explore the skin, blood vessels and internal anatomy in 3D.
+Хүний биеийн интерактив 3D анатоми	Interactive 3D human anatomy
+Чирж эргүүлнэ. Хоёр хуруугаар эсвэл хулганы дугуйгаар томруулна.	Drag to rotate. Pinch or scroll to zoom.
+Ачаалахгүй бол загварын холбоосыг нээнэ үү.	If the viewer does not load, open the model link.
 Дараагийн багцад 10% хөнгөлөлт	10% off your next package
 Биеийн анализ 2 удаа үнэгүй · 2 сар дараалан авбал дараагийн сар ₮1,700,000	Two complimentary body analyses · after two consecutive months, the next month is ₮1,700,000
 Арьсны оношилгоо + гэрийн арчилгааны зөвлөмж · дараагийн гоо сайхны багцад 10%	Skin assessment and home care guidance · 10% off your next beauty package

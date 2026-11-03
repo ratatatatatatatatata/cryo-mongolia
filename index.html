@@ -86,15 +86,12 @@
   <div class="sketch-section-label">Бидний тухай</div>
   <div class="about">
     <div class="about-visual reveal anatomy-panel">
-      <div class="anatomy-head"><span>CRYO / HUMAN ANATOMY</span><h3>Хүний биеийн бүтэц</h3><p>Нэр дээр дарж томруулна уу.</p></div>
-      <div class="anatomy-preview">
-        <svg viewBox="0 0 900 1350" role="img" aria-label="Хүний биеийн анатомийн зураг">
-          <image href="photos/about-anatomy-3d.webp" width="900" height="1350"/>
-          <g class="anatomy-leaders" aria-hidden="true"></g>
-        </svg>
-        <div class="anatomy-labels" aria-label="Биеийн хэсэг сонгох"></div>
+      <div class="anatomy-head"><span>CRYO / HUMAN ANATOMY</span><h3>Хүний биеийн бүтэц</h3><p>Арьс, судас болон биеийн дотоод бүтцийг 3D орчинд үзээрэй.</p></div>
+      <div class="anatomy-model">
+        <iframe title="Хүний биеийн интерактив 3D анатоми" src="https://sketchfab.com/models/9b0b079953b840bc9a13f524b60041e4/embed?autostart=0&amp;animation_autoplay=0" loading="lazy" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
       </div>
-      <button class="anatomy-full" type="button">Бүтэн бие</button>
+      <p class="anatomy-help">Чирж эргүүлнэ. Хоёр хуруугаар эсвэл хулганы дугуйгаар томруулна.</p>
+      <p class="anatomy-credit"><a href="https://sketchfab.com/3d-models/animated-full-human-body-anatomy-9b0b079953b840bc9a13f524b60041e4" target="_blank" rel="noopener noreferrer">Animated Full Human Body Anatomy</a> · <a href="https://sketchfab.com/AVRcontent" target="_blank" rel="noopener noreferrer">AVRcontent</a> / Sketchfab<br><span>Ачаалахгүй бол загварын холбоосыг нээнэ үү.</span></p>
     </div>
     <div class="reveal">
       <div class="section-chip">Бидний тухай</div>
@@ -538,7 +535,6 @@
 <script type="module" src="auth.js"></script>
 <script src="cryo3d.js"></script>
 
-<script src="anatomy-viewer.js"></script>
 <script>
 async function handleContact(e){
   e.preventDefault();
