@@ -13,6 +13,8 @@ const publicFiles = [
   "skinbolic-translations.js",
   "index.css",
   "index.js",
+  "device-shelf.js",
+  "device-shelf.css",
   "public-copy.js",
   "public-device-copy.js",
   "public-ui-copy.js",

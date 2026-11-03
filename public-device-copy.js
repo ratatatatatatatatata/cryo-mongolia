@@ -2,6 +2,18 @@
 (function () {
   'use strict';
   const copy = `
+Эргүүлж сонгоод, дэлгэрэнгүйтэй танилцаарай.	Turn to choose a device and explore the details.
+Төхөөрөмжийн төрөл	Device category
+Дараах төхөөрөмж	Next device
+Өмнөх төхөөрөмж	Previous device
+Бүх төхөөрөмж үзэх →	View all devices →
+Төхөөрөмжүүдийн мэдээлэл үзэх →	Explore our equipment →
+Хаах ×	Close ×
+−200°C · 3 минут	−200°C · 3 minutes
+28,515 LED · 15 минут	28,515 LEDs · 15 minutes
+1.4 ATA · 30 минут	1.4 ATA · 30 minutes
+Цахилгаан · Автомат	Electric · Automatic
+Хөнгөн даралтын хүчилтөрөгчийн камер.	Mild-pressure oxygen chamber.
 Төхөөрөмжүүд — CRYO Mongolia	Equipment — CRYO Mongolia
 Үндсэн хуудас	Home
 Манай	Our

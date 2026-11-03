@@ -28,6 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Geologica:slnt,wght@-12..0,300..800&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="index.css"/>
+  <link rel="stylesheet" href="device-shelf.css"/>
   <link rel="icon" type="image/svg+xml" href="logo.svg"/>
   <noscript><style>.reveal,.stagger>*{opacity:1 !important;transform:none !important}.hero-chip,.hero-sub,.hero-actions,.hero-trust,.hero-scroll-hint{opacity:1 !important;animation:none !important}</style></noscript>
 <link rel="stylesheet" href="public-i18n.css"/>
@@ -45,7 +46,7 @@
   <a href="#home" class="nav-logo" aria-label="Cryo Mongolia Recovery Center — Нүүр"><img src="logo.svg" alt="" aria-hidden="true"/><span><b>CRYO <em>MONGOLIA</em></b><small>RECOVERY CENTER</small></span></a>
   <ul class="nav-links">
     <li><a href="#about">Бидний тухай</a></li>
-    <li><a href="#treatments">Үйлчилгээ</a></li>
+    <li><a href="#devices">Үйлчилгээ</a></li>
     <li><a href="skinbolic.html">Skin Bolic</a></li>
     <li><a href="#devices">Төхөөрөмж</a></li>
     <li><a href="#pricing">Үнэ</a></li>
@@ -64,7 +65,7 @@
 
 <div class="mobile-menu" id="mobileMenu">
   <a href="#about" onclick="toggleMenu()">Бидний тухай</a>
-  <a href="#treatments" onclick="toggleMenu()">Үйлчилгээ</a>
+  <a href="#devices" onclick="toggleMenu()">Үйлчилгээ</a>
   <a href="skinbolic.html">Skin Bolic</a>
   <a href="#devices" onclick="toggleMenu()">Төхөөрөмж</a>
   <a href="#pricing" onclick="toggleMenu()">Үнэ</a>
@@ -94,7 +95,7 @@
     <p class="hero-sub">−200°C хүйтний цэвэр хүчээр биеэ нөхөн сэргээ. Эрүүл мэнд, фитнес, гоо сайхны шинэ хэмжээнд хүр — гурван минутын дотор.</p>
     <div class="hero-actions">
       <a href="#" class="btn btn-primary" onclick="openModal();return false;">Цаг захиалах</a>
-      <a href="#treatments" class="btn btn-outline">Үйлчилгээ үзэх</a>
+      <a href="#devices" class="btn btn-outline">Үйлчилгээ үзэх</a>
     </div>
 
     <div class="hero-trust">
@@ -145,138 +146,22 @@
   </div>
 </section>
 
-<!-- ══════════ TREATMENTS ══════════ -->
-<section class="section white" id="treatments">
-  <div class="treatments-header reveal">
-    <div>
-      <div class="section-chip">Үйлчилгээ</div>
-      <h2 class="section-title">Сэргээн засах үйлчилгээний ангилал</h2>
-    </div>
-    <div class="tab-row">
-      <button class="tab-btn active" onclick="filterTreatments('all',this)">Бүгд</button>
-      <button class="tab-btn" onclick="filterTreatments('cryo',this)">Криотерапи</button>
-      <button class="tab-btn" onclick="filterTreatments('recovery',this)">Нөхөн сэргэлт</button>
-      <button class="tab-btn" onclick="filterTreatments('beauty',this)">Гоо сайхан</button>
-      <button class="tab-btn" onclick="filterTreatments('relax',this)">Тайвшрал</button>
-    </div>
-  </div>
-
-  <div class="treatment-grid reveal">
-    <div class="treatment-card active-card" data-svc="cryocabin" data-cat="cryo" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-cabin-1.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Криотерапи</span><div class="card-title">CryoCabin™ — Бүх биеийн криотерапи</div><p class="card-desc">−200°C хүртэл хэт хүйтэнд 3 минут. Сэргэлт, цусны эргэлт, дархлаа идэвхжүүлнэ.</p>
-      <div class="card-meta"><span class="card-dur">3 мин</span><span class="card-price"><small>₮</small>149,000</span></div>
-      <a class="card-link" href="cabin.html">Дэлгэрэнгүй →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="xcryo" data-cat="cryo" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-xcryo-1.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Криотерапи</span><div class="card-title">X°Cryo™ — Хэсэгчилсэн крио</div><p class="card-desc">Нүүр, мөр, өвдөг зэрэг тодорхой хэсэгт чиглэсэн локал крио. Шууд мэдрэгдэх үр дүн.</p>
-      <div class="card-meta"><span class="card-dur">1–3 мин</span><span class="card-price"><small>₮</small>59,000</span></div>
-      <a class="card-link" href="xcryo.html">Дэлгэрэнгүй →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="oxypro" data-cat="recovery" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-oxypro-1.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Нөхөн сэргэлт</span><div class="card-title">OxyPro™ — Хүчилтөрөгчийн камер</div><p class="card-desc">Хөнгөн даралтын камер. Тархины цусан хангамж, эд эсийн нөхөн төлжилтийг дэмжинэ.</p>
-      <div class="card-meta"><span class="card-dur">30 мин</span><span class="card-price"><small>₮</small>129,000</span></div>
-      <a class="card-link" href="oxypro.html">Дэлгэрэнгүй →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="ledpro" data-cat="beauty" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-ledpro-1.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">LedPro™ — Улаан гэрлийн сэргээн засах үйлчилгээ</div><p class="card-desc">28,515 LED. Арьсны нөхөн төлжилт, коллаген үүсэлт, гэрэлтсэн байдал.</p>
-      <div class="card-meta"><span class="card-dur">15 мин</span><span class="card-price"><small>₮</small>139,000</span></div>
-      <a class="card-link" href="ledpro.html">Дэлгэрэнгүй →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="zerobody" data-cat="relax" data-tilt="7">
-      <div class="card-visual"><img src="photos/service-zerobody.webp" alt="ZeroBody™ хуурай хөвөх сэргээн засах үйлчилгээ" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Тайвшрал</span><div class="card-title">ZeroBody™ — Хуурай хөвөх</div><p class="card-desc">Усанд норохгүй хөвөх мэдрэмж. Стресс тайлалт, гүн нойр дэмжинэ.</p>
-      <div class="card-meta"><span class="card-dur">30 мин</span><span class="card-price"><small>₮</small>85,000</span></div>
-      <a class="card-link" href="#" onclick="openModal();return false;">Цаг захиалах →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="normatec" data-cat="recovery" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-oxypro-2.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Нөхөн сэргэлт</span><div class="card-title">Normatec® — Динамик компресс</div><p class="card-desc">Хөлний даралтат компресс. Булчин амралт, хаван хөөх, лимфийн урсгал.</p>
-      <div class="card-meta"><span class="card-dur">20 мин</span><span class="card-price"><small>₮</small>49,000</span></div>
-      <a class="card-link" href="#" onclick="openModal();return false;">Цаг захиалах →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="oxygen" data-cat="recovery" data-tilt="7">
-      <div class="card-visual"><img src="photos/service-oxygen.webp" alt="Цэвэр хүчилтөрөгчийн үйлчилгээ" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Нөхөн сэргэлт</span><div class="card-title">Цэвэр хүчилтөрөгчийн үйлчилгээ</div><p class="card-desc">Амьсгалын төв тэнцвэржүүлж, төвлөрөл, эрч хүчийг нэмэгдүүлнэ.</p>
-      <div class="card-meta"><span class="card-dur">15 мин</span><span class="card-price"><small>₮</small>35,000</span></div>
-      <a class="card-link" href="#" onclick="openModal();return false;">Цаг захиалах →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="facial" data-cat="beauty" data-tilt="7">
-      <div class="card-visual"><img src="photos/img-xcryo-2.png" alt="" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Гоо сайхан</span><div class="card-title">Гоо сайхны нүүрний үйлчилгээ</div><p class="card-desc">Чийгшүүлэх, залуужуулах, гүн цэвэрлэх — зөвлөлдөж сонгоно.</p>
-      <div class="card-meta"><span class="card-dur">Зөвлөгөөгөөр</span><span class="card-price"><small>₮</small>120,000-аас</span></div>
-      <a class="card-link" href="#" onclick="openModal();return false;">Цаг захиалах →</a></div>
-    </div>
-    <div class="treatment-card active-card" data-svc="massage" data-cat="relax" data-tilt="7">
-      <div class="card-visual"><img src="photos/service-massage.webp" alt="Бүтэн биеийн мэргэжлийн бариа" loading="lazy"/></div>
-      <div class="card-body"><span class="card-tag">Тайвшрал</span><div class="card-title">Бүтэн биеийн бариа</div><p class="card-desc">Булчин суллах, биеийн блок тайлах, стресс бууруулах гүн амралт.</p>
-      <div class="card-meta"><span class="card-dur">60 мин</span><span class="card-price"><small>₮</small>150,000</span></div>
-      <a class="card-link" href="#" onclick="openModal();return false;">Цаг захиалах →</a></div>
-    </div>
-  </div>
+<!-- ══════════ DEVICE SHELF ══════════ -->
+<section id="devices" class="device-library" aria-label="Төхөөрөмжүүд">
+  <div class="dl-heading"><span>CRYO MONGOLIA / TECHNOLOGY</span><h2>Төхөөрөмжүүд</h2><p>Эргүүлж сонгоод, дэлгэрэнгүйтэй танилцаарай.</p></div>
+  <nav class="dl-tabs" aria-label="Төхөөрөмжийн төрөл">
+    <button type="button" data-device-category="all">Бүгд</button><button type="button" data-device-category="cryo">Крио</button><button type="button" data-device-category="light">Улаан гэрэл</button><button type="button" data-device-category="oxygen">Хүчилтөрөгч</button>
+  </nav>
+  <div class="dl-viewport" tabindex="0" role="region" aria-label="Төхөөрөмж сонгох"><div class="dl-stage"></div></div>
+  <div class="dl-caption" aria-live="polite" aria-atomic="true"><h3></h3><p></p><small></small></div>
+  <div class="dl-controls"><button type="button" data-device-prev aria-label="Өмнөх төхөөрөмж">←</button><button type="button" data-device-open>Дэлгэрэнгүй үзэх →</button><button type="button" data-device-next aria-label="Дараах төхөөрөмж">→</button></div>
+  <div class="dl-footer"><span>PREMIUM RECOVERY &amp; LONGEVITY CENTER</span><a href="hub.html">Бүх төхөөрөмж үзэх →</a></div>
+  <noscript><p><a href="hub.html">Төхөөрөмжүүдийн мэдээлэл үзэх →</a></p></noscript>
 </section>
-
-<!-- ══════════ 3D DEVICE STAGE ══════════ -->
-<section class="section alt" id="devices">
-  <div style="text-align:center;max-width:640px;margin:0 auto;" class="reveal">
-    <div class="section-chip">Төхөөрөмж</div>
-    <h2 class="section-title">CTN-ийн <span class="accent">жинхэнэ технологи</span></h2>
-    <p class="section-desc" style="margin:0 auto;">Финландын CTN-аас шууд нийлүүлсэн эх төхөөрөмжүүд. Эргүүлж, ойртож, дэлгэрэнгүйг нь үз.</p>
-  </div>
-
-  <div class="stage-wrap reveal">
-    <div class="stage" data-stage>
-      <div class="stage-item" data-href="cabin.html">
-        <div class="si-frame">
-          <img src="photos/img-cabin-2.png" alt="Крио Кабин"/>
-          <div class="si-name">Крио Кабин</div>
-          <div class="si-sub">−200°C · Бүхэл бие</div>
-        </div>
-      </div>
-      <div class="stage-item" data-href="xcryo.html">
-        <div class="si-frame">
-          <img src="photos/img-xcryo-1.png" alt="X°CRYO"/>
-          <div class="si-name">X°CRYO</div>
-          <div class="si-sub">Локал крио · 1–3 мин</div>
-        </div>
-      </div>
-      <div class="stage-item" data-href="ledpro.html">
-        <div class="si-frame">
-          <img src="photos/img-ledpro-1.png" alt="LedPro"/>
-          <div class="si-name">LedPro</div>
-          <div class="si-sub">28,515 LED · Улаан гэрэл</div>
-        </div>
-      </div>
-      <div class="stage-item" data-href="oxypro.html">
-        <div class="si-frame">
-          <img src="photos/img-oxypro-1.png" alt="OxyPro"/>
-          <div class="si-name">OxyPro</div>
-          <div class="si-sub">1.4 ATA · Хүчилтөрөгч</div>
-        </div>
-      </div>
-      <div class="stage-item" data-href="cabin.html">
-        <div class="si-frame">
-          <img src="photos/img-ecabin.png" alt="e°Cabin"/>
-          <div class="si-name">e°Cabin</div>
-          <div class="si-sub">Цахилгаан · Автомат</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="stage-nav">
-      <button class="stage-btn" data-stage-prev aria-label="Өмнөх төхөөрөмж">‹</button>
-      <div class="stage-dots" data-stage-dots></div>
-      <button class="stage-btn" data-stage-next aria-label="Дараах төхөөрөмж">›</button>
-    </div>
-
-    <div style="text-align:center;margin-top:34px;">
-      <a href="hub.html" class="btn btn-outline">Бүх төхөөрөмж үзэх</a>
-    </div>
-  </div>
-</section>
+<dialog class="dl-detail" aria-labelledby="dl-title">
+  <button class="dl-close" type="button">Хаах ×</button><span class="dl-brand">CRYO MONGOLIA</span>
+  <div class="dl-detail-grid"><div class="dl-detail-copy"><p class="dl-kicker"></p><h2 id="dl-title"></h2><p class="dl-meta"></p><p class="dl-description"></p><a class="dl-more" href="hub.html">Дэлгэрэнгүй үзэх →</a><button class="dl-book" type="button">Цаг захиалах →</button></div><div class="dl-poster"><img alt=""/></div></div>
+</dialog>
 
 <!-- ══════════ BENEFITS ══════════ -->
 <section class="section white" id="benefits">
@@ -549,7 +434,7 @@
       <div class="footer-logo">CRYO <span>Mongolia</span></div>
       <p>Монголын анхны мэргэжлийн крио сэргээн засах үйлчилгээний төв. Эрүүл мэнд, гоо сайхан, нөхөн сэргэлтийн дэлхийн стандартыг Монголд нэвтрүүлж байна.</p>
     </div>
-    <div class="footer-col"><h5>Үйлчилгээ</h5><ul><li><a href="cabin.html">CryoCabin™ — бүх биеийн крио</a></li><li><a href="xcryo.html">X°Cryo™ — хэсэгчилсэн крио</a></li><li><a href="oxypro.html">OxyPro™ — хүчилтөрөгчийн камер</a></li><li><a href="ledpro.html">LedPro™ — улаан гэрэл</a></li><li><a href="#treatments">ZeroBody™ · Normatec®</a></li></ul></div>
+    <div class="footer-col"><h5>Үйлчилгээ</h5><ul><li><a href="cabin.html">CryoCabin™ — бүх биеийн крио</a></li><li><a href="xcryo.html">X°Cryo™ — хэсэгчилсэн крио</a></li><li><a href="oxypro.html">OxyPro™ — хүчилтөрөгчийн камер</a></li><li><a href="ledpro.html">LedPro™ — улаан гэрэл</a></li><li><a href="#devices">ZeroBody™ · Normatec®</a></li></ul></div>
     <div class="footer-col"><h5>Компани</h5><ul><li><a href="#about">Бидний тухай</a></li><li><a href="#">Баг</a></li><li><a href="#">Блог</a></li><li><a href="#">Ажлын байр</a></li><li><a href="#">Франчайз</a></li></ul></div>
     <div class="footer-col"><h5>Холбоо</h5><ul><li><a href="#" onclick="openModal();return false;">Цаг захиалах</a></li><li><a href="#">Асуулт хариулт</a></li><li><a href="privacy.html">Нууцлалын бодлого</a></li><li><a href="#">Үйлчилгээний нөхцөл</a></li></ul></div>
   </div>
@@ -640,6 +525,7 @@
 <script type="module" src="data.js"></script>
 <script type="module" src="auth.js"></script>
 <script src="cryo3d.js"></script>
+<script src="device-shelf.js"></script>
 <script>
 async function handleContact(e){
   e.preventDefault();
