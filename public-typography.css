@@ -1,18 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-/* The navigation's Manrope family is shared by every public component. */
-:root{--ff-display:'Manrope',system-ui,-apple-system,sans-serif;--ff-body:'Manrope',system-ui,-apple-system,sans-serif}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Native Apple system type where available; Inter supplies consistent Cyrillic elsewhere. */
+:root{--ff-display:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;--ff-body:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif}
 body,body *{font-family:var(--ff-body)!important}
-body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-button,input,select,textarea{font-family:inherit}
-h1,h2,h3,h4{font-weight:600;letter-spacing:-.025em;text-wrap:balance}
-p{line-height:1.75}
-.hero-title{font-size:clamp(40px,6.4vw,88px);line-height:1.12;letter-spacing:-.035em}
-.section-title{font-size:clamp(28px,3.4vw,48px);line-height:1.22;letter-spacing:-.025em}
-.section-desc{font-size:clamp(14px,1.2vw,16px);font-weight:400;line-height:1.8}
-.nav-links a{font-size:13px;font-weight:600;letter-spacing:0}
-.dl-heading h2{font-size:clamp(28px,3.4vw,48px)}
-.dl-detail-copy h2{font-size:clamp(36px,4.8vw,68px);line-height:1.15}
-.dl-caption h3{font-size:clamp(23px,2.6vw,32px);line-height:1.3}
-.dl-heading>span,.dl-footer,.dl-kicker,.dl-meta,.dl-brand,.av-eyebrow,.anatomy-head span{letter-spacing:.07em}
-.price-name,.card-title{line-height:1.4}.price-amount{font-size:clamp(34px,3.5vw,44px);letter-spacing:-.035em}
-@media(max-width:600px){.hero-title{font-size:clamp(36px,9vw,52px)}.section-title{font-size:clamp(27px,7vw,34px)}.section-desc{font-size:14px}.dl-detail-copy h2{font-size:36px}}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:17px;line-height:1.5;letter-spacing:-.012em}
+button,input,select,textarea{font-family:inherit;letter-spacing:0}
+h1,h2,h3,h4{font-weight:600;letter-spacing:-.035em;text-wrap:balance}
+p{line-height:1.6}
+.hero-title,.dev-title,.hub-title{font-size:clamp(40px,5.5vw,80px);font-weight:600;line-height:1.08;letter-spacing:-.045em}
+.section-title,.sec-title,.dl-heading h2{font-size:clamp(30px,3.6vw,52px);font-weight:600;line-height:1.13;letter-spacing:-.035em}
+.hero-sub{font-size:clamp(18px,1.8vw,24px);font-weight:400;line-height:1.45;letter-spacing:-.018em;max-width:38em}
+.section-desc,.dev-desc{font-size:clamp(16px,1.5vw,20px);font-weight:400;line-height:1.55;letter-spacing:-.012em;max-width:38em}
+.nav-links a{font-size:13px;font-weight:400;letter-spacing:0;line-height:1.4}
+.section-chip,.card-tag,.dl-kicker,.dl-meta,.av-eyebrow,.anatomy-head span{font-size:12px;font-weight:500;line-height:1.5;letter-spacing:.025em}
+.dl-detail-copy h2{font-size:clamp(36px,4.7vw,64px);line-height:1.1;letter-spacing:-.035em;font-weight:600}
+.dl-caption h3{font-size:clamp(24px,2.5vw,32px);line-height:1.25;letter-spacing:-.025em;font-weight:600}
+.dl-description{font-size:18px;line-height:1.6;letter-spacing:-.012em}
+.dl-heading>span,.dl-footer,.dl-brand{letter-spacing:.035em}
+.price-name,.card-title,.benefit-title,.pillar h4,.process-step h4{font-weight:600;line-height:1.35;letter-spacing:-.02em}
+.card-title,.price-name{font-size:21px}.pillar p,.benefit-list,.card-desc{font-size:14px;line-height:1.65;letter-spacing:0}
+.price-amount{font-size:clamp(34px,3.5vw,46px);font-weight:600;line-height:1.15;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.btn{font-size:14px;font-weight:500;line-height:1.4;letter-spacing:0;text-transform:none}
+.footer-col h5{font-size:13px;font-weight:600;letter-spacing:0}.footer-col a,.footer-bottom{font-size:12px;line-height:1.5;letter-spacing:0}
+@media(max-width:600px){body{font-size:16px}.hero-title,.dev-title,.hub-title{font-size:clamp(36px,8.5vw,48px);line-height:1.12;letter-spacing:-.035em}.section-title,.sec-title,.dl-heading h2{font-size:clamp(28px,7vw,36px);line-height:1.18}.hero-sub{font-size:18px;line-height:1.5}.section-desc,.dev-desc{font-size:16px;line-height:1.6}.dl-detail-copy h2{font-size:36px}.dl-description{font-size:16px}.price-name,.card-title{font-size:19px}}
