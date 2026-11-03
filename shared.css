@@ -428,3 +428,8 @@ footer p{font-size:12px}
 .pillar-num,.pack-kicker,.feat-num,.hs-num,.step-bubble,.dc-num{
   font-weight:800;
 }
+
+/* Reveal before entering the viewport; short transitions keep scrolling responsive. */
+.reveal,.stagger>*{transform:translate3d(0,12px,0);transition-duration:.22s;transition-delay:0s}
+.reveal.visible,.stagger.visible>*{transform:none}
+.scroll-rail{width:100%;transform:scaleX(0);transform-origin:left center}

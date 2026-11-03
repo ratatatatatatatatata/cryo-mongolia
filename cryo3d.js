@@ -38,7 +38,7 @@
   /* ── b. Scroll reveal (+ stagger) ── */
   function initReveal() {
     const els = document.querySelectorAll(".reveal, .stagger");
-    if (!("IntersectionObserver" in window)) {
+    if (REDUCED || !("IntersectionObserver" in window)) {
       els.forEach((e) => e.classList.add("visible"));
       return;
     }
@@ -49,13 +49,13 @@
           e.target.classList.add("visible");
           if (e.target.classList.contains("stagger")) {
             [...e.target.children].forEach((c, i) => {
-              c.style.transitionDelay = i * 0.075 + "s";
+              c.style.transitionDelay = Math.min(i * 0.02, 0.08) + "s";
             });
           }
           obs.unobserve(e.target);
         });
       },
-      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" },
+      { threshold: 0, rootMargin: "240px 0px" },
     );
     els.forEach((el) => obs.observe(el));
   }
@@ -124,22 +124,29 @@
       y = innerHeight / 2,
       tx = x,
       ty = y;
+    let haloFrame = null;
     window.addEventListener(
       "pointermove",
       (e) => {
         tx = e.clientX;
         ty = e.clientY;
         document.body.classList.add("has-halo");
+        if (!haloFrame && !document.hidden) haloFrame = requestAnimationFrame(loop);
       },
       { passive: true },
     );
-    (function loop() {
+    function loop() {
+      haloFrame = null;
+      if (document.hidden) return;
       x += (tx - x) * 0.12;
       y += (ty - y) * 0.12;
       halo.style.transform =
         "translate3d(" + (x - 170) + "px," + (y - 170) + "px,0)";
-      requestAnimationFrame(loop);
-    })();
+      if (Math.abs(tx - x) + Math.abs(ty - y) > 0.5) haloFrame = requestAnimationFrame(loop);
+    }
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) { cancelAnimationFrame(haloFrame); haloFrame = null; }
+    });
   }
 
   /* ── f. Scroll progress rail ── */
@@ -147,12 +154,15 @@
     const rail = document.createElement("div");
     rail.className = "scroll-rail";
     document.body.appendChild(rail);
+    let railFrame = null;
     function upd() {
+      railFrame = null;
       const max = document.documentElement.scrollHeight - innerHeight;
-      rail.style.width = (max > 0 ? (scrollY / max) * 100 : 0) + "%";
+      rail.style.transform = "scaleX(" + (max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0) + ")";
     }
-    window.addEventListener("scroll", upd, { passive: true });
-    window.addEventListener("resize", upd, { passive: true });
+    const queueRail = () => { if (!railFrame) railFrame = requestAnimationFrame(upd); };
+    window.addEventListener("scroll", queueRail, { passive: true });
+    window.addEventListener("resize", queueRail, { passive: true });
     upd();
   }
 
@@ -165,6 +175,7 @@
     const dotsWrap = document.querySelector("[data-stage-dots]");
     let index = 0;
     let timer = null;
+    let stageVisible = !("IntersectionObserver" in window);
 
     if (dotsWrap) {
       items.forEach((_, i) => {
@@ -215,7 +226,7 @@
     }
     function restart() {
       clearInterval(timer);
-      if (!REDUCED) timer = setInterval(() => go(index + 1), 5200);
+      if (!REDUCED && stageVisible && !document.hidden) timer = setInterval(() => go(index + 1), 5200);
     }
 
     stage.querySelectorAll(".stage-item").forEach((el, i) => {
@@ -253,6 +264,13 @@
     );
 
     layout();
+    if ("IntersectionObserver" in window) {
+      const stageObserver = new IntersectionObserver(([entry]) => {
+        stageVisible = entry.isIntersecting; restart();
+      }, { threshold: 0 });
+      stageObserver.observe(stage);
+    }
+    document.addEventListener("visibilitychange", restart);
     restart();
   }
 

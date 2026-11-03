@@ -1460,3 +1460,8 @@ body{
 @media(prefers-reduced-motion:reduce){
   .hero-brand-mark .hero-logo,.brand-orbit{animation:none!important;opacity:1}
 }
+
+/* Reveal before entering the viewport; short transitions keep scrolling responsive. */
+.reveal,.stagger>*{transform:translate3d(0,12px,0);transition-duration:.22s;transition-delay:0s}
+.reveal.visible,.stagger.visible>*{transform:none}
+.scroll-rail{width:100%;transform:scaleX(0);transform-origin:left center}
