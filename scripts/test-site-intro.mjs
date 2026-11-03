@@ -12,9 +12,9 @@ for(const scenario of ['normal','reduced','hash','return','unsupported','failure
  w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  if(scenario==='return')w.sessionStorage.setItem('cryo-intro-assembled-v1','1');
  w.eval(script);
- if(scenario==='normal'){assert.equal(d.querySelectorAll('.intro-logo path').length,4);assert(d.querySelector('.site-intro').open);assert.equal(d.body.style.overflow,'hidden');d.querySelector('.intro-skip').click();assert(!d.querySelector('.site-intro'));assert.equal(d.body.style.overflow,'');assert.equal(w.sessionStorage.getItem('cryo-intro-assembled-v1'),'1');w.eval(script);assert(!d.querySelector('.site-intro'));}
+ if(scenario==='normal'){assert.equal(d.querySelectorAll('.intro-logo path').length,4);assert(d.querySelector('.site-intro').open);assert.equal(d.body.style.overflow,'hidden');assert(!d.querySelector('.intro-skip'));d.querySelector('.site-intro').dispatchEvent(new w.Event('cancel',{cancelable:true}));assert(!d.querySelector('.site-intro'));assert.equal(d.body.style.overflow,'');assert.equal(w.sessionStorage.getItem('cryo-intro-assembled-v1'),'1');w.eval(script);assert(!d.querySelector('.site-intro'));}
  else assert(!d.querySelector('.site-intro'));
  dom.window.close();
 }
 for(const page of ['index','hub','cabin','xcryo','oxypro','ledpro','skinbolic','privacy','data-deletion'])assert(fs.readFileSync(page+'.html','utf8').includes('href="public-typography.css"'));
-console.log('PASS intro skip, return visit, deep links, reduced motion, unsupported browser, animation failure and all public font links');
+console.log('PASS no skip button, Escape dismissal, return visit, deep links, reduced motion, unsupported browser, animation failure and all public font links');
