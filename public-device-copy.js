@@ -2,6 +2,11 @@
 (function () {
   'use strict';
   const copy = `
+Танилцуулга видео	Introduction videos
+Видео удахгүй	Video coming soon
+Сэргээн засах үйлчилгээ	Recovery services
+Нэг сеанс	One session
+Албан ёсны түнш	Official partner
 Алгасах →	Skip →
 Хүний биеийн бүтэц	Human anatomy
 Нэр дээр дарж томруулна уу.	Select a label to zoom in.
