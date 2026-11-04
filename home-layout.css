@@ -12,3 +12,32 @@
 .anatomy-viewer .av-parts{position:static;width:auto;height:auto;padding:0;background:none;border:0;box-shadow:none;backdrop-filter:none;gap:8px}
 @media(max-width:900px){#navbar,#navbar.scrolled{padding:18px 24px 24px;gap:22px;grid-template-columns:1fr 1fr;grid-template-areas:'actions language' 'brand brand' 'links links'}#navbar .nav-actions .nav-login{display:inline-flex}#navbar .nav-actions .nav-cta{display:inline-flex;padding:9px 12px;font-size:12px}#navbar .nav-logo{margin-top:6px}#navbar .nav-links{gap:10px 22px}#about .about{gap:28px;grid-template-columns:minmax(240px,.85fr) minmax(0,1fr)}#about .anatomy-panel{height:530px}.about-summary{gap:8px}.about-summary>div{padding:20px 8px}.sketch-videos{gap:14px}.sketch-videos article>div{padding:10px;flex-wrap:wrap;gap:2px}.sketch-videos h3{font-size:14px}}
 @media(max-width:640px){#navbar,#navbar.scrolled{padding:14px 16px 22px;gap:18px}#navbar .nav-actions{gap:8px}#navbar .nav-login{font-size:11px}#navbar .nav-logo img{width:100px;height:100px}#navbar .nav-logo .sketch-brand-title{font-size:34px}#navbar .nav-logo small{font-size:9px;max-width:300px;letter-spacing:.08em}#navbar .nav-links{gap:8px 18px;margin-top:8px}#navbar .nav-links a{font-size:12px}.public-language button{padding:6px;min-height:34px}#about{padding-top:28px}.sketch-section-label{margin-bottom:26px}#about .about{grid-template-columns:1fr;gap:28px}#about .anatomy-panel{height:490px;max-width:430px;width:100%;margin:auto}#about .section-title{font-size:30px}#about .section-desc{font-size:16px}.about-summary>div{padding:20px 8px}.about-summary strong{font-size:26px}.sketch-videos{grid-template-columns:1fr;max-width:470px;padding-bottom:32px;gap:18px}.sketch-videos article{aspect-ratio:16/9}.sketch-videos article>div{padding:12px 18px;gap:12px}.sketch-videos h3{font-size:16px}.sketch-videos span{font-size:12px}.treatments-header .tab-row{gap:6px}.treatments-header .tab-btn{font-size:11px;padding:9px 12px}}
+
+/* Quiet, spacious editorial treatment for the About section. */
+#about{position:relative;padding-block:88px 96px;background:radial-gradient(ellipse at 18% 48%,#15304435,transparent 55%),#080e17;border-bottom:1px solid #b8d9ed12}
+#about>.sketch-section-label{display:flex;align-items:center;gap:18px;border:0;border-radius:0;padding:0;margin-bottom:54px;font-size:12px;font-weight:500;letter-spacing:.12em;color:#a8bdce}
+#about>.sketch-section-label::before,#about>.sketch-section-label::after{content:"";width:48px;height:1px;background:#a8bdce40}
+#about .about{grid-template-columns:minmax(300px,.9fr) minmax(0,1.15fr);gap:clamp(40px,6vw,88px);max-width:1180px}
+#about .about>div:last-child{padding-block:24px}
+#about .section-title{font-size:clamp(32px,3.35vw,48px);line-height:1.18;font-weight:500;letter-spacing:-.035em;color:#edf4f8;margin-bottom:28px;text-wrap:balance}
+#about .section-title .accent{color:#a7cee4;background:none;-webkit-text-fill-color:currentColor}
+#about .section-desc{font-size:16px;line-height:1.95;letter-spacing:0;color:#a1b3c3;margin-bottom:42px;max-width:35em}
+#about .section-desc strong{font-weight:500!important;color:#d1dee7!important}
+#about .about-summary{gap:0;border-top:1px solid #b8d9ed26;padding-top:30px}
+#about .about-summary>div{padding:0 20px;border:0;border-right:1px solid #b8d9ed20;border-radius:0;background:none;text-align:left}
+#about .about-summary>div:first-child{padding-left:0}
+#about .about-summary>div:last-child{border-right:0;padding-right:0}
+#about .about-summary strong{font-size:clamp(26px,2.6vw,36px);font-weight:400;letter-spacing:-.04em;color:#e0ecf3;margin-bottom:8px;white-space:nowrap}
+#about .about-summary span{font-size:11px;line-height:1.6;color:#91a9bb}
+#about .anatomy-panel{height:580px;padding:28px;border-radius:28px;background:radial-gradient(ellipse at 50% 55%,#172c3d 0%,#0b1622 65%,#0a131e 100%);border:1px solid #b8d9ed22;box-shadow:0 24px 64px #0003,inset 0 1px 0 #ffffff06}
+#about .anatomy-head span{font-size:9px;letter-spacing:.14em;color:#89a5ba}
+#about .anatomy-head h3{font-size:18px;font-weight:500;letter-spacing:-.02em;margin:10px 0 8px;color:#e0ecf3}
+#about .anatomy-head p{font-size:11px;color:#91a9bb}
+#about .anatomy-labels button{padding:7px 10px;border:1px solid #9dbddc35;border-radius:6px;background:#0e1b29f5;color:#c9dce9;font-size:10px;font-weight:500;box-shadow:none}
+#about .anatomy-labels button:hover,#about .anatomy-labels button:focus-visible{background:#223b50;border-color:#a7cee4;outline:2px solid #a7cee4;outline-offset:3px}
+#about .anatomy-leaders{stroke:#92b9d0;opacity:.65}
+#about .anatomy-full{background:#b8d9ed0c;border:1px solid #b8d9ed30;border-radius:99px;padding:9px 17px;color:#c9dce9;font-size:11px;font-weight:500}
+#about .anatomy-full:hover,#about .anatomy-full:focus-visible{background:#b8d9ed20;outline:2px solid #a7cee4;outline-offset:3px}
+@media(max-width:900px){#about{padding-block:60px 68px}#about .about{gap:32px;grid-template-columns:minmax(260px,.9fr) minmax(0,1fr)}#about .anatomy-panel{height:540px;padding:22px}#about .section-title{font-size:34px}#about .section-desc{font-size:15px;line-height:1.85}#about .about-summary>div{padding-inline:12px}#about .about-summary strong{font-size:27px}}
+@media(max-width:700px){#about{padding-block:44px 56px}#about>.sketch-section-label{margin-bottom:32px}#about .about{grid-template-columns:1fr;gap:36px}#about .about>div:last-child{padding:0}#about .anatomy-panel{height:530px;max-width:440px;width:100%;margin:auto;border-radius:24px}#about .section-title{font-size:clamp(30px,7.5vw,40px);margin-bottom:22px}#about .section-desc{font-size:15px;margin-bottom:30px;max-width:none}#about .about-summary{padding-top:24px}#about .about-summary strong{font-size:30px}#about .about-summary span{font-size:11px}}
+@media(max-width:380px){#about .anatomy-panel{height:500px;padding:18px}#about .about-summary strong{font-size:26px}#about .about-summary>div{padding-inline:10px}}
