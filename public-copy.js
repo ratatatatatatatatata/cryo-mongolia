@@ -32,8 +32,8 @@ Cryo Mongolia Recovery Center — Нүүр	Cryo Mongolia Recovery Center — Hom
 Доош гүйл	Scroll to explore
 Хүний булчин, судас ба мэдрэлийн тогтолцооны 3D анатомийн дүрслэл	3D illustration of the human muscular, vascular and nervous systems
 Аюулгүй технологи	Safe technology
-Крио сэргээн засах үйлчилгээний	Cryotherapy recovery:
-шинэ хуудас	a new chapter
+Нөхөн сэргэлтээс	From recovery to
+амьдралын шинэ чанарт	a better quality of life
 CRYO Mongolia нь дэлхийн тэргүүлэгч CTN компанитай хамтарч, Монголд анх удаа хүйтний дэвшилтэт технологийг нэвтрүүлж байна. Бид таны	CRYO Mongolia partners with global technology company CTN to introduce advanced cold technology to Mongolia. We support your
 чанартай амьдрал, гүн амралт, эрч хүч, удаан хугацааны гоо үзэсгэлэнг	quality of life, deep relaxation, vitality and lasting beauty
 дэмжинэ.	.
