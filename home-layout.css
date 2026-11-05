@@ -41,3 +41,8 @@
 @media(max-width:900px){#about{padding-block:60px 68px}#about .about{gap:32px;grid-template-columns:minmax(260px,.9fr) minmax(0,1fr)}#about .anatomy-panel{height:540px;padding:22px}#about .section-title{font-size:34px}#about .section-desc{font-size:15px;line-height:1.85}#about .about-summary>div{padding-inline:12px}#about .about-summary strong{font-size:27px}}
 @media(max-width:700px){#about{padding-block:44px 56px}#about>.sketch-section-label{margin-bottom:32px}#about .about{grid-template-columns:1fr;gap:36px}#about .about>div:last-child{padding:0}#about .anatomy-panel{height:530px;max-width:440px;width:100%;margin:auto;border-radius:24px}#about .section-title{font-size:clamp(30px,7.5vw,40px);margin-bottom:22px}#about .section-desc{font-size:15px;margin-bottom:30px;max-width:none}#about .about-summary{padding-top:24px}#about .about-summary strong{font-size:30px}#about .about-summary span{font-size:11px}}
 @media(max-width:380px){#about .anatomy-panel{height:500px;padding:18px}#about .about-summary strong{font-size:26px}#about .about-summary>div{padding-inline:10px}}
+
+/* Printed brand reference: strong geometric title, light supporting line. */
+#navbar .nav-logo .sketch-brand-title,#navbar .nav-logo .sketch-brand-title em{font-weight:800;letter-spacing:-.025em}
+#navbar .nav-logo small{font-weight:300;letter-spacing:.04em}
+@media(max-width:640px){#navbar .nav-logo .sketch-brand-title{font-size:clamp(25px,7.3vw,34px)}}

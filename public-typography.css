@@ -1,6 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-/* Native Apple system type where available; Inter supplies consistent Cyrillic elsewhere. */
-:root{--ff-display:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;--ff-body:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif}
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+/* Montserrat matches the supplied printed brand reference; includes Cyrillic glyphs. */
+:root{--ff-display:'Montserrat','Segoe UI',Arial,sans-serif;--ff-body:'Montserrat','Segoe UI',Arial,sans-serif}
 body,body *{font-family:var(--ff-body)!important}
 body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:17px;line-height:1.5;letter-spacing:-.012em}
 button,input,select,textarea{font-family:inherit;letter-spacing:0}
