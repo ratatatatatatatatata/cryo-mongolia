@@ -145,6 +145,21 @@ function panels() {
   });
 }
 
+// Package builder: devices in one compact block, then each menu (beauty, massage…) as its own titled block.
+function renderCustomDevices() {
+  const host = $("pkgCustomDevices");
+  const keep = new Map([...host.querySelectorAll('input[data-service-id]')].map(input => [input.dataset.serviceId, input.value]));
+  const row = item => `<label class="pkg-unit-row" for="pkgUnits${item.id}"><span><b>${safe(item.name)}</b><small>${Number(item.duration_minutes) || ''} мин · ${money(item.price)}</small></span><input class="ctl sm num" id="pkgUnits${item.id}" data-service-id="${item.id}" type="number" min="0" max="1000" step="1" value="${safe(keep.get(String(item.id)) ?? 0)}" aria-label="${safe(item.name)} — орох тоо"></label>`;
+  const tops = services.filter(item => !item.parent_id);
+  const childrenOf = top => services.filter(item => Number(item.parent_id) === Number(top.id));
+  const singles = tops.filter(top => !childrenOf(top).length), menus = tops.filter(top => childrenOf(top).length);
+  const block = (title, items) => `<section class="pkg-unit-group"><h4>${safe(title)}<small>${items.length} үйлчилгээ · орох тоо</small></h4><div class="pkg-unit-grid">${items.map(row).join('')}</div></section>`;
+  host.className = 'pkg-unit-groups';
+  host.innerHTML = (singles.length ? block('Төхөөрөмж', singles) : '') + menus.map(top => block(top.name, [top, ...childrenOf(top)])).join('');
+  host.querySelectorAll('input').forEach(input => input.addEventListener('input', () => input.closest('.pkg-unit-row').classList.toggle('on', Number(input.value) > 0)));
+  host.querySelectorAll('input').forEach(input => input.closest('.pkg-unit-row').classList.toggle('on', Number(input.value) > 0));
+}
+
 function customPackageItems() {
   return [...$("pkgCustomDevices").querySelectorAll('input')].filter(input => Number(input.value)>0)
     .map(input => ({ service_id:Number(input.dataset.serviceId), units:Number(input.value) }));
@@ -237,7 +252,7 @@ function options() {
   const packageOptions = '<option value="">Сонгоогүй</option><option value="custom">+ Багц үүсгэх</option>' + packages.map((item) => `<option value="${item.id}">${item.is_vip?'★ VIP · ':''}${safe(item.name)}</option>`).join("");
   $("pkgLeadPurchased").innerHTML = packageOptions;
   $("pkgLeadPurchased").value = selectedPackage;
-  if (!$("pkgCustomDevices").children.length) $("pkgCustomDevices").innerHTML=services.map(item=>`<div class="field"><label for="pkgUnits${item.id}">${item.parent_id?'↳ ':''}${safe(item.name)} — орох тоо</label><input class="ctl" id="pkgUnits${item.id}" data-service-id="${item.id}" type="number" min="0" max="1000" step="1" value="0"></div>`).join('');
+  renderCustomDevices();
   $("pkgVisitServices").innerHTML = services.map((item) => `<label class="staff-check"><input type="checkbox" value="${item.id}" ${closed?'disabled':''}><span>${safe(item.name)}</span></label>`).join("");
   const employee = currentStaff();
   $("pkgLeadStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";

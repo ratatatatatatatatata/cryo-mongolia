@@ -119,7 +119,8 @@ begin
  insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F2','99660004',(select id from public.services where slug='beauty-wax-brow'),'2099-12-05 11:30+08','confirmed');
  if (select count(*) from public.booking_blocks where service_id=(select id from public.services where slug='facial') and starts_at::date='2099-12-05')<>2 then raise exception 'blocks not published on parent calendar'; end if;
  -- Removing a service: unused → deleted, used → archived.
- if not (public.remove_service((select id from public.services where slug='beauty-vitadx'))->>'deleted')::boolean then raise exception 'unused service not deleted'; end if;
+ insert into public.services(slug,name,category,duration_minutes,price,active) values('qa-unused','QA unused service','beauty',30,1000,true);
+ if not (public.remove_service((select id from public.services where slug='qa-unused'))->>'deleted')::boolean then raise exception 'unused service not deleted'; end if;
  r:=public.remove_service((select id from public.services where slug='beauty-wax-brow'));
  if (r->>'deleted')::boolean or (select archived_at from public.services where slug='beauty-wax-brow') is null then raise exception 'used service not archived: %',r; end if;
 
