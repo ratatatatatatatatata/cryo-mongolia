@@ -21,7 +21,13 @@ export function customerPicker(input, getRows, onSelect) {
     if(!rows.length&&query){const empty=document.createElement('p');empty.textContent=`Олдсонгүй — «${query}» шинэ үйлчлүүлэгчээр хадгалагдана. Хажууд нь утсаа оруулна уу.`;list.append(empty);}
   };
   input.addEventListener('input',()=>{selected.textContent='';onSelect(null);render();});input.addEventListener('focus',render);
-  input.addEventListener('blur',event=>{if(!list.contains(event.relatedTarget))list.hidden=true;});
+  // Safari/Firefox on macOS don't focus a clicked button, so the input would blur and the list close
+  // before the click lands. Keep focus in the input while a suggestion is being pressed.
+  let pressing=false;
+  list.addEventListener('pointerdown',()=>{pressing=true;});
+  list.addEventListener('mousedown',event=>event.preventDefault());
+  document.addEventListener('pointerup',()=>setTimeout(()=>{pressing=false;},0));
+  input.addEventListener('blur',event=>{if(!pressing&&!list.contains(event.relatedTarget))list.hidden=true;});
   input.addEventListener('keydown',event=>{if(event.key==='Escape')list.hidden=true;if(event.key==='ArrowDown'){event.preventDefault();list.querySelector('button')?.focus();}});
   document.addEventListener('pointerdown',event=>{if(event.target!==input&&!list.contains(event.target))list.hidden=true;});
   list.addEventListener('focusout',()=>setTimeout(()=>{if(!list.contains(document.activeElement)&&document.activeElement!==input)list.hidden=true;},0));

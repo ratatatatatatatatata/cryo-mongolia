@@ -14,4 +14,10 @@ assert.match(document.querySelector('button').textContent,/Бат · 88112233/);
 document.querySelector('button').click();assert.equal(selected.id,2);assert.equal(input.value,'Бат');
 assert(document.querySelector('.customer-suggestions').hidden);
 input.value='none';input.dispatchEvent(new dom.window.Event('input'));assert.equal(selected,null);assert.equal(document.querySelectorAll('button').length,0);
-console.log('PASS name/phone suggestions, duplicate names, selection, stale selection reset');
+// Safari-style click: pointerdown, input blurs with no relatedTarget, then click must still select.
+input.value='9911';input.dispatchEvent(new dom.window.Event('input'));
+const option=document.querySelector('.customer-suggestion');const E=dom.window.Event;
+option.dispatchEvent(new E('pointerdown',{bubbles:true}));input.dispatchEvent(new dom.window.FocusEvent('blur',{relatedTarget:null}));
+assert.equal(document.querySelector('.customer-suggestions').hidden,false,'list stays open while a suggestion is pressed');
+option.click();assert.equal(selected.phone,'99112233');
+console.log('PASS name/phone suggestions, duplicate names, selection, stale selection reset, Safari click');
