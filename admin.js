@@ -42,6 +42,8 @@ const PAYS = [
   ["refund", "Буцаалт", "f_refund"],
 ];
 
+// Declared up here because boot() wires the forms before the rest of the module is evaluated.
+const CHECKOUT_FIELDS = ['f_golomt','f_khan','f_cash','f_invoice','f_barter','f_gift'];
 const ROLE_MN = {
   owner: "Үндсэн админ",
   admin: "Админ",
@@ -2730,7 +2732,6 @@ function renderSaleDeletionRequests() {
   });
 }
 
-const CHECKOUT_FIELDS = ['f_golomt','f_khan','f_cash','f_invoice','f_barter','f_gift'];
 function checkoutRemaining() {
   const total = bookingUsage(paymentRows, cache.services).total;
   return total - CHECKOUT_FIELDS.reduce((sum, id) => sum + (Number($(id).value) || 0), 0);
