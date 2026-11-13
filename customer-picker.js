@@ -13,10 +13,10 @@ export function customerPicker(input, getRows, onSelect) {
     list.hidden=false;
     for(const row of rows){
       const button=document.createElement('button');button.type='button';button.className='customer-suggestion';
-      button.textContent=`${row.full_name} · ${row.phone || 'Утас бүртгээгүй'}`;
+      button.textContent=`${row.is_vip?'★ VIP · ':''}${row.full_name} · ${row.phone || 'Утас бүртгээгүй'}`;
       button.onclick=()=>{input.value=row.full_name;selected.textContent=`${row.full_name} · ${row.phone||'Утас бүртгээгүй'}`;onSelect(row);list.hidden=true;};list.append(button);
     }
-    if(!rows.length){const empty=document.createElement('p');empty.textContent='Үйлчлүүлэгч олдсонгүй. Шинэ үйлчлүүлэгч бол нэр, утсаа бүртгэнэ үү.';list.append(empty);}
+    if(!rows.length&&query){const empty=document.createElement('p');empty.textContent=`Шинэ үйлчлүүлэгч: «${query}» — утсаа оруулаад хадгалахад автоматаар бүртгэгдэнэ.`;list.append(empty);}
   };
   input.addEventListener('input',()=>{selected.textContent='';onSelect(null);render();});input.addEventListener('focus',render);
   input.addEventListener('keydown',event=>{if(event.key==='Escape')list.hidden=true;if(event.key==='ArrowDown'){event.preventDefault();list.querySelector('button')?.focus();}});

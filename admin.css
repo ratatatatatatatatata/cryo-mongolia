@@ -389,3 +389,10 @@ tr.review td{background:rgba(255,180,80,.05)}
 .customer-suggestion{display:block;width:100%;text-align:left;padding:11px 12px;border:0;border-bottom:1px solid #42617a;background:#102234;color:#eef7ff;cursor:pointer;font:inherit}
 .customer-suggestion:hover,.customer-suggestion:focus{background:#244b68;color:#fff;outline:2px solid #75d4ff;outline-offset:-2px}
 .customer-suggestions p{padding:10px;font-size:12px}
+
+/* VIP customers / packages */
+.vip-badge{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:800;letter-spacing:.08em;vertical-align:middle;
+  color:#2a1a00;background:linear-gradient(135deg,#ffe08a,#e7b94a)}
+.booking-group-row td{border-top:1px solid var(--border-mid)}
+#bookingCheckoutDevices{margin:8px 0 4px}
+#bookingCheckoutDevices span.chip-btn{cursor:default}

@@ -11,7 +11,7 @@ const fields={};const el=id=>fields[id]??=new Element();
 el('bkScheduleDate').value='2099-01-01';el('bkNewRecipient').value='person';el('bkNewKind').value='standard';
 let inserted,fail=false,seq=0;
 const context=vm.createContext({console,Intl,Date,Set,CryoSchedule:globalThis.CryoSchedule,crypto:{randomUUID:()=>`test-${++seq}`},$:el,document:{createElement:()=>new Element()},Option:class{},
- alert:message=>{throw Error(message)},selectedSharedStaff:()=>({id:7,name:'Employee'}),isSharedStaffAccount:()=>true,isAdminUser:()=>true,renderOverview(){},fetchAll:async()=>({error:true}),
+ alert:message=>{throw Error(message)},selectedSharedStaff:()=>({id:7,name:'Employee'}),isSharedStaffAccount:()=>true,isAdminUser:()=>true,renderOverview(){},normalizePhone:v=>String(v||'').replace(/\D/g,''),ensureCustomer:async()=>({}),refreshCustomers(){},fetchAll:async()=>({error:true}),
  sb:{from:table=>({select:()=>({is:()=>({order:async()=>({data:[{id:8,name:'Team'}]})})}),insert:rows=>{inserted=rows;return{select:async()=>fail?{error:{code:'23P01'}}:{data:rows.map((r,i)=>({...r,id:100+i}))}}}})}
 });
 const source=fs.readFileSync('admin.js','utf8');

@@ -140,8 +140,8 @@ function fmtDate(v) {
   wireCustomers();
   for (const [nameId,phoneId] of [['bkNewName','bkNewPhone'],['f_name','f_phone'],['cpk_customer','cpk_phone'],['pay_customer','pay_phone']]) {
     const input=$(nameId); if(!input) continue;
-    if(!$(phoneId)){const field=document.createElement('div');field.className='field';const label=document.createElement('label');label.htmlFor=phoneId;label.textContent='Утас';const phone=document.createElement('input');phone.id=phoneId;phone.type='tel';phone.className='ctl';phone.required=true;phone.readOnly=['cpk_phone','pay_phone'].includes(phoneId);field.append(label,phone);input.closest('.field').after(field);}
-    customerPicker(input,()=>previousCustomers(cache.customers,cache.bookings,cache.sales),c=>{$(phoneId).value=c?.phone||'';input.dataset.customerId=c?.id?String(c.id):'';});
+    if(!$(phoneId)){const field=document.createElement('div');field.className='field';const label=document.createElement('label');label.htmlFor=phoneId;label.textContent='Утас';const phone=document.createElement('input');phone.id=phoneId;phone.type='tel';phone.className='ctl';phone.required=true;phone.maxLength=30;field.append(label,phone);input.closest('.field').after(field);}
+    customerPicker(input,()=>previousCustomers(cache.customers,cache.bookings,cache.sales),c=>{const phone=$(phoneId);if(c){phone.value=c.phone||'';input.dataset.pickedPhone=c.phone||'';}else if(input.dataset.pickedPhone&&phone.value===input.dataset.pickedPhone){phone.value='';input.dataset.pickedPhone='';}input.dataset.customerId=c?.id?String(c.id):'';});
   }
   wireStaff();
   wireAttendance();
@@ -435,7 +435,7 @@ async function loadAll() {
     () => sb.from("sales").select("*").is("archived_at", null).order("sale_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("expenses").select("*").order("spend_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("staff").select("*").order("sort", { ascending: true }),
-    () => sb.from("customers").select("id,full_name,phone,email,notes,source,created_at,updated_at").order("updated_at", { ascending: false }).order("id", { ascending: false }),
+    () => sb.from("customers").select("*").order("updated_at", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("attendance").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("inventory_items").select("*").order("name", { ascending: true }),
     () => sb.from("staff_workdays").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
@@ -609,6 +609,17 @@ function openCustomerForm(customer = null) {
   $("cusPhone").value = customer?.phone || "";
   $("cusEmail").value = customer?.email || "";
   $("cusNote").value = customer?.notes || "";
+  let vip = $("cusVip");
+  if (!vip) {
+    const label = document.createElement("label");
+    label.className = "staff-check";
+    vip = document.createElement("input"); vip.type = "checkbox"; vip.id = "cusVip";
+    const text = document.createElement("span"); text.textContent = "★ VIP хэрэглэгч";
+    label.append(vip, text);
+    $("cusNote").closest(".form-grid").after(label);
+  }
+  vip.checked = !!customer?.is_vip;
+  vip.closest("label").hidden = !isAdminUser();
   $("cusForm").style.display = "";
   $("cusName").focus();
   $("cusForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -642,10 +653,15 @@ async function saveCustomer() {
   const query = customerEditing
     ? sb.from("customers").update(payload).eq("id", customerEditing.id)
     : sb.from("customers").insert({ ...payload, source: "manual" });
-  const { data, error } = await query.select("id,full_name,phone,email,notes,source,created_at,updated_at").single();
+  const { data, error } = await query.select("*").single();
   btn.disabled = false;
   if (error) return alert("Хадгалж чадсангүй: " + error.message);
 
+  if (isAdminUser() && $("cusVip") && !!data.is_vip !== $("cusVip").checked) {
+    const vip = await sb.rpc("set_vip", { p_kind: "customer", p_id: data.id, p_vip: $("cusVip").checked });
+    if (vip.error) alert("VIP төлөв хадгалж чадсангүй: " + vip.error.message);
+    else Object.assign(data, vip.data);
+  }
   if (customerEditing) Object.assign(cache.customers.find((c) => Number(c.id) === Number(customerEditing.id)), data);
   else cache.customers.unshift(data);
   closeCustomerForm();
@@ -671,7 +687,9 @@ function renderCustomers() {
   }
   rows.forEach((customer) => {
     const tr = document.createElement("tr");
-    tr.appendChild(cell(customer.full_name, "t-strong"));
+    const nameCell = cell(customer.full_name, "t-strong");
+    if (customer.is_vip) { const vip = document.createElement("span"); vip.className = "vip-badge"; vip.textContent = "VIP"; nameCell.append(" ", vip); }
+    tr.appendChild(nameCell);
     tr.appendChild(cell(customer.phone || "—", "t-mono"));
     tr.appendChild(cell(customer.email || "—"));
     tr.appendChild(cell(fmtDate(customer.created_at), "t-mono"));
@@ -920,26 +938,35 @@ function renderBookings() {
   const groups=bookingGroups(cache.bookings).filter(group=>group.some(b=>visibleIds.has(b.id)));
   const groupRows=new Map();
   for(const group of groups){
-    const unpaid=group.filter(b=>b.status!=='cancelled'&&b.booking_kind!=='package'&&b.payment_status!=='paid');
+    const live=group.filter(b=>b.status!=='cancelled');
+    const unpaid=live.filter(b=>b.booking_kind!=='package'&&b.payment_status!=='paid');
     const anchor=unpaid[0]||group[0], summary=document.createElement('tr');
-    const usage=bookingUsage(group.filter(b=>b.status!=='cancelled'),cache.services);
+    summary.className='booking-group-row';
+    const usage=bookingUsage(live,cache.services), dueUsage=bookingUsage(unpaid,cache.services);
     summary.appendChild(cell(`${group.length} цаг`, 't-strong'));
-    summary.appendChild(cell(`${anchor.customer_name} · ${anchor.phone||'Утасгүй'}`,'t-strong'));
+    const who=document.createElement('td'),whoName=document.createElement('div'),whoPhone=document.createElement('div');
+    whoName.className='t-strong';whoName.textContent=[...new Set(group.map(b=>b.customer_name))].join(' / ');
+    if(customerIsVip(anchor)){const vip=document.createElement('span');vip.className='vip-badge';vip.textContent='VIP';whoName.append(' ',vip);}
+    whoPhone.style.cssText='font-size:11.5px;color:var(--text-muted);margin-top:3px';whoPhone.textContent=anchor.phone||'Утасгүй';who.append(whoName,whoPhone);summary.append(who);
     const detailCell=document.createElement('td');const details=document.createElement('div'),heading=document.createElement('button');heading.type='button';heading.className='btn-sm ghost';heading.setAttribute('aria-expanded','false');
-    heading.textContent=`${group.length} үйлчилгээ · Дэлгэрэнгүй`;detailCell.append(heading);
+    heading.textContent=`${usage.label||group.length+' үйлчилгээ'} · Дэлгэрэнгүй ▾`;detailCell.append(heading);
     const table=document.createElement('table');table.className='tbl';const nested=document.createElement('tbody');table.append(nested);details.className='tbl-wrap';details.append(table);summary.append(detailCell);
-    summary.appendChild(cell([...new Set(group.map(b=>`${b.booked_date||''} ${b.booked_time||''}`))].join(' · ')));
-    summary.appendChild(cell(money(usage.total),'t-mono'));
+    const times=group.map(b=>b.booked_time).filter(Boolean);
+    summary.appendChild(cell(`${fmtDate(anchor.booked_date)} · ${times.length?times[0]+(times.length>1?'–'+times[times.length-1]:''):'—'}`,'t-mono'));
+    summary.appendChild(cell(money(unpaid.length?dueUsage.total:usage.total),'t-mono'));
     summary.appendChild(cell([...new Set(group.map(b=>STATUS_MN[b.status]||b.status))].join(' / ')));
     const payCell=document.createElement('td'),pay=document.createElement('select');pay.className='ctl sm';
+    pay.setAttribute('aria-label',`Төлөлт ${anchor.customer_name}`);
     pay.innerHTML='<option value="pending">Хүлээгдэж байгаа</option><option value="paid">Төлбөр төлсөн</option><option value="internal">Дотоод ажилтан</option>';
     pay.disabled=!unpaid.length;
-    const internal=group.filter(b=>b.status!=='cancelled').every(b=>cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal));
+    const internal=live.length&&live.every(b=>cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal));
     pay.value=unpaid.length?'pending':internal?'internal':'paid';
-    if(group.every(b=>b.booking_kind==='package')){pay.add(new Option('Багцын эрхээр','package'));pay.value='package';}
-    pay.onchange=()=>{if(pay.value==='internal')recordInternalBooking(anchor,pay);else if(pay.value==='paid')openBookingPayment(anchor);pay.value='pending';};
-    payCell.append(pay);summary.append(payCell);summary.appendChild(cell('Дэлгэрэнгүйгээс сонгоно'));summary.appendChild(cell(unpaid.length&&unpaid.length<group.length?'Хэсэгчлэн төлөгдсөн · үлдсэн цагуудыг нэгтгэн төлнө':''));
-    const expanded=document.createElement('tr'),expandedCell=document.createElement('td');expandedCell.colSpan=9;expanded.hidden=true;expandedCell.append(details);expanded.append(expandedCell);heading.onclick=()=>{expanded.hidden=!expanded.hidden;heading.setAttribute('aria-expanded',String(!expanded.hidden));};body.append(summary,expanded);for(const booking of group)groupRows.set(booking.id,nested);
+    if(live.length&&live.every(b=>b.booking_kind==='package')){pay.add(new Option('Багцын эрхээр','package'));pay.value='package';}
+    pay.onchange=()=>{if(pay.value==='internal')recordInternalBooking(anchor,pay,unpaid);else if(pay.value==='paid')openBookingPayment(anchor,unpaid);pay.value='pending';};
+    payCell.append(pay);summary.append(payCell);
+    summary.appendChild(cell(unpaid.length>1?`${unpaid.length} цагийг нэг дор төлнө`:'Дэлгэрэнгүйгээс сонгоно'));
+    summary.appendChild(cell(unpaid.length&&unpaid.length<live.length?'Хэсэгчлэн төлөгдсөн · үлдсэн цагуудыг нэгтгэн төлнө':''));
+    const expanded=document.createElement('tr'),expandedCell=document.createElement('td');expandedCell.colSpan=9;expanded.hidden=true;expandedCell.append(details);expanded.append(expandedCell);heading.onclick=()=>{expanded.hidden=!expanded.hidden;heading.setAttribute('aria-expanded',String(!expanded.hidden));heading.textContent=`${usage.label||group.length+' үйлчилгээ'} · ${expanded.hidden?'Дэлгэрэнгүй ▾':'Хураах ▴'}`;};body.append(summary,expanded);for(const booking of group)groupRows.set(booking.id,nested);
   }
   groups.flat().forEach((b) => {
     const tr = document.createElement("tr");
@@ -994,19 +1021,7 @@ function renderBookings() {
     st.appendChild(sel);
     tr.appendChild(st);
     const payment = document.createElement('td');
-    const pay = document.createElement('select');
-    pay.className = 'ctl sm';
-    pay.setAttribute('aria-label', `Төлөлт ${b.ref}`);
-    pay.innerHTML = '<option value="pending">Хүлээгдэж байгаа</option><option value="paid">Төлбөр төлсөн</option><option value="internal">Дотоод ажилтан</option>';
-    pay.value = cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal) ? 'internal' : (b.payment_status || 'pending');
-    pay.disabled = b.payment_status === 'paid' || b.status === 'cancelled' || b.booking_kind === 'package';
-    if (b.booking_kind === 'package') pay.title = 'Багцын ашиглалтад давхар төлбөр авахгүй';
-    pay.addEventListener('change', () => {
-      if (pay.value === 'paid') openBookingPayment(b);
-      if (pay.value === 'internal') recordInternalBooking(b,pay);
-      pay.value = cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal) ? 'internal' : (b.payment_status || 'pending');
-    });
-    payment.textContent=b.booking_kind==='package'?'Багцын эрхээр':b.payment_status==='paid'?'Бүртгэгдсэн':'Нэгдсэн төлөлт';tr.appendChild(payment);
+    payment.textContent=b.status==='cancelled'?'—':b.booking_kind==='package'?'Багцын эрхээр':b.payment_status==='paid'?(cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal)?'Дотоод ажилтан':'Төлсөн'):'Хүлээгдэж байгаа · дээрх мөрөөс нэгтгэн төлнө';tr.appendChild(payment);
     const providerCell = document.createElement('td');
     const provider = document.createElement('select');
     provider.className = 'ctl sm';
@@ -1033,7 +1048,15 @@ function renderBookings() {
     providerCell.appendChild(provider);
     if (b.performed_at) { const hint=document.createElement('small'); hint.textContent='Үйлчилгээ үзүүлсэн'; providerCell.appendChild(hint); }
     tr.appendChild(providerCell);
-    tr.appendChild(cell(b.note || b.notes || "—", "record-note"));
+    const noteCell = cell(b.note || b.notes || "—", "record-note");
+    if (isAdminUser()) {
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.className = 'btn-sm ghost'; edit.textContent = 'Засах';
+      edit.style.marginLeft = '8px';
+      edit.onclick = () => openBookingEdit(b);
+      noteCell.appendChild(edit);
+    }
+    tr.appendChild(noteCell);
 
     groupRows.get(b.id).appendChild(tr);
   });
@@ -1174,6 +1197,7 @@ async function saveStaffBooking() {
   const employee = bookingEmployee();
   if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   button.disabled = true;
+  if (!teamMode && normalizePhone(phone).length === 8) ensureCustomer(name, phone).catch(() => {});
   try {
     const group = crypto.randomUUID();
     // One insert statement: a conflict rolls back every selected slot.
@@ -1190,6 +1214,7 @@ async function saveStaffBooking() {
     bkSelectedSlots = [];
     ['bkNewName','bkNewPhone','bkNewNote'].forEach(id => { $(id).value = ''; });
     renderBookingSelection(); renderBookings(); renderOverview();
+    refreshCustomers();
   } catch (error) {
     $("bkNewStatus").textContent = error.code === '23P01' ? 'Сонгосон цагийн аль нэг нь захиалагдсан эсвэл давхцсан байна. Аль ч цаг хадгалагдаагүй. Сонголтоо засна уу.' : 'Хадгалж чадсангүй: ' + error.message;
     const refreshed = await fetchAll(() => sb.from('bookings').select('*').order('id'));
@@ -1342,6 +1367,15 @@ function renderPackages() {
     t2.style.cssText = "font-size:11.5px;color:var(--text-muted);margin-top:3px";
     t2.textContent = esc(p.kicker || "");
     nm.append(t1, t2);
+    if (p.is_vip) { const vip = document.createElement("span"); vip.className = "vip-badge"; vip.textContent = "VIP"; t1.append(" ", vip); }
+    let vipIn = null;
+    if (isAdminUser() && "is_vip" in p) {
+      const vipLabel = document.createElement("label");
+      vipLabel.style.cssText = "display:flex;gap:6px;align-items:center;font-size:11.5px;margin-top:5px;cursor:pointer";
+      vipIn = document.createElement("input"); vipIn.type = "checkbox"; vipIn.checked = !!p.is_vip;
+      vipLabel.append(vipIn, "VIP хэрэглэгчийн багц");
+      nm.appendChild(vipLabel);
+    }
     tr.appendChild(nm);
 
     tr.appendChild(cell(p.period || "—"));
@@ -1400,6 +1434,7 @@ function renderPackages() {
         active: acIn.checked,
         updated_at: new Date().toISOString(),
       };
+      if (vipIn) patch.is_vip = vipIn.checked;
       const { error } = await sb.from("packages").update(patch).eq("id", p.id);
       if (error) throw error;
       Object.assign(p, patch);
@@ -1694,7 +1729,13 @@ async function saveContract() {
   };
   if (!patch.customer_label || !patch.package_label)
     return alert("Үйлчлүүлэгч болон багцын нэрийг оруулна уу.");
-  if (!contractEditing && (!patch.customer_id || !$("cpk_phone").value.trim())) return alert('Нэр, утастай үйлчлүүлэгч сонгоно уу. Утасгүй бол Үйлчлүүлэгчид хэсэгт утсыг нөхөж бүртгэнэ үү.');
+  if (!contractEditing && !patch.customer_id) {
+    try {
+      const customer = await ensureCustomer(patch.customer_label, $("cpk_phone").value);
+      patch.customer_id = customer.id;
+      patch.customer_label = customer.full_name;
+    } catch (error) { return alert(error.message); }
+  }
   if (patch.expires_on && patch.purchased_on && patch.expires_on < patch.purchased_on)
     return alert("Дуусах огноо эхэлсэн огнооноос өмнө байж болохгүй.");
 
@@ -2533,7 +2574,8 @@ function updateFormTotal() {
 
 function openLedForm(row) {
   paymentBooking = null;
-  DEVICES.forEach(([, , id])=>$(id).readOnly=false);
+  paymentRows = [];
+  setBookingCheckoutMode(false);
   if($('bookingPackageCheckout')) $('bookingPackageCheckout').hidden=true;
   $("ledgerFormHome").after($("ledForm"));
   $("ledSave").textContent = 'Хадгалах';
@@ -2585,54 +2627,187 @@ function openLedForm(row) {
   $("ledForm").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-async function recordInternalBooking(booking, control) {
+let paymentRows = [];
+
+function customerIsVip(booking) {
+  const phone = normalizePhone(booking?.phone);
+  return !!phone && cache.customers.some(c => c.is_vip && normalizePhone(c.phone) === phone);
+}
+
+// Unpaid, chargeable slots of the same customer/day as `booking` (fallback when no rows are passed).
+function paymentGroup(booking) {
+  const group = bookingGroups(cache.bookings).find(rows => rows.some(b => Number(b.id) === Number(booking.id))) || [booking];
+  return group.filter(b => b.status !== 'cancelled' && b.payment_status !== 'paid' && b.booking_kind !== 'package');
+}
+
+function applyCheckoutResult(data) {
+  for (const row of data.bookings || [data.booking]) {
+    const current = cache.bookings.find(b => Number(b.id) === Number(row?.id));
+    if (current) Object.assign(current, row);
+  }
+  for (const sale of data.sales || [data.sale]) if (sale) window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: sale }));
+}
+
+async function recordInternalBooking(booking, control, rows = null) {
   const employee=bookingEmployee();
   if(!isAdminUser()&&!employee)return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
-  const group=paymentGroup(booking), usage=bookingUsage(group,cache.services);
+  const group=rows?.length?rows:paymentGroup(booking), usage=bookingUsage(group,cache.services);
+  if(!group.length)return alert('Төлөх захиалга үлдээгүй байна.');
   if(!usage.total)return alert('Төхөөрөмжийн үндсэн үнийг тохируулна уу.');
-  if(!confirm(`${booking.customer_name} · ${usage.label} · ${money(usage.total)} — Дотоод ажилтан гэж бүртгэх үү?`))return;
+  if(!confirm(`${booking.customer_name} · ${usage.label} · ${money(usage.total)}\n\nДотоод ажилтны хэрэглээ гэж бүртгэх үү? Үйлчилгээний үнийн дүн дотоод борлуулалтад орно (орлогод нэмэгдэхгүй).`))return;
   control.disabled=true;
   try{
-    const {data,error}=await sb.rpc(group.length>1?'pay_booking_group':'pay_booking',{p_booking_id:booking.id,p_sale:{customer_name:booking.customer_name,services:usage.label,staff_id:employee?.id||null,internal_amount:usage.total,is_internal:true,note:'Дотоод ажилтан',...usage.counts}});
+    const sale={customer_name:booking.customer_name,staff_id:employee?.id||null,internal_amount:usage.total,is_internal:true,note:'Дотоод ажилтан'};
+    if(isAdminUser()&&booking.booked_date)sale.sale_date=booking.booked_date;
+    const {data,error}=await sb.rpc('pay_bookings',{p_booking_ids:group.map(b=>b.id),p_sale:sale});
     if(error)throw error;
-    for(const row of data.bookings||[data.booking]){const current=cache.bookings.find(b=>Number(b.id)===Number(row.id));if(current)Object.assign(current,row);}
-    for(const sale of data.sales||[data.sale])window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:sale}));
+    applyCheckoutResult(data);
     renderBookings();renderReports();
   }catch(error){alert(error.message);control.disabled=false;}
 }
 
-function paymentGroup(booking) {
-  if(!booking.booking_group || booking.booking_kind==='package') return [booking];
-  return cache.bookings.filter(b=>b.booking_group===booking.booking_group && b.customer_name===booking.customer_name && b.phone===booking.phone && b.user_id===booking.user_id && b.status!=='cancelled' && b.payment_status!=='paid' && b.booking_kind!=='package');
+function setBookingCheckoutMode(on, usage = null) {
+  const deviceGrid = $("f_cabin").closest('.form-grid');
+  const deviceTitle = deviceGrid.previousElementSibling;
+  // Devices come from the booked services; staff never re-enter them.
+  DEVICES.forEach(([, , id]) => { $(id).readOnly = on; $(id).closest('.field').hidden = on; });
+  deviceTitle.textContent = on ? 'Ашигласан төхөөрөмж (захиалгаас автоматаар)' : 'Ашигласан төхөөрөмж';
+  let summary = $("bookingCheckoutDevices");
+  if (!summary) {
+    summary = document.createElement('div');
+    summary.id = 'bookingCheckoutDevices';
+    summary.className = 'booking-device-tabs';
+    deviceGrid.before(summary);
+  }
+  summary.hidden = !on;
+  summary.replaceChildren();
+  if (on && usage) {
+    for (const part of usage.label.split(' + ').filter(Boolean)) {
+      const chip = document.createElement('span'); chip.className = 'chip-btn on'; chip.textContent = part; summary.appendChild(chip);
+    }
+  }
+  ['f_invoice','f_refund','f_internal_amount'].forEach(id => { $(id).closest('.field').hidden = on; });
+  $("f_internal").closest('label').hidden = on;
+  $("f_svc").readOnly = on; $("f_name").readOnly = on; $("f_phone").readOnly = on;
 }
 
-function openBookingPayment(booking) {
+function openBookingPayment(booking, rows = null) {
   const employee=bookingEmployee();
   if (!isAdminUser() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
+  const group = rows?.length ? rows : paymentGroup(booking);
+  if (!group.length) return alert('Төлөх захиалга үлдээгүй байна.');
   openLedForm(null);
   paymentBooking=booking;
-  const service=cache.services.find(row=>Number(row.id)===Number(booking.service_id));
+  paymentRows=group;
   $("bookingPaymentHost").appendChild($("ledForm"));
-  $("ledFormTitle").textContent=`Төлбөр бүртгэх · ${booking.ref}`;
+  $("ledFormTitle").textContent=`Төлбөр бүртгэх · ${booking.customer_name} · ${group.length} цаг`;
   let packageButton=$('bookingPackageCheckout');
   if(!packageButton){packageButton=document.createElement('button');packageButton.id='bookingPackageCheckout';packageButton.className='btn-sm primary';packageButton.type='button';$('ledFormTitle').after(packageButton);}
   packageButton.hidden=false;packageButton.textContent='Багц сонгох / авсан багцаа ашиглах';
   packageButton.onclick=()=>{switchView('packages');$('ledForm').style.display='none';window.dispatchEvent(new CustomEvent('cryo:package-checkout',{detail:booking}));};
   $("ledSave").textContent='Төлсөн';
-  $("f_date").value=bookingDateToday();$("f_date").readOnly=true;
+  // Staff record today's takings; an administrator back-filling a past slot records it on the visit day.
+  $("f_date").value=isAdminUser() && booking.booked_date ? booking.booked_date : bookingDateToday();
+  $("f_date").readOnly=!isAdminUser();
   $("f_name").value=booking.customer_name || '';
   $("f_phone").value=booking.phone || '';
-  $("f_svc").value=service?.name || booking.service || '';
   $("f_note").value=booking.note || '';
   ['f_invoice','f_refund'].forEach(id => {$(id).value=0;$(id).disabled=true;});
-  const group=paymentGroup(booking);
-  const total=group.reduce((sum,b)=>sum+Number(cache.services.find(s=>Number(s.id)===Number(b.service_id))?.price||0),0);
-  $("f_svc").value=group.map(b=>cache.services.find(s=>Number(s.id)===Number(b.service_id))?.name||b.service).join(' + ');
-  $("ledFormTotal").textContent=`${group.length} үйлчилгээ · Нийт ${money(total)} · Нэг төлөлтөөр бүртгэнэ`;
-  $("f_cash").value=total;
-  const usage=bookingUsage(group,cache.services);$("f_svc").value=usage.label;
-  DEVICES.forEach(([key,,id])=>{$(id).value=usage.counts[key]||0;$(id).readOnly=true;});
+  const usage=bookingUsage(group,cache.services);
+  $("f_svc").value=usage.label;
+  $("ledFormTotal").textContent=`${group.length} үйлчилгээ · Нийт ${money(usage.total)} · Нэг төлөлтөөр бүртгэнэ`;
+  $("f_cash").value=usage.total;
+  DEVICES.forEach(([key,,id])=>{$(id).value=usage.counts[key]||0;});
+  setBookingCheckoutMode(true, usage);
   $("ledForm").scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ── admin: correct an existing appointment (customer, device, time) ── */
+function openBookingEdit(booking) {
+  if (!isAdminUser()) return;
+  let panel = $("bkEditForm");
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'panel'; panel.id = 'bkEditForm';
+    panel.innerHTML = `<div class="panel-head"><div class="panel-title" id="bkEditTitle">Захиалга засах</div></div>
+      <div class="form-grid">
+        <div class="field"><label for="bkEditName">Үйлчлүүлэгч *</label><input class="ctl" id="bkEditName" maxlength="200" autocomplete="off"></div>
+        <div class="field"><label for="bkEditPhone">Утас *</label><input class="ctl" id="bkEditPhone" type="tel" maxlength="30"></div>
+        <div class="field"><label for="bkEditService">Төхөөрөмж *</label><select class="ctl" id="bkEditService"></select></div>
+        <div class="field"><label for="bkEditDate">Өдөр *</label><input class="ctl" id="bkEditDate" type="date"></div>
+        <div class="field"><label for="bkEditTime">Цаг *</label><input class="ctl" id="bkEditTime" type="time" step="1800"></div>
+        <div class="field"><label for="bkEditNote">Тэмдэглэл</label><input class="ctl" id="bkEditNote" maxlength="1000"></div>
+      </div>
+      <p class="page-sub">Админ өнгөрсөн цагийн захиалгыг засаж, хоосон үлдсэн цагт нөхөж бүртгэж болно. Төлөгдсөн захиалгын төхөөрөмж, цагийг өөрчлөхгүй.</p>
+      <div class="form-actions"><button class="btn-sm primary" id="bkEditSave">Хадгалах</button><button class="btn-sm ghost" id="bkEditCancel">Болих</button><span id="bkEditStatus" role="status"></span></div>`;
+    $("bookingPaymentHost").before(panel);
+    customerPicker($("bkEditName"),()=>previousCustomers(cache.customers,cache.bookings,cache.sales),c=>{if(c)$("bkEditPhone").value=c.phone||'';});
+    $("bkEditCancel").onclick = () => { panel.hidden = true; };
+  }
+  panel.hidden = false;
+  $("bkEditTitle").textContent = `Захиалга засах · ${booking.ref}`;
+  $("bkEditStatus").textContent = '';
+  $("bkEditName").value = booking.customer_name || '';
+  $("bkEditPhone").value = booking.phone || '';
+  $("bkEditNote").value = booking.note || '';
+  $("bkEditDate").value = booking.booked_date || '';
+  $("bkEditTime").value = booking.booked_time || '';
+  const svc = $("bkEditService"); svc.replaceChildren();
+  cache.services.filter(s => (s.active && s.category !== 'legacy-import') || Number(s.id) === Number(booking.service_id))
+    .forEach(s => svc.add(new Option(s.name, String(s.id))));
+  svc.value = String(booking.service_id || '');
+  const paid = booking.payment_status === 'paid';
+  ['bkEditService','bkEditDate','bkEditTime'].forEach(id => { $(id).disabled = paid; });
+  $("bkEditSave").onclick = async () => {
+    const button = $("bkEditSave");
+    if (button.disabled) return;
+    const name = $("bkEditName").value.trim().replace(/\s+/g,' '), phone = $("bkEditPhone").value.trim();
+    if (!name || !phone) return alert('Үйлчлүүлэгчийн нэр, утсыг оруулна уу.');
+    const patch = { customer_name: name, phone, note: $("bkEditNote").value.trim() || null };
+    if (!paid) {
+      if (!$("bkEditDate").value || !$("bkEditTime").value) return alert('Өдөр, цагаа оруулна уу.');
+      patch.service_id = Number(svc.value);
+      patch.starts_at = `${$("bkEditDate").value}T${$("bkEditTime").value.slice(0,5)}:00+08:00`;
+    }
+    button.disabled = true;
+    try {
+      const { data, error } = await sb.from('bookings').update(patch).eq('id', booking.id).select().single();
+      if (error) throw error;
+      Object.assign(booking, data);
+      panel.hidden = true;
+      await refreshCustomers();
+      renderBookings(); renderOverview();
+    } catch (error) {
+      $("bkEditStatus").textContent = error.code === '23P01' ? 'Тухайн цаг өөр захиалгатай давхцаж байна.' : 'Хадгалж чадсангүй: ' + error.message;
+    } finally { button.disabled = false; }
+  };
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  $("bkEditName").focus();
+}
+
+// A typed name + phone that is not yet registered becomes a customer; an existing phone reuses its record.
+async function ensureCustomer(name, rawPhone) {
+  const fullName = String(name || '').trim().replace(/\s+/g, ' ');
+  const phone = normalizePhone(rawPhone);
+  if (!fullName) throw new Error('Үйлчлүүлэгчийн нэр оруулна уу.');
+  if (phone.length !== 8) throw new Error('Утасны дугаарыг 8 оронтой оруулна уу.');
+  const known = cache.customers.find(c => normalizePhone(c.phone) === phone);
+  if (known) return known;
+  const { data, error } = await sb.from('customers').insert({ full_name: fullName, phone, source: 'manual' }).select('*').single();
+  if (error) {
+    await refreshCustomers();
+    const existing = cache.customers.find(c => normalizePhone(c.phone) === phone);
+    if (existing) return existing;
+    throw new Error('Үйлчлүүлэгч бүртгэж чадсангүй: ' + error.message);
+  }
+  cache.customers.unshift(data);
+  renderCustomers();
+  return data;
+}
+
+async function refreshCustomers() {
+  const { data, error } = await fetchAll(() => sb.from('customers').select('*').order('updated_at', { ascending: false }).order('id', { ascending: false }));
+  if (!error) { cache.customers = data || []; renderCustomers(); }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3282,21 +3457,20 @@ async function saveLedger() {
     if (patch.golomt+patch.khan+patch.cash+patch.barter+patch.internal_amount<=0) return alert('Төлсөн эсвэл дотоод дүнгээ оруулна уу.');
     btn.disabled=true;
     try {
-      const grouped=paymentGroup(paymentBooking).length>1;
-      const {data,error}=await sb.rpc(grouped?'pay_booking_group':'pay_booking',{p_booking_id:paymentBooking.id,p_sale:patch});
+      const ids=(paymentRows.length?paymentRows:paymentGroup(paymentBooking)).map(b=>b.id);
+      if(!isAdminUser()) delete patch.sale_date;
+      const {data,error}=await sb.rpc('pay_bookings',{p_booking_ids:ids,p_sale:patch});
       if (error) throw error;
-      Object.assign(paymentBooking,data.booking);
-      for(const row of data.bookings||[]){const local=cache.bookings.find(b=>Number(b.id)===Number(row.id));if(local)Object.assign(local,row);}
-      for(const sale of data.sales||[])window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:sale}));
-      window.dispatchEvent(new CustomEvent('cryo:sale-saved',{detail:data.sale}));
-      paymentBooking=null;ledEditing=null;$("ledForm").style.display='none';
-      renderBookings();renderReports();switchView('reports');
+      applyCheckoutResult(data);
+      paymentBooking=null;paymentRows=[];ledEditing=null;setBookingCheckoutMode(false);$("ledForm").style.display='none';
+      renderBookings();renderReports();refreshCustomers();switchView('reports');
     } catch(error) { alert('Төлбөр хадгалж чадсангүй: '+error.message); }
     finally { btn.disabled=false; }
     return;
   }
   if (!isAdminUser()) return alert('Борлуулалтыг захиалгын төлөлтөөс бүртгэнэ үү.');
   btn.disabled = true;
+  if (normalizePhone(patch.phone).length === 8) await ensureCustomer(patch.customer_name, patch.phone).catch(() => {});
   const res = ledEditing
     ? await sb.from("sales").update(patch).eq("id", ledEditing.id).select().maybeSingle()
     : await sb.from("sales").insert(patch).select().maybeSingle();
@@ -3313,6 +3487,7 @@ async function saveLedger() {
   ledEditing = null;
   renderLedger();
   renderReports();
+  refreshCustomers();
 }
 
 function renderLedger() {
