@@ -82,7 +82,7 @@ begin
  if not (select is_vip from public.customers where id=cust) then raise exception 'VIP package did not mark customer'; end if;
  -- Hour-long sessions book back to back; nested treatments share the parent's calendar.
  insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA M1','99660001',(select id from public.services where slug='massage'),'2099-12-05 10:00+08','confirmed');
- insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA M2','99660002',(select id from public.services where slug='massage'),'2099-12-05 11:00+08','confirmed');
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA M2','99660002',(select id from public.services where slug='massage-lymph'),'2099-12-05 11:30+08','confirmed');
  insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F1','99660003',(select id from public.services where slug='beauty-teatree'),'2099-12-05 10:00+08','confirmed') returning id into b3;
  if (select blocked_until-starts_at from public.bookings where id=b3)<>interval '90 minutes' or (select calendar_id from public.bookings where id=b3)<>(select id from public.services where slug='facial') then raise exception 'child calendar/block wrong'; end if;
  denied:=false; begin insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F2','99660004',(select id from public.services where slug='beauty-wax-brow'),'2099-12-05 11:00+08','confirmed'); exception when exclusion_violation then denied:=true; end;
