@@ -90,6 +90,11 @@ begin
  denied:=false; begin perform public.add_extra_income(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000011','staff_id',employee,'kind','other','source','x','amount',1,'payment_method','cash')); exception when raise_exception then denied:=true; end;
  if not denied then raise exception 'unknown income kind accepted'; end if;
 
+ -- Split payment including an invoice part.
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA Split','99440001',(select id from public.services where slug='oxygen'),'2099-11-09 10:00+08','confirmed') returning id into b3;
+ r:=public.pay_bookings(array[b3],jsonb_build_object('staff_id',employee,'customer_name','QA Split','cash',10000,'invoice',20000,'khan',5000));
+ if (r#>>'{sale,invoice}')::bigint<>20000 or (r#>>'{sale,cash}')::bigint<>10000 or (r#>>'{sale,khan}')::bigint<>5000 or (r#>>'{sale,total}')::bigint<>35000 or r#>>'{booking,payment_status}'<>'paid' then raise exception 'split with invoice wrong: %',r->'sale'; end if;
+
  -- Staff cannot toggle VIP on customers.
  select id into cust from public.customers where phone='99001122';
  denied:=false; begin perform public.set_vip('customer',cust,true); exception when insufficient_privilege then denied:=true; end;
@@ -121,6 +126,6 @@ begin
  -- Admin deletes a paid booking: the sale is archived, not lost.
  r:=public.delete_booking(b1);
  if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
- raise notice 'PASS extra income, gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS invoice split, extra income, gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;

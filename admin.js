@@ -2272,7 +2272,9 @@ function wireReports() {
 }
 
 function isReportableSale(row) {
-  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)+Number(row.gift_card||0)+Number(row.internal_amount||0)>0;
+  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)+Number(row.gift_card||0)+Number(row.internal_amount||0)>0
+    // A confirmed-but-unpaid booking carries a placeholder invoice; count an invoice only once the booking is paid.
+    || (Number(row.invoice||0)>0 && cache.bookings.some(b=>Number(b.id)===Number(row.booking_id)&&b.payment_status==='paid'));
 }
 
 function reportRows() {
@@ -2618,6 +2620,12 @@ function wireLedger() {
   [...PAYS.map((p) => p[2])].forEach((id) =>
     $(id).addEventListener("input", updateFormTotal),
   );
+  // Checkout: clicking an empty payment field takes whatever is still unpaid, so one click picks the method.
+  CHECKOUT_FIELDS.forEach((id) => $(id).addEventListener("focus", () => {
+    if (!paymentBooking || Number($(id).value) || $(id).disabled) return;
+    const left = checkoutRemaining();
+    if (left > 0) { $(id).value = left; $(id).select(); updateFormTotal(); if (id === 'f_gift') splitGiftCardPayment(true); }
+  }));
 }
 
 function pendingDeletionFor(saleId) {
@@ -2722,8 +2730,21 @@ function renderSaleDeletionRequests() {
   });
 }
 
+const CHECKOUT_FIELDS = ['f_golomt','f_khan','f_cash','f_invoice','f_barter','f_gift'];
+function checkoutRemaining() {
+  const total = bookingUsage(paymentRows, cache.services).total;
+  return total - CHECKOUT_FIELDS.reduce((sum, id) => sum + (Number($(id).value) || 0), 0);
+}
+
 function updateFormTotal() {
   const v = (id) => Number($(id).value) || 0;
+  if (paymentBooking) {
+    const total = bookingUsage(paymentRows, cache.services).total, left = checkoutRemaining();
+    $("ledFormTotal").textContent = `${paymentRows.length} үйлчилгээ · Нийт ${money(total)} · ` +
+      (left === total ? 'Төлбөрийн хэлбэрээ сонгож дүнгээ оруулна уу (хэд хэдэн хэлбэрээр хувааж болно)'
+        : left > 0 ? `Оруулсан ${money(total - left)} · Үлдэгдэл ${money(left)}` : left < 0 ? `Нийт дүнгээс ${money(-left)} илүү байна` : 'Төлбөр бүрэн ✓');
+    return;
+  }
   const t =
     v("f_golomt") + v("f_khan") + v("f_cash") + v("f_invoice") + v("f_barter") - v("f_refund");
   $("ledFormTotal").textContent = "Нийт: " + money(t);
@@ -2889,12 +2910,13 @@ function splitGiftCardPayment(typed = false, force = false) {
   if (card && (gift > 0 || force) && !typed) {
     const fromCard = Math.min(total, card.balance), extra = total - fromCard;
     $("f_gift").value = fromCard;
-    const others = ['f_golomt','f_khan','f_cash','f_barter'], paid = others.reduce((n, id) => n + (Number($(id).value) || 0), 0);
-    if (paid !== extra) { others.forEach(id => { $(id).value = 0; }); $("f_cash").value = extra; }
+    const others = ['f_golomt','f_khan','f_cash','f_invoice','f_barter'], paid = others.reduce((n, id) => n + (Number($(id).value) || 0), 0);
+    if (paid > extra) others.forEach(id => { $(id).value = 0; });
   }
   const now = Number($("f_gift").value) || 0, extraNow = Math.max(0, total - now);
+  updateFormTotal();
   hint.textContent = !card ? '' : now > card.balance ? `Картын үлдэгдэл ${money(card.balance)} — түүнээс ихийг хасахгүй.`
-    : extraNow > 0 ? `Картаас ${money(now)} · Нэмэлт төлбөр ${money(extraNow)} (доорх банк/бэлэнд оруулсан) — өнөөдрийн борлуулалтад орно.` : `Картаас ${money(now)} хасагдана · үлдэгдэл ${money(card.balance - now)}.`;
+    : extraNow > 0 ? `Картаас ${money(now)} · Нэмэлт төлбөр ${money(extraNow)} — төлбөрийн хэлбэрээ сонгож оруулна, өнөөдрийн борлуулалтад орно.` : `Картаас ${money(now)} хасагдана · үлдэгдэл ${money(card.balance - now)}.`;
 }
 
 function setBookingCheckoutMode(on, usage = null) {
@@ -2918,7 +2940,7 @@ function setBookingCheckoutMode(on, usage = null) {
       const chip = document.createElement('span'); chip.className = 'chip-btn on'; chip.textContent = part; summary.appendChild(chip);
     }
   }
-  ['f_invoice','f_refund','f_internal_amount'].forEach(id => { $(id).closest('.field').hidden = on; });
+  ['f_refund','f_internal_amount'].forEach(id => { $(id).closest('.field').hidden = on; });
   $("f_internal").closest('label').hidden = on;
   $("f_svc").readOnly = on; $("f_name").readOnly = on; $("f_phone").readOnly = on;
 }
@@ -2944,11 +2966,12 @@ function openBookingPayment(booking, rows = null, method = 'cash') {
   $("f_name").value=booking.customer_name || '';
   $("f_phone").value=booking.phone || '';
   $("f_note").value=booking.note || '';
-  ['f_invoice','f_refund'].forEach(id => {$(id).value=0;$(id).disabled=true;});
+  $("f_refund").value=0;$("f_refund").disabled=true;$("f_invoice").value=0;
   const usage=bookingUsage(group,cache.services);
   $("f_svc").value=usage.label;
-  $("ledFormTotal").textContent=`${group.length} үйлчилгээ · Нийт ${money(usage.total)} · Нэг төлөлтөөр бүртгэнэ`;
-  if (method === 'gift') { $("f_cash").value=0; $("f_gift").value=usage.total; } else { $("f_cash").value=usage.total; $("f_gift").value=0; }
+  // No method is pre-selected: staff choose bank, cash, invoice, barter or gift card, or split across several.
+  $("f_cash").value=0; $("f_gift").value=method === 'gift' ? usage.total : 0;
+  updateFormTotal();
   DEVICES.forEach(([key,,id])=>{$(id).value=usage.counts[key]||0;});
   setBookingCheckoutMode(true, usage);
   loadGiftCardChoices();
@@ -3705,7 +3728,8 @@ async function saveLedger() {
   if (!patch.customer_name || !patch.phone) return alert("Үйлчлүүлэгчийн нэр, утсыг оруулна уу.");
 
   if (paymentBooking) {
-    if (patch.golomt+patch.khan+patch.cash+patch.barter+patch.gift_card+patch.internal_amount<=0) return alert('Төлсөн, gift card эсвэл дотоод дүнгээ оруулна уу.');
+    if (patch.golomt+patch.khan+patch.cash+patch.invoice+patch.barter+patch.gift_card+patch.internal_amount<=0) return alert('Төлбөрийн хэлбэрээ сонгож дүнгээ оруулна уу.');
+    { const left = checkoutRemaining(); if (!patch.internal_amount && left !== 0) return alert(left > 0 ? `Төлбөр ${money(left)} дутуу байна. Үлдэгдлийг аль нэг хэлбэрт оруулна уу.` : `Төлбөр нийт дүнгээс ${money(-left)} илүү байна.`); }
     btn.disabled=true;
     try {
       const ids=(paymentRows.length?paymentRows:paymentGroup(paymentBooking)).map(b=>b.id);
