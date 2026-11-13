@@ -1050,12 +1050,16 @@ function renderBookings() {
     if (b.performed_at) { const hint=document.createElement('small'); hint.textContent='Үйлчилгээ үзүүлсэн'; providerCell.appendChild(hint); }
     tr.appendChild(providerCell);
     const noteCell = cell(b.note || b.notes || "—", "record-note");
-    if (isAdminUser()) {
+    {
       const edit = document.createElement('button');
       edit.type = 'button'; edit.className = 'btn-sm ghost'; edit.textContent = 'Засах';
       edit.style.marginLeft = '8px';
       edit.onclick = () => openBookingEdit(b);
-      noteCell.appendChild(edit);
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'btn-sm ghost'; remove.textContent = 'Устгах';
+      remove.style.marginLeft = '6px';
+      remove.onclick = () => deleteBooking(b, remove);
+      noteCell.append(edit, remove);
     }
     tr.appendChild(noteCell);
 
@@ -1139,11 +1143,11 @@ function renderBookingSchedule() {
     const selected = bkSelectedSlots.some(slot => slot.serviceId === service.id && slot.startsAt === startsAt);
     button.className = 'booking-slot' + (selected ? ' selected' : '');
     button.setAttribute('aria-pressed', String(selected));
-    button.disabled = !!occupied || (past && !isAdminUser());
+    button.disabled = !!occupied;
     const label = document.createElement('strong'), detail = document.createElement('small');
     label.textContent = time;
     const startsHere = occupied && Date.parse(occupied.starts_at) >= start && Date.parse(occupied.starts_at) < start + 30 * 60000;
-    detail.textContent = occupied ? (startsHere ? `Захиалгатай · ${occupied.customer_name || ''}` : `Завгүй · ${occupied.booked_time || ''}-ийн захиалгын үргэлжлэл`) : past ? (isAdminUser()?'Өнгөрсөн сул цаг · Нөхөж бүртгэх':'Өнгөрсөн цаг') : 'Сул · Бүртгэх';
+    detail.textContent = occupied ? (startsHere ? `Захиалгатай · ${occupied.customer_name || ''}` : `Завгүй · ${occupied.booked_time || ''}-ийн захиалгын үргэлжлэл`) : past ? 'Өнгөрсөн сул цаг · Нөхөж бүртгэх' : 'Сул · Бүртгэх';
     button.append(label, detail);
     button.onclick = () => {
       if (selected) bkSelectedSlots = bkSelectedSlots.filter(slot => !(slot.serviceId === service.id && slot.startsAt === startsAt));
@@ -1195,7 +1199,6 @@ async function saveStaffBooking() {
   const team = teamMode ? bkTeams.find(t => String(t.id) === $("bkNewTeam").value) : null;
   const name = teamMode ? team?.name : $("bkNewName").value.trim(), phone = $("bkNewPhone").value.trim();
   if (!name || !phone) return alert('Үйлчлүүлэгч эсвэл багаа сонгож, холбоо барих утсаа оруулна уу.');
-  if (!isAdminUser() && slots.some(slot => Date.parse(slot.startsAt) <= Date.now())) return alert('Өнгөрсөн цагийг сонголтоос хасна уу.');
   const employee = bookingEmployee();
   if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   // Selections survive device/day changes, so confirm every time before booking several slots.
@@ -2730,8 +2733,22 @@ function openBookingPayment(booking, rows = null, method = 'cash') {
 }
 
 /* ── admin: correct an existing appointment (customer, device, time) ── */
+async function deleteBooking(booking, button) {
+  const paid = booking.payment_status === 'paid';
+  if (paid && !isAdminUser()) return alert('Төлбөр бүртгэгдсэн захиалгыг зөвхөн админ устгана.');
+  const what = `${booking.customer_name} · ${booking.service || ''} · ${booking.booked_date || ''} ${booking.booked_time || ''}`;
+  if (!confirm(`${what}\n\nЭнэ захиалгыг бүрмөсөн устгах уу?${paid ? '\n\nТөлбөр нь бүртгэгдсэн: борлуулалтын бичлэг архивлагдаж, тайлангаас хасагдана.' : ''}`)) return;
+  button.disabled = true;
+  try {
+    const { data, error } = await sb.rpc('delete_booking', { p_booking_id: booking.id });
+    if (error) throw error;
+    cache.bookings = cache.bookings.filter(row => Number(row.id) !== Number(booking.id));
+    if (data?.sale_id) cache.sales = cache.sales.filter(sale => Number(sale.id) !== Number(data.sale_id));
+    renderBookings(); renderOverview(); renderReports(); renderLedger();
+  } catch (error) { alert('Устгаж чадсангүй: ' + error.message); button.disabled = false; }
+}
+
 function openBookingEdit(booking) {
-  if (!isAdminUser()) return;
   let panel = $("bkEditForm");
   if (!panel) {
     panel = document.createElement('div');
@@ -2745,7 +2762,7 @@ function openBookingEdit(booking) {
         <div class="field"><label for="bkEditTime">Цаг *</label><input class="ctl" id="bkEditTime" type="time" step="1800"></div>
         <div class="field"><label for="bkEditNote">Тэмдэглэл</label><input class="ctl" id="bkEditNote" maxlength="1000"></div>
       </div>
-      <p class="page-sub">Админ өнгөрсөн цагийн захиалгыг засаж, хоосон үлдсэн цагт нөхөж бүртгэж болно. Төлөгдсөн захиалгын төхөөрөмж, цагийг өөрчлөхгүй.</p>
+      <p class="page-sub">Өнгөрсөн цагийн захиалгыг засаж, хоосон үлдсэн цагт нөхөж бүртгэж болно. Төлөгдсөн захиалгын төхөөрөмж, цагийг өөрчлөхгүй.</p>
       <div class="form-actions"><button class="btn-sm primary" id="bkEditSave">Хадгалах</button><button class="btn-sm ghost" id="bkEditCancel">Болих</button><span id="bkEditStatus" role="status"></span></div>`;
     $("bookingPaymentHost").before(panel);
     customerPicker($("bkEditName"),()=>previousCustomers(cache.customers,cache.bookings,cache.sales),c=>{if(c)$("bkEditPhone").value=c.phone||'';});
@@ -2778,14 +2795,14 @@ function openBookingEdit(booking) {
     }
     button.disabled = true;
     try {
-      const { data, error } = await sb.from('bookings').update(patch).eq('id', booking.id).select().single();
+      const { data, error } = await sb.rpc('edit_booking', { p_booking_id: booking.id, p_patch: patch });
       if (error) throw error;
       Object.assign(booking, data);
       panel.hidden = true;
       await refreshCustomers();
       renderBookings(); renderOverview();
     } catch (error) {
-      $("bkEditStatus").textContent = error.code === '23P01' ? 'Тухайн цаг өөр захиалгатай давхцаж байна.' : 'Хадгалж чадсангүй: ' + error.message;
+      $("bkEditStatus").textContent = (error.code === '23P01' || /overlap|bookings_no_device_overlap/.test(error.message || '')) ? 'Тухайн цаг өөр захиалгатай давхцаж байна.' : 'Хадгалж чадсангүй: ' + error.message;
     } finally { button.disabled = false; }
   };
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

@@ -34,5 +34,5 @@ fail=false;await vm.runInContext('saveStaffBooking()',context);assert(inserted.e
 console.log('PASS multi-slot selection across devices/dates, person/team assignment, atomic request, conflict retains selection');
 el('bkScheduleDate').value='2000-01-03';vm.runInContext("bkDevice='1';bkSelectedSlots=[];renderBookingSchedule()",context);
 assert.equal(el('bkScheduleSlots').children[0].disabled,false);
-context.isAdminUser=()=>false;vm.runInContext('renderBookingSchedule()',context);assert.equal(el('bkScheduleSlots').children[0].disabled,true);
-console.log('PASS past empty slots enabled for admin, disabled for staff');
+context.isAdminUser=()=>false;vm.runInContext('renderBookingSchedule()',context);assert.equal(el('bkScheduleSlots').children[0].disabled,false);
+console.log('PASS past empty slots enabled for admin and staff');

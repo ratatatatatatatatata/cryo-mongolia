@@ -57,6 +57,15 @@ begin
  execute 'set local role authenticated';
  if not exists(select 1 from public.bookings where id=b3) then raise exception 'staff cannot see past booking'; end if;
 
+ -- Staff back-fill a past slot, correct it, and delete it; a paid booking is admin-only.
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA Back','99770001',(select id from public.services where slug='zerobody'),'2020-02-02 10:00+08','confirmed') returning id into b3;
+ r:=public.edit_booking(b3,jsonb_build_object('customer_name',' QA  Backfill ','phone','99770002','note','x','starts_at','2020-02-02 11:00+08'));
+ if r->>'customer_name'<>'QA Backfill' or r->>'booked_time'<>'11:00' or r->>'phone'<>'99770002' then raise exception 'staff edit failed: %',r; end if;
+ perform public.delete_booking(b3);
+ if exists(select 1 from public.bookings where id=b3) or exists(select 1 from public.sales where booking_id=b3) then raise exception 'staff delete failed'; end if;
+ denied:=false; begin perform public.delete_booking(b1); exception when raise_exception then denied:=true; end;
+ if not denied or not exists(select 1 from public.bookings where id=b1) then raise exception 'staff deleted a paid booking'; end if;
+
  -- Staff cannot toggle VIP on customers.
  select id into cust from public.customers where phone='99001122';
  denied:=false; begin perform public.set_vip('customer',cust,true); exception when insufficient_privilege then denied:=true; end;
@@ -71,6 +80,9 @@ begin
  perform public.set_vip('package',pkg,true);
  insert into public.customer_package_contracts(customer_id,customer_label,package_id,package_label,status) values(cust,'QA Day',pkg,'QA VIP','active');
  if not (select is_vip from public.customers where id=cust) then raise exception 'VIP package did not mark customer'; end if;
- raise notice 'PASS gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ -- Admin deletes a paid booking: the sale is archived, not lost.
+ r:=public.delete_booking(b1);
+ if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
+ raise notice 'PASS staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;
