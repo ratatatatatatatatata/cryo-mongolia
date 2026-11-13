@@ -70,9 +70,9 @@ function panels() {
         <div class="panel-head"><div class="panel-title">Багцын борлуулалт бүртгэх</div></div>
         <div class="form-grid">
           <div class="field"><label for="pkgSaleDate">Огноо *</label><input class="ctl" type="date" id="pkgSaleDate"></div>
-          <div class="field"><label for="pkgSaleSearch">Үйлчлүүлэгч хайх</label><input class="ctl" type="search" id="pkgSaleSearch" placeholder="Нэр / латин галиг / утас" autocomplete="off"></div>
-          <div class="field"><label for="pkgSalePhone">Утас *</label><input class="ctl" type="tel" id="pkgSalePhone" maxlength="30" placeholder="Шинэ үйлчлүүлэгч бол утсаа оруулна"></div>
-          <div class="field"><label for="pkgLeadCustomer">Үйлчлүүлэгч *</label><select class="ctl" id="pkgLeadCustomer"></select></div>
+          <div class="field"><label for="pkgSaleSearch">Үйлчлүүлэгч *</label><input class="ctl" type="search" id="pkgSaleSearch" placeholder="Нэр бичих эсвэл өмнөхөөс сонгох" autocomplete="off"></div>
+          <div class="field"><label for="pkgSalePhone">Утас *</label><input class="ctl" type="tel" id="pkgSalePhone" maxlength="30" placeholder="8 оронтой утас"></div>
+          <div class="field" hidden><select class="ctl" id="pkgLeadCustomer" aria-hidden="true" tabindex="-1"></select></div>
           <div class="field"><label for="pkgLeadPurchased">Багц *</label><select class="ctl" id="pkgLeadPurchased"></select></div>
           <div class="field"><label for="pkgSalePrice">Багцын үнэ</label><input class="ctl" id="pkgSalePrice" readonly value="—"></div>
         </div>
@@ -130,7 +130,7 @@ function panels() {
     const custom = $("pkgLeadPurchased").value === 'custom';
     $("pkgCustomForm").hidden = !custom;
     $("pkgSaleAmount").readOnly = false;
-    ['pkgLeadCustomer','pkgSaleSearch','pkgSalePhone','pkgSaleDate','pkgSaleBank','pkgSaleAmount','pkgLeadNotes'].forEach(id=>$(id).closest('.field').hidden=custom);
+    ['pkgSaleSearch','pkgSalePhone','pkgSaleDate','pkgSaleBank','pkgSaleAmount','pkgLeadNotes'].forEach(id=>$(id).closest('.field').hidden=custom);
     $('pkgLeadSave').textContent=custom?'Багцын загвар хадгалах':'Борлуулалт бүртгэх';
     if (custom) return updateCustomPackagePrice();
     const selected = packages.find(item => String(item.id) === $("pkgLeadPurchased").value);
@@ -228,8 +228,7 @@ function renderSaleCustomers() {
   const rows = customers.filter(item => matchesName(item.full_name, query) || (query && String(item.phone || '').includes(query)));
   customer.innerHTML = `<option value="">${rows.length ? 'Үйлчлүүлэгч сонгох' : 'Үйлчлүүлэгч олдсонгүй'}</option>` + rows.map((item) => `<option value="${item.id}">${safe(item.full_name)} · ${safe(item.phone || "утасгүй")}</option>`).join("");
   customer.value = rows.some(item => String(item.id) === selected) ? selected : '';
-  customer.closest('.field').hidden=true;
-  customerPicker($('pkgSaleSearch'),()=>customers,item=>{if(!item){customer.value='';if($('pkgSalePhone').dataset.picked===$('pkgSalePhone').value)$('pkgSalePhone').value='';return;} $('pkgSalePhone').value=item.phone||'';$('pkgSalePhone').dataset.picked=item.phone||''; customer.replaceChildren(new Option(`${item.full_name} · ${item.phone||'Утас бүртгээгүй'}`,String(item.id),true,true));});
+    customerPicker($('pkgSaleSearch'),()=>customers,item=>{if(!item){customer.value='';if($('pkgSalePhone').dataset.picked===$('pkgSalePhone').value)$('pkgSalePhone').value='';return;} $('pkgSalePhone').value=item.phone||'';$('pkgSalePhone').dataset.picked=item.phone||''; customer.replaceChildren(new Option(`${item.full_name} · ${item.phone||'Утас бүртгээгүй'}`,String(item.id),true,true));});
 }
 
 function options() {
@@ -333,13 +332,15 @@ async function ensureSaleCustomer() {
 
 async function saveLead() {
   let customer = customers.find((item) => String(item.id) === $("pkgLeadCustomer").value);
-  if (!customer && $("pkgLeadPurchased").value !== 'custom') {
-    try { customer = await ensureSaleCustomer(); } catch (error) { return alert(error.message); }
-  }
   const purchased = packages.find((item) => String(item.id) === $("pkgLeadPurchased").value);
   const employee = currentStaff();
   const custom=$("pkgLeadPurchased").value==='custom';
-  if (!custom && !customer) return alert("Үйлчлүүлэгчээ сонгоно уу.");
+  if (!purchased && !custom) return alert("Багцаа сонгоно уу.");
+  // A name that isn't in the list becomes a new customer with the phone typed beside it.
+  if (!custom && !customer) {
+    try { customer = await ensureSaleCustomer(); } catch (error) { return alert(error.message); }
+  }
+  if (!custom && !customer) return alert("Үйлчлүүлэгчийн нэр, утсыг оруулна уу.");
   if (!custom && !customer.phone) return alert("Үйлчлүүлэгчид хэсэгт утасны дугаарыг бүртгэнэ үү.");
   if (!purchased && !custom) return alert("Багцаа сонгоно уу.");
   const items=custom ? customPackageItems() : [];
