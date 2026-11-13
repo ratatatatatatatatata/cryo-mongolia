@@ -52,5 +52,20 @@ try{
  await page2.locator('#xiOpen').click();assert.equal(await page2.locator('#extraIncomePanel').isVisible(),true);assert.equal(await page2.locator('#xiKind option').count(),2);
  await page2.locator('#xiCancel').click();assert.equal(await page2.locator('#extraIncomePanel').isVisible(),false);
  assert.deepEqual(errors2,[],'signed-in dashboard threw');
+ // Staff account: the sales page is read-only, but the extra-income button and form must still be there.
+ const page3=await browser.newPage();const errors3=[];page3.on('pageerror',e=>errors3.push(e.message));
+ await page3.route('**/*',async route=>{const url=new URL(route.request().url());
+  if(url.hostname==='cdn.jsdelivr.net')return route.fulfill({contentType:types.js,body:`const data=${JSON.stringify({...data,profiles:[{id:'u1',email:'staff@test.mn',full_name:'Staff',role:'staff'}]})};const session={user:{id:'u1',email:'staff@test.mn'}};
+   export const createClient=()=>({auth:{getSession:async()=>({data:{session}}),getUser:async()=>({data:{user:session.user}}),onAuthStateChange(){return{data:{subscription:{unsubscribe(){}}}}},signOut:async()=>({})},rpc:async(name)=>({data:name==='is_admin'?false:[],error:null}),
+   from(table){let single=false;const q={select(){return q},order(){return q},is(){return q},eq(){return q},neq(){return q},gte(){return q},lte(){return q},in(){return q},range(){return q},limit(){return q},maybeSingle(){single=true;return q},single(){single=true;return q},then(r){const rows=data[table]||[];r({data:single?(rows[0]||null):rows,error:null})}};return q},
+   channel(){const c={on(){return c},subscribe(){return c}};return c},removeChannel(){}});`});
+  if(url.hostname!=='test.local')return route.abort();
+  const path=url.pathname==='/'?'/admin.html':url.pathname;
+  if(path==='/supabase-config.js')return route.fulfill({contentType:types.js,body:`window.CRYO_SUPABASE={url:'https://test.local',anonKey:'k'};`});
+  try{return route.fulfill({contentType:types[path.split('.').pop()]||'text/plain',body:await readFile(new URL('..'+path,import.meta.url))});}catch{return route.fulfill({status:404,body:''});}});
+ await page3.goto('https://test.local/');await page3.locator('#xiOpen').waitFor({state:'visible',timeout:10000});
+ assert.equal(await page3.locator('#repSales').isVisible(),false,'staff still cannot open the manual sale form');
+ await page3.locator('#xiOpen').click();assert.equal(await page3.locator('#xiSave').isVisible(),true);assert.equal(await page3.locator('#xiCancel').isVisible(),true);
+ assert.deepEqual(errors3,[],'staff dashboard threw');
  assert.deepEqual(errors,[]);console.log('PASS admin page boots without script errors and the login form submits; signed-in dashboard, grouped checkout and split-payment form render. Mock data only.');
 }finally{await browser.close();}
