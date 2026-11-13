@@ -37,6 +37,7 @@ const PAYS = [
   ["cash", "Бэлэн", "f_cash"],
   ["invoice", "Нэхэмжлэх", "f_invoice"],
   ["barter", "Barter", "f_barter"],
+  ["gift_card", "Gift card", "f_gift"],
   ["internal_amount", "Дотоод", "f_internal_amount"],
   ["refund", "Буцаалт", "f_refund"],
 ];
@@ -923,8 +924,7 @@ function renderBookings() {
   renderBookingSchedule();
   const rows = cache.bookings
     .filter((b) => bkFilter === "all" || b.status === bkFilter)
-    .filter(b => me?.role!=='staff' || bkFilter==='done' || b.booked_date>=bookingDateToday())
-    .filter(b => !$("bkFromDate").value || b.booked_date >= $("bkFromDate").value)
+        .filter(b => !$("bkFromDate").value || b.booked_date >= $("bkFromDate").value)
     .filter(b => !$("bkToDate").value || b.booked_date <= $("bkToDate").value)
     .filter((b) => bkDevice === "all" || String(b.service_id || "") === bkDevice)
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
@@ -957,12 +957,13 @@ function renderBookings() {
     summary.appendChild(cell([...new Set(group.map(b=>STATUS_MN[b.status]||b.status))].join(' / ')));
     const payCell=document.createElement('td'),pay=document.createElement('select');pay.className='ctl sm';
     pay.setAttribute('aria-label',`Төлөлт ${anchor.customer_name}`);
-    pay.innerHTML='<option value="pending">Хүлээгдэж байгаа</option><option value="paid">Төлбөр төлсөн</option><option value="internal">Дотоод ажилтан</option>';
+    pay.innerHTML='<option value="pending">Хүлээгдэж байгаа</option><option value="paid">Төлбөр төлсөн</option><option value="gift">Gift card-аар</option><option value="internal">Дотоод ажилтан</option>';
     pay.disabled=!unpaid.length;
-    const internal=live.length&&live.every(b=>cache.sales.some(s=>Number(s.booking_id)===Number(b.id)&&s.is_internal));
-    pay.value=unpaid.length?'pending':internal?'internal':'paid';
+    const saleOf=b=>cache.sales.find(s=>Number(s.booking_id)===Number(b.id));
+    const internal=live.length&&live.every(b=>saleOf(b)?.is_internal), gift=live.length&&live.every(b=>Number(saleOf(b)?.gift_card||0)>0);
+    pay.value=unpaid.length?'pending':internal?'internal':gift?'gift':'paid';
     if(live.length&&live.every(b=>b.booking_kind==='package')){pay.add(new Option('Багцын эрхээр','package'));pay.value='package';}
-    pay.onchange=()=>{if(pay.value==='internal')recordInternalBooking(anchor,pay,unpaid);else if(pay.value==='paid')openBookingPayment(anchor,unpaid);pay.value='pending';};
+    pay.onchange=()=>{if(pay.value==='internal')recordInternalBooking(anchor,pay,unpaid);else if(pay.value==='paid'||pay.value==='gift')openBookingPayment(anchor,unpaid,pay.value==='gift'?'gift':'cash');pay.value='pending';};
     payCell.append(pay);summary.append(payCell);
     summary.appendChild(cell(unpaid.length>1?`${unpaid.length} цагийг нэг дор төлнө`:'Дэлгэрэнгүйгээс сонгоно'));
     summary.appendChild(cell(unpaid.length&&unpaid.length<live.length?'Хэсэгчлэн төлөгдсөн · үлдсэн цагуудыг нэгтгэн төлнө':''));
@@ -1090,9 +1091,9 @@ function renderBookingSchedule() {
   if (!date.value) date.value = bookingDateToday();
   if (!date.dataset.wired) {
     date.dataset.wired = '1';
-    $("bkFromDate").value=isAdminUser() ? '' : bookingDateToday();
+    $("bkFromDate").value='';
     $("bkAllDates").addEventListener('click', () => {
-      $("bkFromDate").value=isAdminUser() ? '' : bookingDateToday();
+      $("bkFromDate").value='';
       $("bkToDate").value='';
       bkFilter='all'; bkDevice='all';
       $("bkFilters").querySelectorAll('[data-status]').forEach(button => button.classList.toggle('on', button.dataset.status==='all'));
@@ -1106,11 +1107,11 @@ function renderBookingSchedule() {
   }
   if (date.dataset.filterRole !== me?.role) {
     date.dataset.filterRole=me?.role || '';
-    $("bkFromDate").value=isAdminUser() ? '' : (bkFilter==='done' ? '' : bookingDateToday());
+    $("bkFromDate").value='';
     $("bkToDate").value='';
   }
-  $("bkAllDates").hidden=!isAdminUser();
-  date.min=me?.role==='staff' && bkFilter!=='done' ? bookingDateToday() : '';
+  $("bkAllDates").hidden=false;
+  date.min='';
   if (date.min && date.value<date.min) date.value=date.min;
   tabs.replaceChildren();
   const devices = cache.services.filter(service => service.active && service.category !== 'legacy-import');
@@ -1127,7 +1128,7 @@ function renderBookingSchedule() {
   $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Нэг буюу олон сул цаг сонгоно уу. Төхөөрөмж, өдөр солиход сонголт хадгалагдана.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
   if (!service || !date.value) return;
   const duration = Number(service.duration_minutes) || 30;
-  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled' && (me?.role!=='staff' || row.booked_date>=bookingDateToday() || row.status==='done'));
+  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled');
   for (let minute = 9 * 60; minute + duration <= 21 * 60; minute += 30) {
     const time = `${String(Math.floor(minute / 60)).padStart(2,'0')}:${String(minute % 60).padStart(2,'0')}`;
     const startsAt = `${date.value}T${time}:00+08:00`, start = Date.parse(startsAt);
@@ -1141,7 +1142,8 @@ function renderBookingSchedule() {
     button.disabled = !!occupied || (past && !isAdminUser());
     const label = document.createElement('strong'), detail = document.createElement('small');
     label.textContent = time;
-    detail.textContent = occupied ? `Захиалгатай · ${occupied.customer_name || ''}` : past ? (isAdminUser()?'Өнгөрсөн сул цаг · Нөхөж бүртгэх':'Өнгөрсөн цаг') : 'Сул · Бүртгэх';
+    const startsHere = occupied && Date.parse(occupied.starts_at) >= start && Date.parse(occupied.starts_at) < start + 30 * 60000;
+    detail.textContent = occupied ? (startsHere ? `Захиалгатай · ${occupied.customer_name || ''}` : `Завгүй · ${occupied.booked_time || ''}-ийн захиалгын үргэлжлэл`) : past ? (isAdminUser()?'Өнгөрсөн сул цаг · Нөхөж бүртгэх':'Өнгөрсөн цаг') : 'Сул · Бүртгэх';
     button.append(label, detail);
     button.onclick = () => {
       if (selected) bkSelectedSlots = bkSelectedSlots.filter(slot => !(slot.serviceId === service.id && slot.startsAt === startsAt));
@@ -1196,6 +1198,11 @@ async function saveStaffBooking() {
   if (!isAdminUser() && slots.some(slot => Date.parse(slot.startsAt) <= Date.now())) return alert('Өнгөрсөн цагийг сонголтоос хасна уу.');
   const employee = bookingEmployee();
   if (isSharedStaffAccount() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
+  // Selections survive device/day changes, so confirm every time before booking several slots.
+  if (slots.length > 1) {
+    const list = [...slots].sort((a,b)=>a.startsAt.localeCompare(b.startsAt)).map(slot => `• ${slot.startsAt.slice(0,10)} ${slot.startsAt.slice(11,16)} · ${cache.services.find(s => s.id === slot.serviceId)?.name || ''}`).join('\n');
+    if (!confirm(`${name}-д дараах ${slots.length} цагийг бүртгэх үү?\n\n${list}\n\nБуруу цаг байвал «Cancel» дараад × дээр дарж хасна уу.`)) return;
+  }
   button.disabled = true;
   if (!teamMode && normalizePhone(phone).length === 8) ensureCustomer(name, phone).catch(() => {});
   try {
@@ -2144,7 +2151,7 @@ function wireReports() {
 }
 
 function isReportableSale(row) {
-  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)+Number(row.internal_amount||0)>0;
+  return row.source !== 'booking' || Number(row.golomt||0)+Number(row.khan||0)+Number(row.cash||0)+Number(row.barter||0)+Number(row.gift_card||0)+Number(row.internal_amount||0)>0;
 }
 
 function reportRows() {
@@ -2691,7 +2698,7 @@ function setBookingCheckoutMode(on, usage = null) {
   $("f_svc").readOnly = on; $("f_name").readOnly = on; $("f_phone").readOnly = on;
 }
 
-function openBookingPayment(booking, rows = null) {
+function openBookingPayment(booking, rows = null, method = 'cash') {
   const employee=bookingEmployee();
   if (!isAdminUser() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   const group = rows?.length ? rows : paymentGroup(booking);
@@ -2716,7 +2723,7 @@ function openBookingPayment(booking, rows = null) {
   const usage=bookingUsage(group,cache.services);
   $("f_svc").value=usage.label;
   $("ledFormTotal").textContent=`${group.length} үйлчилгээ · Нийт ${money(usage.total)} · Нэг төлөлтөөр бүртгэнэ`;
-  $("f_cash").value=usage.total;
+  if (method === 'gift') { $("f_cash").value=0; $("f_gift").value=usage.total; } else { $("f_cash").value=usage.total; $("f_gift").value=0; }
   DEVICES.forEach(([key,,id])=>{$(id).value=usage.counts[key]||0;});
   setBookingCheckoutMode(true, usage);
   $("ledForm").scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -3442,7 +3449,6 @@ async function saveLedger() {
     therapist: $("f_staff").value || null,
     staff_id: Number($("f_staff").selectedOptions[0]?.dataset.staffId) || null,
     therapist_amount: v("f_staffamt"),
-    gift_card: v("f_gift"),
     needs_review: false,
     source: ledEditing ? ledEditing.source : "manual",
   };
@@ -3454,7 +3460,7 @@ async function saveLedger() {
   if (!patch.customer_name || !patch.phone) return alert("Үйлчлүүлэгчийн нэр, утсыг оруулна уу.");
 
   if (paymentBooking) {
-    if (patch.golomt+patch.khan+patch.cash+patch.barter+patch.internal_amount<=0) return alert('Төлсөн эсвэл дотоод дүнгээ оруулна уу.');
+    if (patch.golomt+patch.khan+patch.cash+patch.barter+patch.gift_card+patch.internal_amount<=0) return alert('Төлсөн, gift card эсвэл дотоод дүнгээ оруулна уу.');
     btn.disabled=true;
     try {
       const ids=(paymentRows.length?paymentRows:paymentGroup(paymentBooking)).map(b=>b.id);

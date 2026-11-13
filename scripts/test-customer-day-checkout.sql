@@ -46,6 +46,17 @@ begin
  r:=public.pay_bookings(array[b3],jsonb_build_object('staff_id',employee,'customer_name','QA Staff','is_internal',true,'internal_amount',1));
  if (r#>>'{sale,internal_amount}')::bigint<>129000 or (r#>>'{sale,total}')::bigint<>0 or not (r#>>'{sale,is_internal}')::boolean then raise exception 'internal usage wrong'; end if;
 
+ -- Gift card pays a booking without counting as cash revenue.
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA Gift','99887755',(select id from public.services where slug='ledpro'),'2099-11-07 10:00+08','confirmed') returning id into b3;
+ r:=public.pay_bookings(array[b3],jsonb_build_object('staff_id',employee,'customer_name','QA Gift','gift_card',139000));
+ if (r#>>'{sale,gift_card}')::bigint<>139000 or (r#>>'{sale,total}')::bigint<>0 or (r#>>'{sale,led_pro}')::int<>1 then raise exception 'gift card payment wrong: %',r->'sale'; end if;
+ -- Staff can see past, not-yet-done appointments.
+ execute 'reset role'; alter table public.bookings disable trigger zz_guard_booking_backdate;
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA Old','99880000',(select id from public.services where slug='oxygen'),'2020-01-02 10:00+08','confirmed') returning id into b3;
+ alter table public.bookings enable trigger zz_guard_booking_backdate;
+ execute 'set local role authenticated';
+ if not exists(select 1 from public.bookings where id=b3) then raise exception 'staff cannot see past booking'; end if;
+
  -- Staff cannot toggle VIP on customers.
  select id into cust from public.customers where phone='99001122';
  denied:=false; begin perform public.set_vip('customer',cust,true); exception when insufficient_privilege then denied:=true; end;
@@ -60,6 +71,6 @@ begin
  perform public.set_vip('package',pkg,true);
  insert into public.customer_package_contracts(customer_id,customer_label,package_id,package_label,status) values(cust,'QA Day',pkg,'QA VIP','active');
  if not (select is_vip from public.customers where id=cust) then raise exception 'VIP package did not mark customer'; end if;
- raise notice 'PASS same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;
