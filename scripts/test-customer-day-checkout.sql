@@ -70,6 +70,11 @@ begin
  r:=public.issue_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000001','staff_id',employee,'issued_on','2026-11-10','buyer_name','QA Buyer','buyer_phone','99550001','recipient_name','QA Recipient','amount',200000,'payment_method','khan'));
  if r#>>'{card,code}' not like 'GC-%' or (r#>>'{card,issued_on}')::date<>'2026-11-10' or (r#>>'{sale,khan}')::bigint<>200000 or (r#>>'{sale,sale_date}')::date<>'2026-11-10' then raise exception 'issue failed: %',r; end if;
  if (public.issue_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000001','staff_id',employee,'recipient_name','x','amount',1,'payment_method','cash'))#>>'{card,id}')<>(r#>>'{card,id}') or (select count(*) from public.gift_cards where recipient_name='QA Recipient')<>1 then raise exception 'issue retry duplicated'; end if;
+ -- Promotional card: no sale, no income.
+ declare promo jsonb; begin
+  promo:=public.issue_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000020','staff_id',employee,'recipient_name','QA Promo','amount',50000,'payment_method','promo'));
+  if promo->'sale' <> 'null'::jsonb or promo#>>'{card,payment_method}'<>'promo' or exists(select 1 from public.sales where source_key='gift-card:'||(promo#>>'{card,id}')) then raise exception 'promo card created income: %',promo; end if;
+ end;
  b3:=(r#>>'{card,id}')::bigint;
  r:=public.use_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000002','staff_id',employee,'card_id',b3,'amount',150000,'service','LedPro'));
  if (r->>'balance')::bigint<>50000 then raise exception 'balance wrong: %',r; end if;
@@ -127,6 +132,6 @@ begin
  -- Admin deletes a paid booking: the sale is archived, not lost.
  r:=public.delete_booking(b1);
  if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
- raise notice 'PASS invoice split, extra income, gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS promo gift card, invoice split, extra income, gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;

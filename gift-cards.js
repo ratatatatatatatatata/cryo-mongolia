@@ -6,7 +6,7 @@ const cfg = window.CRYO_SUPABASE || {}, sb = createClient(cfg.url, cfg.anonKey),
 const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const METHODS = { golomt: 'Голомт', khan: 'Хаан', cash: 'Бэлэн', invoice: 'Нэхэмжлэх', barter: 'Бартер', internal: 'Дотоод' };
+const METHODS = { golomt: 'Голомт', khan: 'Хаан', cash: 'Бэлэн', invoice: 'Нэхэмжлэх', barter: 'Бартер', internal: 'Дотоод', promo: 'Урамшуулал' };
 
 let cards = [], uses = [], staff = [], user = null, isAdmin = false, selected = null, loading = false;
 let issueRequest = crypto.randomUUID(), useRequest = crypto.randomUUID();
@@ -48,7 +48,7 @@ function markup() {
       <div class="field"><label for="gcRecipientPhone">Утас</label><input class="ctl" type="tel" id="gcRecipientPhone" maxlength="30"></div>
       <div class="field" style="grid-column:span 2"><label for="gcNote">Тэмдэглэл</label><input class="ctl" id="gcNote" maxlength="500"></div>
     </div>
-    <p class="page-sub">Олгосон өдрөөр борлуулалтад орлого болж бүртгэгдэнэ. Дараа нь картаар төлөхөд орлогод давхар нэмэгдэхгүй.</p>
+    <p class="page-sub" id="gcIncomeNote">Олгосон өдрөөр борлуулалтад орлого болж бүртгэгдэнэ. Дараа нь картаар төлөхөд орлогод давхар нэмэгдэхгүй.</p>
     <div class="form-actions"><button class="btn-sm primary" id="gcSave">Gift card бүртгэх</button><button class="btn-sm ghost" id="gcCancel">Болих</button></div>
   </div>
   <div class="panel"><div class="form-grid">
@@ -62,6 +62,11 @@ function markup() {
   $('gcAdd').onclick = () => { $('gcForm').hidden = false; $('gcDate').value = $('gcDate').value || today(); $('gcRecipient').focus(); };
   $('gcCancel').onclick = () => { $('gcForm').hidden = true; };
   $('gcSave').onclick = issue;
+  $('gcMethod').onchange = () => {
+    $('gcIncomeNote').textContent = $('gcMethod').value === 'promo'
+      ? 'Урамшуулал: үнэгүй олгоно — ямар ч төлбөр, орлого бүртгэгдэхгүй. Картаар үйлчилгээ авахад ч орлогод тооцогдохгүй.'
+      : 'Олгосон өдрөөр борлуулалтад орлого болж бүртгэгдэнэ. Дараа нь картаар төлөхөд орлогод давхар нэмэгдэхгүй.';
+  };
   $('gcSearch').oninput = render; $('gcFilter').onchange = render;
 }
 
@@ -111,7 +116,7 @@ function render() {
     || (digits && [c.recipient_phone, c.buyer_phone].some(p => String(p || '').replace(/\s/g, '').includes(digits))))
     .sort((a, b) => String(b.issued_on).localeCompare(String(a.issued_on)) || b.id - a.id);
   $('gcBody').innerHTML = rows.length ? rows.map(c => `<tr class="${Number(selected) === Number(c.id) ? 'on' : ''}">
-    <td class="t-mono t-strong">${safe(c.code)}</td><td class="t-mono">${safe(c.issued_on)}</td>
+    <td class="t-mono t-strong">${safe(c.code)}${c.payment_method === 'promo' ? ' <span class="vip-badge">Урамшуулал</span>' : ''}</td><td class="t-mono">${safe(c.issued_on)}</td>
     <td><div class="t-strong">${safe(c.recipient_name)}</div><div style="font-size:11.5px;color:var(--text-muted)">${safe(c.recipient_phone || '')}</div></td>
     <td><div>${safe(c.buyer_name || '—')}</div><div style="font-size:11.5px;color:var(--text-muted)">${safe(c.buyer_phone || '')}</div></td>
     <td class="t-mono">${money(c.amount)}</td><td class="t-mono">${money(cardSpent(c))}</td><td class="t-mono t-strong">${money(balance(c))}</td>
@@ -177,6 +182,7 @@ async function issue() {
     if (error) throw error;
     issueRequest = crypto.randomUUID();
     cards = [data.card, ...cards.filter(c => c.id !== data.card.id)];
+    $('gcIncomeNote').textContent = 'Олгосон өдрөөр борлуулалтад орлого болж бүртгэгдэнэ. Дараа нь картаар төлөхөд орлогод давхар нэмэгдэхгүй.';
     if (data.sale) window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data.sale }));
     ['gcCode', 'gcAmount', 'gcMethod', 'gcBuyer', 'gcBuyerPhone', 'gcRecipient', 'gcRecipientPhone', 'gcNote'].forEach(id => { $(id).value = ''; });
     $('gcForm').hidden = true; selected = data.card.id;
