@@ -6,7 +6,7 @@ import {packageCustomerGroups,packageState} from '../package-customers.js';
 import {matchesName} from '../name-search.js';
 const require=createRequire(process.env.TEST_NODE_MODULES?process.env.TEST_NODE_MODULES+'/package.json':import.meta.url);
 const {JSDOM}=require('jsdom');const dom=new JSDOM('<div id="pkgCustomerList"></div>');
-const ctx=vm.createContext({document:dom.window.document,packageCustomerGroups,packageState,matchesName,$:id=>dom.window.document.getElementById(id),safe:s=>String(s??''),used:()=>0,todayKey:()=> '2026-11-03',renderSelectedPackage(){}});
+const ctx=vm.createContext({document:dom.window.document,packageCustomerGroups,packageState,matchesName,$:id=>dom.window.document.getElementById(id),safe:s=>String(s??''),used:()=>0,todayKey:()=> '2026-11-03',renderSelectedPackage(){},packages:[],phoneDigits:v=>String(v||'').replace(/\D/g,'')});
 vm.runInContext(`let selectedCustomerKey=null,selectedContractId=null,packageSearch='';const customers=[{id:1,full_name:'Бат',phone:'99112233'}];const contracts=[{id:1,customer_label:'Бат',package_label:'Active',total_units:6,status:'active'},{id:2,customer_label:'Бат',package_label:'Done',total_units:6,status:'completed'}];`,ctx);
 const source=readFileSync('package-workspace.js','utf8');vm.runInContext(source.slice(source.indexOf('function renderPackageCustomers()'),source.indexOf('function renderSelectedPackage()')),ctx);
 vm.runInContext('renderPackageCustomers()',ctx);
