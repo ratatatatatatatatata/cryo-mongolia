@@ -65,6 +65,7 @@ let cache = {
 let bkFilter = "all";
 let bkDevice = "all";
 let bkSelectedSlots = [];
+let bkFrom = '', bkTo = ''; // applied only when «Шүүх» is pressed
 let bkSubService = {}; // calendar id → chosen treatment id
 let bkTeams = [];
 let cpkSearch = "";
@@ -398,10 +399,6 @@ function wireBookingFilters() {
       .forEach((x) => x.classList.remove("on"));
     b.classList.add("on");
     bkFilter = b.dataset.status;
-    if (me?.role==='staff') {
-      $("bkFromDate").value=bkFilter==='done' ? '' : bookingDateToday();
-      $("bkToDate").value='';
-    }
     renderBookings();
   });
 }
@@ -925,8 +922,9 @@ function renderBookings() {
   renderBookingSchedule();
   const rows = cache.bookings
     .filter((b) => bkFilter === "all" || b.status === bkFilter)
-        .filter(b => !$("bkFromDate").value || b.booked_date >= $("bkFromDate").value)
-    .filter(b => !$("bkToDate").value || b.booked_date <= $("bkToDate").value)
+    .filter(b => !bkFrom || b.booked_date >= bkFrom)
+    .filter(b => !bkTo || b.booked_date <= bkTo)
+    .filter(b => isAdminUser() || staffBookingDays().includes(b.booked_date))
     .filter((b) => bkDevice === "all" || String(bookingCalendar(b)) === bkDevice)
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
@@ -1091,6 +1089,12 @@ function syncBookingDeviceFilter() {
   }
 }
 
+// Staff work with yesterday, today and tomorrow only.
+function staffBookingDays() {
+  const day = offset => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(Date.now() + offset * 86400000));
+  return [day(-1), day(0), day(1)];
+}
+
 function bookingDateToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 }
@@ -1106,14 +1110,19 @@ function renderBookingSchedule() {
   if (!date.dataset.wired) {
     date.dataset.wired = '1';
     $("bkFromDate").value='';
+    $("bkApplyDates").addEventListener('click', () => {
+      const from = $("bkFromDate").value, to = $("bkToDate").value;
+      if (from && to && to < from) return alert('Дуусах өдөр эхлэх өдрөөс өмнө байж болохгүй.');
+      bkFrom = from; bkTo = to; renderBookings();
+    });
     $("bkAllDates").addEventListener('click', () => {
       $("bkFromDate").value='';
       $("bkToDate").value='';
+      bkFrom = ''; bkTo = '';
       bkFilter='all'; bkDevice='all';
       $("bkFilters").querySelectorAll('[data-status]').forEach(button => button.classList.toggle('on', button.dataset.status==='all'));
       renderBookings();
     });
-    ['bkFromDate','bkToDate'].forEach(id => $(id).addEventListener('change',renderBookings));
     date.addEventListener('change', renderBookings);
     $("bkNewCancel").addEventListener('click', () => { bkSelectedSlots = []; renderBookingSelection(); renderBookings(); });
     $("bkNewRecipient").addEventListener('change', renderBookingSelection);
@@ -1123,10 +1132,13 @@ function renderBookingSchedule() {
     date.dataset.filterRole=me?.role || '';
     $("bkFromDate").value='';
     $("bkToDate").value='';
+    bkFrom = ''; bkTo = '';
   }
-  $("bkAllDates").hidden=false;
-  date.min='';
-  if (date.min && date.value<date.min) date.value=date.min;
+  $("bkAllDates").hidden=!isAdminUser();
+  const staffDays = isAdminUser() ? null : staffBookingDays();
+  date.min = staffDays ? staffDays[0] : ''; date.max = staffDays ? staffDays[2] : '';
+  ['bkFromDate','bkToDate'].forEach(id => { $(id).min = date.min; $(id).max = date.max; });
+  if (staffDays && !staffDays.includes(date.value)) date.value = staffDays[1];
   tabs.replaceChildren();
   const devices = listedServices().filter(service => service.active && !service.parent_id);
   [{id:'all', name:'Бүх захиалга'}, ...devices].forEach(service => {
@@ -2273,7 +2285,33 @@ function reportRows() {
   };
 }
 
+let extraIncomeRequest = crypto.randomUUID();
+function wireExtraIncome() {
+  const button = $("xiSave");
+  if (!button || button.dataset.wired) return;
+  button.dataset.wired = '1';
+  button.addEventListener('click', async () => {
+    if (button.disabled) return;
+    const employee = bookingEmployee(), amount = Number($("xiAmount").value), source = $("xiSource").value.trim();
+    if (!isAdminUser() && !employee) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
+    if (!source) return alert('Хаанаас гэдгийг бөглөнө үү.');
+    if (!Number.isSafeInteger(amount) || amount <= 0) return alert('Үнийн дүнгээ оруулна уу.');
+    if (!$("xiMethod").value) return alert('Төлбөрийн хэлбэрээ сонгоно уу.');
+    button.disabled = true;
+    try {
+      const { data, error } = await sb.rpc('add_extra_income', { p: { request_id: extraIncomeRequest, staff_id: employee?.id || null, kind: $("xiKind").value, source, amount, payment_method: $("xiMethod").value, note: $("xiNote").value.trim() } });
+      if (error) throw error;
+      extraIncomeRequest = crypto.randomUUID();
+      window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data.sale }));
+      $("xiStatus").textContent = `${data.sale.services} · ${source} · ${money(amount)} өнөөдрийн борлуулалтад бүртгэгдлээ.`;
+      ['xiSource','xiAmount','xiMethod','xiNote'].forEach(id => { $(id).value = ''; });
+    } catch (error) { alert('Орлого бүртгэж чадсангүй: ' + error.message); }
+    finally { button.disabled = false; }
+  });
+}
+
 function renderTodaySales() {
+  wireExtraIncome();
   const body=$("repTodayBody");
   if (!body) return;
   const today=bookingDateToday(), employee=selectedSharedStaff();

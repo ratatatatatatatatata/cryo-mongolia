@@ -247,6 +247,18 @@
         </div>
       </div>
 
+      <div class="panel" id="extraIncomePanel">
+        <div class="panel-head"><div><div class="panel-title">Нэмэлт орлого</div><div class="page-sub">Oxygen balloon болон нэхэмжлэлийн орлогыг өнөөдрийн борлуулалтад шууд бүртгэнэ</div></div></div>
+        <div class="form-grid">
+          <div class="field"><label for="xiKind">Орлогын төрөл *</label><select class="ctl" id="xiKind"><option value="oxygen_balloon">Oxygen balloon</option><option value="invoice">Нэхэмжлэл</option></select></div>
+          <div class="field"><label for="xiSource">Хаанаас *</label><input class="ctl" id="xiSource" maxlength="160" placeholder="Хүн эсвэл байгууллагын нэр"></div>
+          <div class="field"><label for="xiAmount">Үнийн дүн (₮) *</label><input class="ctl" id="xiAmount" type="number" min="1" step="1000"></div>
+          <div class="field"><label for="xiMethod">Төлбөрийн хэлбэр *</label><select class="ctl" id="xiMethod"><option value="">Сонгох</option><option value="cash">Бэлэн</option><option value="khan">Хаан</option><option value="golomt">Голомт</option><option value="invoice">Нэхэмжлэх</option><option value="barter">Barter</option></select></div>
+          <div class="field" style="grid-column:span 2"><label for="xiNote">Тэмдэглэл</label><input class="ctl" id="xiNote" maxlength="300"></div>
+        </div>
+        <div class="form-actions"><button class="btn-sm primary" id="xiSave">Орлого бүртгэх</button><span id="xiStatus" role="status"></span></div>
+      </div>
+
       <div class="panel">
         <div class="panel-head"><div class="panel-title" id="repTodayTitle">Өнөөдрийн борлуулалтын бүртгэл</div></div>
         <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Огноо</th><th>Үйлчлүүлэгч</th><th>Үйлчилгээ / багц</th><th>Ажилтан</th><th>Дүн</th><th>Төлбөр</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody id="repTodayBody"></tbody></table></div>
@@ -658,7 +670,7 @@
         <div class="form-grid">
           <div class="field"><label for="bkFromDate">Захиалга шүүх — эхлэх өдөр</label><input class="ctl" type="date" id="bkFromDate"></div>
           <div class="field"><label for="bkToDate">Дуусах өдөр</label><input class="ctl" type="date" id="bkToDate"></div>
-          <div><button class="btn-sm ghost" id="bkAllDates" hidden>Бүх хугацааны захиалга</button></div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"><button class="btn-sm primary" id="bkApplyDates">Шүүх</button><button class="btn-sm ghost" id="bkAllDates" hidden>Бүх хугацааны захиалга</button></div>
         </div>
         <div class="field"><label for="bkScheduleDate">Өдөр</label><input class="ctl" type="date" id="bkScheduleDate"></div>
         <p class="page-sub" id="bkScheduleHint">Төхөөрөмж дээр дарж цагуудыг харна уу.</p>

@@ -83,6 +83,13 @@ begin
  denied:=false; begin perform public.manage_gift_card(jsonb_build_object('action','archive','card_id',b3)); exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'staff archived a card'; end if;
 
+ -- Extra income lands in today's sales; a retry does not duplicate it.
+ r:=public.add_extra_income(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000010','staff_id',employee,'kind','oxygen_balloon','source','QA Клуб','amount',45000,'payment_method','golomt'));
+ perform public.add_extra_income(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000010','staff_id',employee,'kind','oxygen_balloon','source','QA Клуб','amount',45000,'payment_method','golomt'));
+ if r#>>'{sale,services}'<>'Oxygen balloon' or (r#>>'{sale,golomt}')::bigint<>45000 or (r#>>'{sale,sale_date}')::date<>(now() at time zone 'Asia/Ulaanbaatar')::date or (select count(*) from public.sales where customer_name='QA Клуб')<>1 then raise exception 'extra income wrong: %',r; end if;
+ denied:=false; begin perform public.add_extra_income(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000011','staff_id',employee,'kind','other','source','x','amount',1,'payment_method','cash')); exception when raise_exception then denied:=true; end;
+ if not denied then raise exception 'unknown income kind accepted'; end if;
+
  -- Staff cannot toggle VIP on customers.
  select id into cust from public.customers where phone='99001122';
  denied:=false; begin perform public.set_vip('customer',cust,true); exception when insufficient_privilege then denied:=true; end;
@@ -114,6 +121,6 @@ begin
  -- Admin deletes a paid booking: the sale is archived, not lost.
  r:=public.delete_booking(b1);
  if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
- raise notice 'PASS gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS extra income, gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;
