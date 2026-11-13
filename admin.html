@@ -242,12 +242,13 @@
         </div>
         <div style="display:flex;gap:9px;flex-wrap:wrap;">
           <button class="btn-sm primary" id="repSales">+ Борлуулалт бүртгэх</button>
+          <button class="btn-sm primary" id="xiOpen" aria-controls="extraIncomePanel" aria-expanded="false">+ Нэмэлт орлого</button>
           <button class="btn-sm ghost" id="repCsv">↓ CSV татах</button>
           <button class="btn-sm ghost" id="repPrint">⎙ Хэвлэх</button>
         </div>
       </div>
 
-      <div class="panel" id="extraIncomePanel">
+      <div class="panel" id="extraIncomePanel" hidden>
         <div class="panel-head"><div><div class="panel-title">Нэмэлт орлого</div><div class="page-sub">Oxygen balloon болон нэхэмжлэлийн орлогыг өнөөдрийн борлуулалтад шууд бүртгэнэ</div></div></div>
         <div class="form-grid">
           <div class="field"><label for="xiKind">Орлогын төрөл *</label><select class="ctl" id="xiKind"><option value="oxygen_balloon">Oxygen balloon</option><option value="invoice">Нэхэмжлэл</option></select></div>
@@ -256,7 +257,7 @@
           <div class="field"><label for="xiMethod">Төлбөрийн хэлбэр *</label><select class="ctl" id="xiMethod"><option value="">Сонгох</option><option value="cash">Бэлэн</option><option value="khan">Хаан</option><option value="golomt">Голомт</option><option value="invoice">Нэхэмжлэх</option><option value="barter">Barter</option></select></div>
           <div class="field" style="grid-column:span 2"><label for="xiNote">Тэмдэглэл</label><input class="ctl" id="xiNote" maxlength="300"></div>
         </div>
-        <div class="form-actions"><button class="btn-sm primary" id="xiSave">Орлого бүртгэх</button><span id="xiStatus" role="status"></span></div>
+        <div class="form-actions"><button class="btn-sm primary" id="xiSave">Орлого бүртгэх</button><button class="btn-sm ghost" id="xiCancel">Болих</button><span id="xiStatus" role="status"></span></div>
       </div>
 
       <div class="panel">

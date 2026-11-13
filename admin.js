@@ -1058,7 +1058,7 @@ function renderBookings() {
       remove.type = 'button'; remove.className = 'btn-sm ghost'; remove.textContent = 'Устгах';
       remove.style.marginLeft = '6px';
       remove.onclick = () => deleteBooking(b, remove);
-      noteCell.append(edit, remove);
+      if (staffCanChange(b.booked_date)) noteCell.append(edit, remove);
     }
     tr.appendChild(noteCell);
 
@@ -1094,6 +1094,8 @@ function staffBookingDays() {
   const day = offset => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date(Date.now() + offset * 86400000));
   return [day(-1), day(0), day(1)];
 }
+
+const staffCanChange = day => isAdminUser() || staffBookingDays().slice(1).includes(day);
 
 function bookingDateToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
@@ -1136,9 +1138,10 @@ function renderBookingSchedule() {
   }
   $("bkAllDates").hidden=!isAdminUser();
   const staffDays = isAdminUser() ? null : staffBookingDays();
-  date.min = staffDays ? staffDays[0] : ''; date.max = staffDays ? staffDays[2] : '';
-  ['bkFromDate','bkToDate'].forEach(id => { $(id).min = date.min; $(id).max = date.max; });
-  if (staffDays && !staffDays.includes(date.value)) date.value = staffDays[1];
+  // Staff view yesterday–tomorrow, but book and edit only today and tomorrow.
+  date.min = staffDays ? staffDays[1] : ''; date.max = staffDays ? staffDays[2] : '';
+  ['bkFromDate','bkToDate'].forEach(id => { $(id).min = staffDays ? staffDays[0] : ''; $(id).max = date.max; });
+  if (staffDays && !staffDays.slice(1).includes(date.value)) date.value = staffDays[1];
   tabs.replaceChildren();
   const devices = listedServices().filter(service => service.active && !service.parent_id);
   [{id:'all', name:'Бүх захиалга'}, ...devices].forEach(service => {
@@ -1247,6 +1250,7 @@ async function saveStaffBooking() {
     const list = [...slots].sort((a,b)=>a.startsAt.localeCompare(b.startsAt)).map(slot => `• ${slot.startsAt.slice(0,10)} ${slot.startsAt.slice(11,16)} · ${cache.services.find(s => s.id === slot.serviceId)?.name || ''}`).join('\n');
     if (!confirm(`${name}-д дараах ${slots.length} цагийг бүртгэх үү?\n\n${list}\n\nБуруу цаг байвал «Cancel» дараад × дээр дарж хасна уу.`)) return;
   }
+  if (slots.some(slot => !staffCanChange(slot.startsAt.slice(0,10)))) return alert('Ажилтан зөвхөн өнөөдөр, маргаашийн цагт захиалга бүртгэнэ. Бусад өдрийг сонголтоос хасна уу.');
   button.disabled = true;
   if (!teamMode && normalizePhone(phone).length === 8) ensureCustomer(name, phone).catch(() => {});
   try {
@@ -2290,6 +2294,9 @@ function wireExtraIncome() {
   const button = $("xiSave");
   if (!button || button.dataset.wired) return;
   button.dataset.wired = '1';
+  const toggle = open => { $("extraIncomePanel").hidden = !open; $("xiOpen").setAttribute('aria-expanded', String(open)); if (open) { $("xiStatus").textContent = ''; $("xiSource").focus(); } };
+  $("xiOpen").addEventListener('click', () => toggle($("extraIncomePanel").hidden));
+  $("xiCancel").addEventListener('click', () => toggle(false));
   button.addEventListener('click', async () => {
     if (button.disabled) return;
     const employee = bookingEmployee(), amount = Number($("xiAmount").value), source = $("xiSource").value.trim();
@@ -2950,6 +2957,7 @@ function openBookingPayment(booking, rows = null, method = 'cash') {
 
 /* ── admin: correct an existing appointment (customer, device, time) ── */
 async function deleteBooking(booking, button) {
+  if (!staffCanChange(booking.booked_date)) return alert('Ажилтан зөвхөн өнөөдөр, маргаашийн захиалгыг устгана.');
   const paid = booking.payment_status === 'paid';
   if (paid && !isAdminUser()) return alert('Төлбөр бүртгэгдсэн захиалгыг зөвхөн админ устгана.');
   const what = `${booking.customer_name} · ${booking.service || ''} · ${booking.booked_date || ''} ${booking.booked_time || ''}`;
@@ -2965,6 +2973,7 @@ async function deleteBooking(booking, button) {
 }
 
 function openBookingEdit(booking) {
+  if (!staffCanChange(booking.booked_date)) return alert('Ажилтан зөвхөн өнөөдөр, маргаашийн захиалгыг засна.');
   let panel = $("bkEditForm");
   if (!panel) {
     panel = document.createElement('div');
@@ -2997,6 +3006,7 @@ function openBookingEdit(booking) {
     .sort((a, b) => calendarOf(a) - calendarOf(b) || Number(!!a.parent_id) - Number(!!b.parent_id) || Number(a.sort) - Number(b.sort))
     .forEach(s => svc.add(new Option((s.parent_id ? '— ' : '') + s.name, String(s.id))));
   svc.value = String(booking.service_id || '');
+  { const days = isAdminUser() ? null : staffBookingDays(); $("bkEditDate").min = days ? days[1] : ''; $("bkEditDate").max = days ? days[2] : ''; }
   const paid = booking.payment_status === 'paid';
   ['bkEditService','bkEditDate','bkEditTime'].forEach(id => { $(id).disabled = paid; });
   $("bkEditSave").onclick = async () => {
@@ -3007,6 +3017,7 @@ function openBookingEdit(booking) {
     const patch = { customer_name: name, phone, note: $("bkEditNote").value.trim() || null };
     if (!paid) {
       if (!$("bkEditDate").value || !$("bkEditTime").value) return alert('Өдөр, цагаа оруулна уу.');
+      if (!staffCanChange($("bkEditDate").value)) return alert('Ажилтан зөвхөн өнөөдөр, маргаашийн цаг руу засна.');
       patch.service_id = Number(svc.value);
       patch.starts_at = `${$("bkEditDate").value}T${$("bkEditTime").value.slice(0,5)}:00+08:00`;
     }

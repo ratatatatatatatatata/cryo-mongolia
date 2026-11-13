@@ -35,5 +35,9 @@ fail=false;await vm.runInContext('saveStaffBooking()',context);assert(inserted.e
 console.log('PASS multi-slot selection across devices/dates, person/team assignment, atomic request, conflict retains selection');
 el('bkScheduleDate').value='2000-01-03';vm.runInContext("bkDevice='1';bkSelectedSlots=[];renderBookingSchedule()",context);
 assert.equal(el('bkScheduleSlots').children[0].disabled,false);
-context.isAdminUser=()=>false;vm.runInContext('renderBookingSchedule()',context);assert.equal(el('bkScheduleSlots').children[0].disabled,false);
-console.log('PASS past empty slots enabled for admin and staff');
+context.isAdminUser=()=>false;vm.runInContext('renderBookingSchedule()',context);
+const days=vm.runInContext('staffBookingDays()',context);assert.equal(el('bkScheduleDate').value,days[1],'staff are moved from a past day to today');assert.equal(el('bkScheduleDate').min,days[1]);assert.equal(el('bkScheduleDate').max,days[2]);
+assert.equal(vm.runInContext(`staffCanChange('${days[0]}')`,context),false);assert.equal(vm.runInContext(`staffCanChange('${days[2]}')`,context),true);
+vm.runInContext("bkSelectedSlots=[{serviceId:1,startsAt:'2099-01-03T10:00:00+08:00',ref:'far'}]",context);el('bkNewRecipient').value='person';el('bkNewName').value='X';el('bkNewPhone').value='99112233';
+await assert.rejects(()=>vm.runInContext('saveStaffBooking()',context),/өнөөдөр, маргааш/);
+console.log('PASS admin back-fills any day; staff book and edit only today and tomorrow');
