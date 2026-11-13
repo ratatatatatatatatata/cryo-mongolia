@@ -708,12 +708,24 @@
       <div class="page-head">
         <div>
           <div class="page-title">Үйлчилгээ, үнэ</div>
-          <div class="page-sub">Энд өөрчилсөн үнэ вэбсайт дээр шууд харагдана</div>
+          <div class="page-sub">Үйлчилгээ нэмэх, засах, устгах. Өөрчилсөн үнэ вэбсайт дээр шууд харагдана</div>
         </div>
+        <button class="btn-sm primary" id="svcAdd">+ Үйлчилгээ нэмэх</button>
+      </div>
+      <div class="panel" id="svcForm" hidden>
+        <div class="panel-head"><div class="panel-title">Шинэ үйлчилгээ</div></div>
+        <div class="form-grid">
+          <div class="field" style="grid-column:span 2"><label for="svcNewName">Нэр *</label><input class="ctl" id="svcNewName" maxlength="160"></div>
+          <div class="field"><label for="svcNewParent">Аль үйлчилгээний дотор</label><select class="ctl" id="svcNewParent"></select></div>
+          <div class="field"><label for="svcNewMinutes">Хугацаа (минут) *</label><input class="ctl" id="svcNewMinutes" type="number" min="1" max="480" step="1" value="30"></div>
+          <div class="field"><label for="svcNewPrice">Үнэ (₮) *</label><input class="ctl" id="svcNewPrice" type="number" min="0" step="1000" value="0"></div>
+        </div>
+        <p class="page-sub">«Дотор» сонговол тухайн үйлчилгээний цагийн хуваарийг хамт ашиглана (жишээ нь гоо сайхны нэг өрөө). «Бие даасан» бол өөрийн цагийн хуваарьтай.</p>
+        <div class="form-actions"><button class="btn-sm primary" id="svcNewSave">Хадгалах</button><button class="btn-sm ghost" id="svcNewCancel">Болих</button><span id="svcNewStatus" role="status"></span></div>
       </div>
       <div class="panel" style="padding:0;overflow:hidden;">
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Үйлчилгээ</th><th>Ангилал</th><th>Хугацаа</th><th>Үнэ (₮)</th><th>Идэвхтэй</th><th></th></tr></thead>
+          <thead><tr><th>Үйлчилгээ</th><th>Ангилал</th><th>Хугацаа (мин)</th><th>Үнэ (₮)</th><th>Идэвхтэй</th><th></th></tr></thead>
           <tbody id="svcBody"></tbody>
         </table></div>
       </div>

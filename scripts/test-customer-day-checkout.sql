@@ -80,9 +80,23 @@ begin
  perform public.set_vip('package',pkg,true);
  insert into public.customer_package_contracts(customer_id,customer_label,package_id,package_label,status) values(cust,'QA Day',pkg,'QA VIP','active');
  if not (select is_vip from public.customers where id=cust) then raise exception 'VIP package did not mark customer'; end if;
+ -- Hour-long sessions book back to back; nested treatments share the parent's calendar.
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA M1','99660001',(select id from public.services where slug='massage'),'2099-12-05 10:00+08','confirmed');
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA M2','99660002',(select id from public.services where slug='massage'),'2099-12-05 11:00+08','confirmed');
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F1','99660003',(select id from public.services where slug='beauty-teatree'),'2099-12-05 10:00+08','confirmed') returning id into b3;
+ if (select blocked_until-starts_at from public.bookings where id=b3)<>interval '90 minutes' or (select calendar_id from public.bookings where id=b3)<>(select id from public.services where slug='facial') then raise exception 'child calendar/block wrong'; end if;
+ denied:=false; begin insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F2','99660004',(select id from public.services where slug='beauty-wax-brow'),'2099-12-05 11:00+08','confirmed'); exception when exclusion_violation then denied:=true; end;
+ if not denied then raise exception 'overlap inside shared calendar accepted'; end if;
+ insert into public.bookings(ref,customer_name,phone,service_id,starts_at,status) values('QA-'||gen_random_uuid(),'QA F2','99660004',(select id from public.services where slug='beauty-wax-brow'),'2099-12-05 11:30+08','confirmed');
+ if (select count(*) from public.booking_blocks where service_id=(select id from public.services where slug='facial') and starts_at::date='2099-12-05')<>2 then raise exception 'blocks not published on parent calendar'; end if;
+ -- Removing a service: unused → deleted, used → archived.
+ if not (public.remove_service((select id from public.services where slug='beauty-vitadx'))->>'deleted')::boolean then raise exception 'unused service not deleted'; end if;
+ r:=public.remove_service((select id from public.services where slug='beauty-wax-brow'));
+ if (r->>'deleted')::boolean or (select archived_at from public.services where slug='beauty-wax-brow') is null then raise exception 'used service not archived: %',r; end if;
+
  -- Admin deletes a paid booking: the sale is archived, not lost.
  r:=public.delete_booking(b1);
  if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
- raise notice 'PASS staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;

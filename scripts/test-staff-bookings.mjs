@@ -15,7 +15,8 @@ const context=vm.createContext({console,Intl,Date,Set,CryoSchedule:globalThis.Cr
  sb:{from:table=>({select:()=>({is:()=>({order:async()=>({data:[{id:8,name:'Team'}]})})}),insert:rows=>{inserted=rows;return{select:async()=>fail?{error:{code:'23P01'}}:{data:rows.map((r,i)=>({...r,id:100+i}))}}}})}
 });
 const source=fs.readFileSync('admin.js','utf8');
-vm.runInContext(`let bkDevice='1',bkSelectedSlots=[],bkTeams=[],me={};let cache={services:[{id:1,name:'Short',active:true,duration_minutes:3},{id:2,name:'Long',active:true,duration_minutes:60}],bookings:[]};function renderBookings(){renderBookingSchedule();}`,context);
+vm.runInContext(`let bkDevice='1',bkSelectedSlots=[],bkSubService={},bkTeams=[],me={};const money=n=>String(n);let cache={services:[{id:1,name:'Short',active:true,duration_minutes:3},{id:2,name:'Long',active:true,duration_minutes:60}],bookings:[]};function renderBookings(){renderBookingSchedule();}`,context);
+vm.runInContext(source.slice(source.indexOf('// Services nested under a parent'),source.indexOf('function syncBookingDeviceFilter()')),context);
 vm.runInContext(source.slice(source.indexOf('function bookingDateToday()'),source.indexOf('function renderMessages()')),context);
 vm.runInContext('renderBookingSchedule()',context);
 el('bkScheduleSlots').children[0].onclick();el('bkScheduleSlots').children[1].onclick();

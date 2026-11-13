@@ -273,7 +273,7 @@ async function load() {
     sb.from("profiles").select("role").eq("id", user.id).maybeSingle(),
     allRows(() => sb.from("customer_package_contracts").select("id,customer_id,customer_label,package_id,package_label,total_units,status,purchased_on,expires_on,notes,service_units,agreed_price,opening_paid").order("customer_label").order("id")),
     allRows(() => sb.from("package_redemptions").select("id,contract_id,used_on,units,service_id,service_label,staff_id,notes,created_at").order("used_on", { ascending: false }).order("id")),
-    sb.from("services").select("id,name,active,category").eq("active", true).neq("category", "legacy-import").order("sort"),
+    sb.from("services").select("*").eq("active", true).neq("category", "legacy-import").order("sort"),
     sb.rpc('package_payment_history'),
     allRows(()=>sb.from('package_account_events').select('id,contract_id,action,detail,created_at').order('id')),
   ]);
@@ -286,7 +286,7 @@ async function load() {
   $("pkgLeadSave").disabled = false;
   $("pkgVisitSave").disabled = false;
   customers = result[0].data || []; packages = result[1].data || []; staff = result[2].data || []; leads = result[3].data || [];
-  profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = result[7].data || [];
+  profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = (result[7].data || []).filter(item => !item.parent_id);
   accountSales=result[8].data||[];accountEvents=result[9].data||[];
   options();
   renderLeads();

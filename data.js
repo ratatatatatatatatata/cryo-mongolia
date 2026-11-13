@@ -19,7 +19,7 @@ window.cryoData = {
   async getBookableServices() {
     if (!sb) return { data: [] };
     return sb.from("services")
-      .select("id,slug,name,duration,duration_minutes,price")
+      .select("*")
       .eq("active", true)
       .neq("category", "legacy-import")
       .order("sort", { ascending: true });

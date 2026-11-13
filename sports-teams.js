@@ -33,7 +33,7 @@ function markup(){ $('sportsTeamsPanel').innerHTML=`
 async function allRows(table){const data=[];for(let offset=0;;offset+=1000){const r=await sb.from(table).select('*').order('id').range(offset,offset+999);if(r.error)throw r.error;data.push(...r.data);if(r.data.length<1000)return data;}}
 async function load(){if(loading)return;loading=true;try{const session=(await sb.auth.getSession()).data.session;if(!session)return;user=session.user;const adminResult=await sb.rpc('is_admin');if(adminResult.error)throw adminResult.error;isTeamAdmin=adminResult.data===true;
  [teams,members,visits,services,staff]=await Promise.all(['sports_teams','sports_team_members','sports_team_visits','services','staff'].map(allRows));
- services=services.filter(s=>s.active&&s.category!=='legacy-import');ready=true;
+ services=services.filter(s=>s.active&&s.category!=='legacy-import'&&!s.parent_id);ready=true;
  const previousTeam=$('stTeam').value;
  $('stTeam').innerHTML='<option value="">Баг сонгох</option>'+teams.filter(t=>!t.archived_at).map(t=>`<option value="${t.id}">${safe(t.name)}</option>`).join('');
  $('stTeam').value=previousTeam;

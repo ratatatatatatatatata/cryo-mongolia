@@ -98,7 +98,7 @@ function slotIso(dateKey, time) {
   return `${dateKey}T${time}:00+08:00`;
 }
 function minutesLabel(n) {
-  return `${n} минут · цагийн сонголт 30 минутын зайтай`;
+  return `${n} минут · цагийн сонголт ${Math.max(30, CryoSchedule.blockedMinutes(n))} минутын зайтай`;
 }
 function activeService() {
   return bk.services.find((s) => Number(s.id) === Number(bk.service?.id)) || bk.service;
@@ -111,7 +111,7 @@ async function loadBookingSetup() {
     showToast("Үйлчилгээний мэдээлэл татаж чадсангүй");
     return;
   }
-  bk.services = res.data || [];
+  bk.services = (res.data || []).filter((s) => !s.parent_id);
   const select = document.getElementById("b_service");
   if (!select) return;
   select.innerHTML = '<option value="">Төхөөрөмж сонгоно уу</option>';
@@ -203,7 +203,7 @@ function buildTimeGrid() {
     return;
   }
   const duration = Number(service.duration_minutes) || 30;
-  for (let minute = OPEN_MINUTES; minute + duration <= CLOSE_MINUTES; minute += SLOT_STEP_MINUTES) {
+  for (let minute = OPEN_MINUTES; minute + duration <= CLOSE_MINUTES; minute += Math.max(SLOT_STEP_MINUTES, CryoSchedule.blockedMinutes(duration))) {
     const hh = String(Math.floor(minute / 60)).padStart(2, "0");
     const mm = String(minute % 60).padStart(2, "0");
     const time = `${hh}:${mm}`;

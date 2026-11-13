@@ -65,6 +65,7 @@ let cache = {
 let bkFilter = "all";
 let bkDevice = "all";
 let bkSelectedSlots = [];
+let bkSubService = {}; // calendar id → chosen treatment id
 let bkTeams = [];
 let cpkSearch = "";
 let cpkStatus = "all";
@@ -926,7 +927,7 @@ function renderBookings() {
     .filter((b) => bkFilter === "all" || b.status === bkFilter)
         .filter(b => !$("bkFromDate").value || b.booked_date >= $("bkFromDate").value)
     .filter(b => !$("bkToDate").value || b.booked_date <= $("bkToDate").value)
-    .filter((b) => bkDevice === "all" || String(b.service_id || "") === bkDevice)
+    .filter((b) => bkDevice === "all" || String(bookingCalendar(b)) === bkDevice)
     .sort((a, b) => String(a.starts_at || '').localeCompare(String(b.starts_at || '')));
 
   if (!rows.length) {
@@ -1067,12 +1068,21 @@ function renderBookings() {
   });
 }
 
+// Services nested under a parent (e.g. beauty treatments) share the parent's calendar.
+const calendarOf = (service) => Number(service?.parent_id || service?.id || 0);
+function bookingCalendar(booking) {
+  return Number(booking.calendar_id) || calendarOf(cache.services.find(s => Number(s.id) === Number(booking.service_id))) || Number(booking.service_id);
+}
+function listedServices() {
+  return cache.services.filter(s => s.category !== 'legacy-import' && !s.archived_at);
+}
+
 function syncBookingDeviceFilter() {
   const select = $("bkDevice");
   if (!select) return;
   const current = bkDevice;
   select.innerHTML = '<option value="all">Бүх төхөөрөмж</option>';
-  cache.services.filter((service) => service.active).forEach((service) => select.appendChild(new Option(service.name, String(service.id))));
+  listedServices().filter((service) => service.active && !service.parent_id).forEach((service) => select.appendChild(new Option(service.name, String(service.id))));
   bkDevice = [...select.options].some((option) => option.value === current) ? current : "all";
   select.value = bkDevice;
   if (!select.dataset.wired) {
@@ -1118,7 +1128,7 @@ function renderBookingSchedule() {
   date.min='';
   if (date.min && date.value<date.min) date.value=date.min;
   tabs.replaceChildren();
-  const devices = cache.services.filter(service => service.active && service.category !== 'legacy-import');
+  const devices = listedServices().filter(service => service.active && !service.parent_id);
   [{id:'all', name:'Бүх захиалга'}, ...devices].forEach(service => {
     const button = document.createElement('button');
     button.className = 'chip-btn' + (String(service.id) === bkDevice ? ' on' : '');
@@ -1128,12 +1138,31 @@ function renderBookingSchedule() {
     tabs.appendChild(button);
   });
   grid.replaceChildren();
-  const service = devices.find(item => String(item.id) === bkDevice);
-  $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут. Нэг буюу олон сул цаг сонгоно уу. Төхөөрөмж, өдөр солиход сонголт хадгалагдана.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
+  const calendar = devices.find(item => String(item.id) === bkDevice);
+  // A calendar with nested treatments: pick which one is being booked.
+  let picker = $("bkSubService");
+  if (!picker) {
+    picker = document.createElement('select'); picker.id = 'bkSubService'; picker.className = 'ctl';
+    picker.setAttribute('aria-label', 'Үйлчилгээний төрөл'); picker.style.cssText = 'max-width:520px;margin:10px 0';
+    picker.addEventListener('change', () => { bkSubService[bkDevice] = picker.value; renderBookingSchedule(); });
+    $("bkScheduleHint").before(picker);
+  }
+  const children = calendar ? listedServices().filter(item => item.active && Number(item.parent_id) === Number(calendar.id)) : [];
+  picker.hidden = !children.length;
+  let service = calendar;
+  if (children.length) {
+    picker.replaceChildren(...[calendar, ...children].map(item => new Option(`${item.name} · ${item.duration_minutes} мин · ${money(item.price)}`, String(item.id))));
+    service = [calendar, ...children].find(item => String(item.id) === String(bkSubService[bkDevice])) || calendar;
+    picker.value = String(service.id);
+  }
+  const step = service ? Math.max(30, CryoSchedule.blockedMinutes(service.duration_minutes)) : 30;
+  $("bkScheduleHint").textContent = service ? `${service.name} · ${service.duration_minutes} минут · цаг ${step} минутын зайтай. Нэг буюу олон сул цаг сонгоно уу. Төхөөрөмж, өдөр солиход сонголт хадгалагдана.` : 'Төхөөрөмж дээр дарж цагуудыг харна уу.';
   if (!service || !date.value) return;
   const duration = Number(service.duration_minutes) || 30;
-  const bookings = cache.bookings.filter(row => Number(row.service_id) === Number(service.id) && row.status !== 'cancelled');
-  for (let minute = 9 * 60; minute + duration <= 21 * 60; minute += 30) {
+  const bookings = cache.bookings.filter(row => bookingCalendar(row) === Number(calendar.id) && row.status !== 'cancelled');
+  const slotCalendar = slot => calendarOf(cache.services.find(item => Number(item.id) === Number(slot.serviceId)));
+  const slotEnd = slot => Date.parse(slot.startsAt) + CryoSchedule.blockedMinutes(cache.services.find(item => Number(item.id) === Number(slot.serviceId))?.duration_minutes) * 60000;
+  for (let minute = 9 * 60; minute + duration <= 21 * 60; minute += step) {
     const time = `${String(Math.floor(minute / 60)).padStart(2,'0')}:${String(minute % 60).padStart(2,'0')}`;
     const startsAt = `${date.value}T${time}:00+08:00`, start = Date.parse(startsAt);
     const end = start + CryoSchedule.blockedMinutes(duration) * 60000;
@@ -1146,13 +1175,13 @@ function renderBookingSchedule() {
     button.disabled = !!occupied;
     const label = document.createElement('strong'), detail = document.createElement('small');
     label.textContent = time;
-    const startsHere = occupied && Date.parse(occupied.starts_at) >= start && Date.parse(occupied.starts_at) < start + 30 * 60000;
-    detail.textContent = occupied ? (startsHere ? `Захиалгатай · ${occupied.customer_name || ''}` : `Завгүй · ${occupied.booked_time || ''}-ийн захиалгын үргэлжлэл`) : past ? 'Өнгөрсөн сул цаг · Нөхөж бүртгэх' : 'Сул · Бүртгэх';
+    const startsHere = occupied && Date.parse(occupied.starts_at) >= start && Date.parse(occupied.starts_at) < end;
+    detail.textContent = occupied ? (startsHere ? `Захиалгатай · ${occupied.customer_name || ''}` : `Завгүй · ${occupied.booked_time || ''} · ${occupied.customer_name || ''}`) : past ? 'Өнгөрсөн сул цаг · Нөхөж бүртгэх' : 'Сул · Бүртгэх';
     button.append(label, detail);
     button.onclick = () => {
       if (selected) bkSelectedSlots = bkSelectedSlots.filter(slot => !(slot.serviceId === service.id && slot.startsAt === startsAt));
       else {
-        if (bkSelectedSlots.some(slot => slot.serviceId === service.id && CryoSchedule.overlaps(start, end, Date.parse(slot.startsAt), Date.parse(slot.startsAt) + CryoSchedule.blockedMinutes(duration) * 60000))) {
+        if (bkSelectedSlots.some(slot => slotCalendar(slot) === Number(calendar.id) && CryoSchedule.overlaps(start, end, Date.parse(slot.startsAt), slotEnd(slot)))) {
           return alert('Сонгосон цагтай давхцаж байна. Өөр цаг сонгоно уу.');
         }
         bkSelectedSlots.push({ serviceId: service.id, startsAt, ref: 'STAFF-' + crypto.randomUUID() });
@@ -1296,27 +1325,80 @@ function renderMessages() {
 /* ══════════════════════════════════════════════════════════════
    SERVICES
    ══════════════════════════════════════════════════════════════ */
+function wireServiceForm() {
+  const add = $("svcAdd");
+  if (!add || add.dataset.wired) return;
+  add.dataset.wired = '1';
+  add.onclick = () => {
+    const parent = $("svcNewParent");
+    parent.replaceChildren(new Option('Бие даасан үйлчилгээ', ''));
+    listedServices().filter(s => !s.parent_id).forEach(s => parent.add(new Option(`${s.name} дотор`, String(s.id))));
+    $("svcNewStatus").textContent = '';
+    $("svcForm").hidden = false; $("svcNewName").focus();
+  };
+  $("svcNewCancel").onclick = () => { $("svcForm").hidden = true; };
+  $("svcNewSave").onclick = async () => {
+    const button = $("svcNewSave");
+    if (button.disabled) return;
+    const name = $("svcNewName").value.trim().replace(/\s+/g, ' ');
+    const minutes = Number($("svcNewMinutes").value), price = Number($("svcNewPrice").value);
+    const parent = cache.services.find(s => String(s.id) === $("svcNewParent").value) || null;
+    if (!name) return alert('Үйлчилгээний нэр оруулна уу.');
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 480) return alert('Хугацааг 1–480 минутын бүхэл тоогоор оруулна уу.');
+    if (!Number.isInteger(price) || price < 0) return alert('Үнээ зөв оруулна уу.');
+    const siblings = cache.services.filter(s => Number(s.parent_id || 0) === Number(parent?.id || 0));
+    const row = {
+      slug: 'svc-' + crypto.randomUUID().slice(0, 12), name, category: parent?.category || 'custom',
+      duration: `${minutes} мин`, duration_minutes: minutes, price, active: true,
+      sort: Math.max(0, ...siblings.map(s => Number(s.sort) || 0)) + 1,
+    };
+    if (parent) row.parent_id = parent.id;
+    button.disabled = true;
+    const { data, error } = await sb.from('services').insert(row).select().single();
+    button.disabled = false;
+    if (error) { $("svcNewStatus").textContent = error.code === '23505' ? 'Ийм нэртэй үйлчилгээ аль хэдийн байна.' : 'Хадгалж чадсангүй: ' + error.message; return; }
+    cache.services.push(data);
+    $("svcNewName").value = ''; $("svcForm").hidden = true;
+    renderServices(); renderBookings();
+  };
+}
+
 function renderServices() {
   const body = $("svcBody");
   body.innerHTML = "";
+  wireServiceForm();
+  if ($("svcAdd")) $("svcAdd").hidden = !isAdminUser();
   /* the names imported from the old sheets are history, not a price list —
      they are counted on the Excel шилжилт page instead */
-  const services = cache.services.filter((s) => s.category !== "legacy-import");
-  if (!services.length) {
+  const all = listedServices();
+  if (!all.length) {
     body.innerHTML =
       '<tr><td colspan="6"><div class="empty">Үйлчилгээ алга. setup.sql-ийг ажиллуулсан уу?</div></td></tr>';
     return;
   }
+  const bySort = (a, b) => Number(a.sort) - Number(b.sort) || Number(a.id) - Number(b.id);
+  const services = all.filter(s => !s.parent_id).sort(bySort)
+    .flatMap(parent => [parent, ...all.filter(s => Number(s.parent_id) === Number(parent.id)).sort(bySort)]);
   services.forEach((s) => {
     const tr = document.createElement("tr");
-    tr.appendChild(cell(s.name, "t-strong"));
-    tr.appendChild(cell(s.category || "—"));
+    const nm = document.createElement("td");
+    const nmIn = document.createElement("input");
+    nmIn.className = "ctl sm";
+    nmIn.style.cssText = `min-width:240px;${s.parent_id ? 'margin-left:22px;width:calc(100% - 22px)' : 'font-weight:700'}`;
+    nmIn.maxLength = 160;
+    nmIn.value = esc(s.name);
+    nmIn.readOnly = !isAdminUser();
+    nm.appendChild(nmIn);
+    tr.appendChild(nm);
+    const parent = cache.services.find(p => Number(p.id) === Number(s.parent_id));
+    tr.appendChild(cell(parent ? `${parent.name} дотор` : (s.category || "—")));
 
     const dur = document.createElement("td");
     const durIn = document.createElement("input");
-    durIn.className = "ctl sm";
+    durIn.className = "ctl sm num";
+    durIn.type = "number"; durIn.min = "1"; durIn.max = "480"; durIn.step = "1";
     durIn.style.maxWidth = "110px";
-    durIn.value = esc(s.duration || "");
+    durIn.value = Number(s.duration_minutes || 30);
     dur.appendChild(durIn);
     tr.appendChild(dur);
 
@@ -1338,19 +1420,39 @@ function renderServices() {
     ac.appendChild(acIn);
     tr.appendChild(ac);
 
-    tr.appendChild(
-      saveCell(async () => {
-        const patch = {
-          duration: durIn.value.trim(),
-          price: Number(prIn.value) || 0,
-          active: acIn.checked,
-          updated_at: new Date().toISOString(),
-        };
-        const { error } = await sb.from("services").update(patch).eq("id", s.id);
-        if (error) throw error;
-        Object.assign(s, patch);
-      }),
-    );
+    const actions = saveCell(async () => {
+      const minutes = Number(durIn.value), name = nmIn.value.trim().replace(/\s+/g, ' ');
+      if (!name) throw new Error('Нэр хоосон байна');
+      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 480) throw new Error('Хугацаа 1–480 минут байна');
+      const patch = {
+        name,
+        price: Number(prIn.value) || 0,
+        active: acIn.checked,
+        updated_at: new Date().toISOString(),
+      };
+      // Keep the public text label unless the length actually changed.
+      if (minutes !== Number(s.duration_minutes)) { patch.duration_minutes = minutes; patch.duration = `${minutes} мин`; }
+      const { error } = await sb.from("services").update(patch).eq("id", s.id);
+      if (error) throw error;
+      Object.assign(s, patch);
+      renderBookings();
+    });
+    if (isAdminUser()) {
+      const remove = document.createElement("button");
+      remove.className = "btn-sm ghost";
+      remove.style.marginLeft = "7px";
+      remove.textContent = "Устгах";
+      remove.addEventListener("click", async () => {
+        if (!confirm(`«${s.name}» үйлчилгээг устгах уу? Өмнөх захиалга, борлуулалтын түүх хадгалагдана.`)) return;
+        remove.disabled = true;
+        const { error } = await sb.rpc('remove_service', { p_id: s.id });
+        if (error) { remove.disabled = false; return alert("Устгаж чадсангүй: " + error.message); }
+        cache.services = cache.services.filter(row => Number(row.id) !== Number(s.id));
+        renderServices(); renderBookings();
+      });
+      actions.appendChild(remove);
+    }
+    tr.appendChild(actions);
     body.appendChild(tr);
   });
 }
@@ -2777,8 +2879,9 @@ function openBookingEdit(booking) {
   $("bkEditDate").value = booking.booked_date || '';
   $("bkEditTime").value = booking.booked_time || '';
   const svc = $("bkEditService"); svc.replaceChildren();
-  cache.services.filter(s => (s.active && s.category !== 'legacy-import') || Number(s.id) === Number(booking.service_id))
-    .forEach(s => svc.add(new Option(s.name, String(s.id))));
+  listedServices().filter(s => s.active || Number(s.id) === Number(booking.service_id))
+    .sort((a, b) => calendarOf(a) - calendarOf(b) || Number(!!a.parent_id) - Number(!!b.parent_id) || Number(a.sort) - Number(b.sort))
+    .forEach(s => svc.add(new Option((s.parent_id ? '— ' : '') + s.name, String(s.id))));
   svc.value = String(booking.service_id || '');
   const paid = booking.payment_status === 'paid';
   ['bkEditService','bkEditDate','bkEditTime'].forEach(id => { $(id).disabled = paid; });
