@@ -47,6 +47,10 @@ try{
  assert.equal(await page2.locator('#f_cash').inputValue(),'0');assert.equal(await page2.locator('#f_invoice').isEnabled(),true);
  await page2.locator('#f_khan').focus();assert.equal(await page2.locator('#f_khan').inputValue(),'288000');
  assert.match(await page2.locator('#ledFormTotal').innerText(),/Төлбөр бүрэн/);
+ // Extra income sits behind its button on the sales page.
+ await page2.locator('#navReports').click();assert.equal(await page2.locator('#extraIncomePanel').isVisible(),false);
+ await page2.locator('#xiOpen').click();assert.equal(await page2.locator('#extraIncomePanel').isVisible(),true);assert.equal(await page2.locator('#xiKind option').count(),2);
+ await page2.locator('#xiCancel').click();assert.equal(await page2.locator('#extraIncomePanel').isVisible(),false);
  assert.deepEqual(errors2,[],'signed-in dashboard threw');
  assert.deepEqual(errors,[]);console.log('PASS admin page boots without script errors and the login form submits; signed-in dashboard, grouped checkout and split-payment form render. Mock data only.');
 }finally{await browser.close();}
