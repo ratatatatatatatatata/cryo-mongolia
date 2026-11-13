@@ -237,7 +237,7 @@ function options() {
   const packageOptions = '<option value="">Сонгоогүй</option><option value="custom">+ Багц үүсгэх</option>' + packages.map((item) => `<option value="${item.id}">${item.is_vip?'★ VIP · ':''}${safe(item.name)}</option>`).join("");
   $("pkgLeadPurchased").innerHTML = packageOptions;
   $("pkgLeadPurchased").value = selectedPackage;
-  if (!$("pkgCustomDevices").children.length) $("pkgCustomDevices").innerHTML=services.map(item=>`<div class="field"><label for="pkgUnits${item.id}">${safe(item.name)} — орох тоо</label><input class="ctl" id="pkgUnits${item.id}" data-service-id="${item.id}" type="number" min="0" max="1000" step="1" value="0"></div>`).join('');
+  if (!$("pkgCustomDevices").children.length) $("pkgCustomDevices").innerHTML=services.map(item=>`<div class="field"><label for="pkgUnits${item.id}">${item.parent_id?'↳ ':''}${safe(item.name)} — орох тоо</label><input class="ctl" id="pkgUnits${item.id}" data-service-id="${item.id}" type="number" min="0" max="1000" step="1" value="0"></div>`).join('');
   $("pkgVisitServices").innerHTML = services.map((item) => `<label class="staff-check"><input type="checkbox" value="${item.id}" ${closed?'disabled':''}><span>${safe(item.name)}</span></label>`).join("");
   const employee = currentStaff();
   $("pkgLeadStaff").textContent = employee ? `Бүртгэх ажилтан: ${employee.name}` : "Хажуугийн хэсгээс бүртгэх ажилтны нэрийг сонгоно уу";
@@ -286,7 +286,7 @@ async function load() {
   $("pkgLeadSave").disabled = false;
   $("pkgVisitSave").disabled = false;
   customers = result[0].data || []; packages = result[1].data || []; staff = result[2].data || []; leads = result[3].data || [];
-  profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; services = (result[7].data || []).filter(item => !item.parent_id);
+  profile = result[4].data || {}; contracts = result[5].data || []; redemptions = result[6].data || []; { const rows = (result[7].data || []).filter(item => !item.archived_at), tops = rows.filter(item => !item.parent_id); services = tops.flatMap(top => [top, ...rows.filter(item => Number(item.parent_id) === Number(top.id))]); }
   accountSales=result[8].data||[];accountEvents=result[9].data||[];
   options();
   renderLeads();

@@ -2684,7 +2684,23 @@ function updateFormTotal() {
   $("ledFormTotal").textContent = "Нийт: " + money(t);
 }
 
+function syncSaleServiceList() {
+  const list = $("f_svc_list");
+  if (!list) return;
+  list.replaceChildren(...listedServices().filter(s => s.active).map(s => { const o = document.createElement('option'); o.value = s.name; o.label = `${s.duration_minutes} мин · ${money(s.price)}`; return o; }));
+  const input = $("f_svc");
+  if (input.dataset.wired) return;
+  input.dataset.wired = '1';
+  input.addEventListener('change', () => {
+    if (paymentBooking) return;
+    const service = listedServices().find(s => s.name === input.value.trim());
+    const paid = PAYS.reduce((sum, [, , id]) => sum + (Number($(id).value) || 0), 0);
+    if (service && !paid) { $("f_cash").value = service.price; updateFormTotal(); }
+  });
+}
+
 function openLedForm(row) {
+  syncSaleServiceList();
   paymentBooking = null;
   paymentRows = [];
   setBookingCheckoutMode(false);
@@ -2778,7 +2794,28 @@ async function recordInternalBooking(booking, control, rows = null) {
   }catch(error){alert(error.message);control.disabled=false;}
 }
 
+let giftCardChoices = [];
+async function loadGiftCardChoices() {
+  const select = $("f_gift_card"), field = $("f_gift_card_field");
+  if (!select) return;
+  select.replaceChildren(new Option('Бүртгэлгүй карт / сонгохгүй', ''));
+  giftCardChoices = [];
+  try {
+    const [cards, uses] = await Promise.all([
+      sb.from('gift_cards').select('id,code,recipient_name,recipient_phone,amount').is('archived_at', null),
+      fetchAll(() => sb.from('gift_card_uses').select('card_id,amount').order('id')),
+    ]);
+    if (cards.error || uses.error) return; // register not installed yet
+    giftCardChoices = (cards.data || []).map(card => ({ ...card, balance: Number(card.amount) - (uses.data || []).filter(u => Number(u.card_id) === Number(card.id)).reduce((n, u) => n + Number(u.amount), 0) })).filter(card => card.balance > 0);
+    giftCardChoices.forEach(card => select.add(new Option(`${card.code} · ${card.recipient_name} · үлдэгдэл ${money(card.balance)}`, String(card.id))));
+    const phone = normalizePhone(paymentBooking?.phone);
+    const own = giftCardChoices.filter(card => phone && normalizePhone(card.recipient_phone) === phone);
+    if (own.length === 1) select.value = String(own[0].id);
+  } finally { field.hidden = !paymentBooking; }
+}
+
 function setBookingCheckoutMode(on, usage = null) {
+  if ($("f_gift_card_field")) $("f_gift_card_field").hidden = !on;
   const deviceGrid = $("f_cabin").closest('.form-grid');
   const deviceTitle = deviceGrid.previousElementSibling;
   // Devices come from the booked services; staff never re-enter them.
@@ -2831,6 +2868,7 @@ function openBookingPayment(booking, rows = null, method = 'cash') {
   if (method === 'gift') { $("f_cash").value=0; $("f_gift").value=usage.total; } else { $("f_cash").value=usage.total; $("f_gift").value=0; }
   DEVICES.forEach(([key,,id])=>{$(id).value=usage.counts[key]||0;});
   setBookingCheckoutMode(true, usage);
+  loadGiftCardChoices();
   $("ledForm").scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -3584,10 +3622,17 @@ async function saveLedger() {
     btn.disabled=true;
     try {
       const ids=(paymentRows.length?paymentRows:paymentGroup(paymentBooking)).map(b=>b.id);
+      const giftCard=giftCardChoices.find(card=>String(card.id)===$("f_gift_card")?.value);
+      if(patch.gift_card>0&&giftCard&&patch.gift_card>giftCard.balance) throw new Error(`${giftCard.code} картын үлдэгдэл ${money(giftCard.balance)} байна.`);
       if(!isAdminUser()) delete patch.sale_date;
       const {data,error}=await sb.rpc('pay_bookings',{p_booking_ids:ids,p_sale:patch});
       if (error) throw error;
       applyCheckoutResult(data);
+      if(patch.gift_card>0&&giftCard){
+        const used=await sb.rpc('use_gift_card',{p:{request_id:crypto.randomUUID(),staff_id:patch.staff_id,card_id:giftCard.id,amount:patch.gift_card,used_on:bookingDateToday(),service:patch.services,note:`Захиалга · ${patch.customer_name}`}});
+        if(used.error) alert(`Төлбөр бүртгэгдсэн боловч ${giftCard.code} картаас хасаж чадсангүй: ${used.error.message}. Gift card цэснээс гараар хасна уу.`);
+        else window.dispatchEvent(new CustomEvent('cryo:gift-cards-changed'));
+      }
       paymentBooking=null;paymentRows=[];ledEditing=null;setBookingCheckoutMode(false);$("ledForm").style.display='none';
       renderBookings();renderReports();refreshCustomers();switchView('reports');
     } catch(error) { alert('Төлбөр хадгалж чадсангүй: '+error.message); }

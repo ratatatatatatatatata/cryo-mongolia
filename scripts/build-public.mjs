@@ -43,6 +43,7 @@ const publicFiles = [
   "booking-groups.js",
   "booking-packages.js",
   "sports-teams.js",
+  "gift-cards.js",
   "excel-export.js",
   "cabin.html",
   "hub.html",

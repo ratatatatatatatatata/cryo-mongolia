@@ -37,6 +37,7 @@
 
 <script type="module" src="package-workspace.js"></script>
 <script type="module" src="sports-teams.js"></script>
+<script type="module" src="gift-cards.js"></script>
 
     <form id="authForm">
       <div class="field" id="nameField" style="display:none;">
@@ -101,6 +102,7 @@
     <button class="nav-item" data-view="services" id="navServices"><span class="ic">✦</span> Үйлчилгээ, үнэ</button>
     <button class="nav-item" data-view="packages" id="navPackages"><span class="ic">◎</span> Багц</button>
     <button class="nav-item" data-view="sportsTeams" id="navSportsTeams"><span class="ic">♧</span> Спортын баг</button>
+    <button class="nav-item" data-view="giftCards" id="navGiftCards"><span class="ic">❖</span> Gift card</button>
     <button class="nav-item" data-view="staff" id="navStaff"><span class="ic">♙</span> Ажилтнууд</button>
     <button class="nav-item" data-view="attendance" id="navAttendance"><span class="ic">◷</span> Ээлж, ирц</button>
     <button class="nav-item" data-view="payroll" id="navPayroll"><span class="ic">₮</span> Цалин</button>
@@ -436,7 +438,7 @@
         <div class="form-grid">
           <div class="field"><label>Огноо</label><input class="ctl" type="date" id="f_date"/></div>
           <div class="field"><label>Үйлчлүүлэгч</label><input class="ctl" type="text" id="f_name" placeholder="Нэр"/></div>
-          <div class="field" style="grid-column:span 2"><label>Үйлчилгээ</label><input class="ctl" type="text" id="f_svc" placeholder="CC; RL; Oxy pro"/></div>
+          <div class="field" style="grid-column:span 2"><label>Үйлчилгээ</label><input class="ctl" type="text" id="f_svc" placeholder="Үйлчилгээ сонгох эсвэл бичих" list="f_svc_list" autocomplete="off"/><datalist id="f_svc_list"></datalist></div>
           <div class="field"><label>Ажилтан</label><select class="ctl" id="f_staff"></select></div>
           <div class="field"><label>Ажилтны дүн</label><input class="ctl" type="number" id="f_staffamt" value="0" step="1000"/></div>
         </div>
@@ -448,6 +450,7 @@
           <div class="field"><label>Нэхэмжлэх</label><input class="ctl" type="number" id="f_invoice" value="0" step="1000"/></div>
           <div class="field"><label>Barter</label><input class="ctl" type="number" id="f_barter" value="0" step="1000"/></div>
           <div class="field"><label for="f_gift">Gift card (орлогод нэмэгдэхгүй)</label><input class="ctl" type="number" id="f_gift" value="0" min="0" step="1000"/></div>
+          <div class="field" id="f_gift_card_field" hidden><label for="f_gift_card">Аль gift card-аас хасах</label><select class="ctl" id="f_gift_card"></select></div>
           <div class="field"><label>Дотоод (орлогод нэмэгдэхгүй)</label><input class="ctl" type="number" id="f_internal_amount" value="0" min="0" step="1000"/></div>
           <div class="field"><label>Буцаалт</label><input class="ctl" type="number" id="f_refund" value="0" step="1000"/></div>
         </div>
@@ -733,6 +736,7 @@
 
     <!-- ── PACKAGES ── -->
     <section class="view" data-panel="sportsTeams" id="sportsTeamsPanel"></section>
+    <section class="view" data-panel="giftCards" id="giftCardsPanel"></section>
     <section class="view" data-panel="packages">
       <div class="page-head"><div class="page-title">Багц</div>
           <button class="btn-sm primary" id="repPackageSales" aria-controls="packageSalesOperations" aria-expanded="false">+ Багцын борлуулалт</button>
