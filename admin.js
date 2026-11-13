@@ -2807,11 +2807,49 @@ async function loadGiftCardChoices() {
     ]);
     if (cards.error || uses.error) return; // register not installed yet
     giftCardChoices = (cards.data || []).map(card => ({ ...card, balance: Number(card.amount) - (uses.data || []).filter(u => Number(u.card_id) === Number(card.id)).reduce((n, u) => n + Number(u.amount), 0) })).filter(card => card.balance > 0);
-    giftCardChoices.forEach(card => select.add(new Option(`${card.code} · ${card.recipient_name} · үлдэгдэл ${money(card.balance)}`, String(card.id))));
+    let search = $("f_gift_card_search"), hint = $("f_gift_card_hint");
+    if (!search) {
+      search = document.createElement('input'); search.id = 'f_gift_card_search'; search.type = 'search'; search.className = 'ctl'; search.autocomplete = 'off';
+      search.placeholder = 'Нэр, утас эсвэл картын дугаараар хайх'; search.style.marginBottom = '6px';
+      hint = document.createElement('small'); hint.id = 'f_gift_card_hint';
+      select.before(search); select.after(hint);
+      search.addEventListener('input', () => fill(true));
+      select.addEventListener('change', () => splitGiftCardPayment(false, true));
+      $("f_gift").addEventListener('input', () => splitGiftCardPayment(true));
+    }
+    function fill(pickFirst = false) {
+      const query = search.value.trim(), digits = query.replace(/\s/g, ''), keep = select.value;
+      const rows = giftCardChoices.filter(card => !query || matchesName(card.recipient_name, query) || matchesName(card.code, query) || (digits && String(card.recipient_phone || '').replace(/\s/g, '').includes(digits)));
+      select.replaceChildren(new Option(rows.length || !query ? 'Бүртгэлгүй карт / сонгохгүй' : 'Карт олдсонгүй', ''));
+      rows.forEach(card => select.add(new Option(`${card.code} · ${card.recipient_name} · үлдэгдэл ${money(card.balance)}`, String(card.id))));
+      select.value = rows.some(card => String(card.id) === keep) ? keep : (pickFirst && query && rows.length === 1 ? String(rows[0].id) : '');
+      if (pickFirst) splitGiftCardPayment(false, !!select.value);
+    }
+    search.value = '';
+    fill();
     const phone = normalizePhone(paymentBooking?.phone);
     const own = giftCardChoices.filter(card => phone && normalizePhone(card.recipient_phone) === phone);
-    if (own.length === 1) select.value = String(own[0].id);
+    if (own.length === 1 && Number($("f_gift").value) > 0) select.value = String(own[0].id);
+    splitGiftCardPayment();
   } finally { field.hidden = !paymentBooking; }
+}
+
+// A chosen card pays what it holds; anything above it becomes an extra payment taken today.
+function splitGiftCardPayment(typed = false, force = false) {
+  const hint = $("f_gift_card_hint");
+  if (!hint || !paymentBooking) return;
+  const card = giftCardChoices.find(item => String(item.id) === $("f_gift_card").value);
+  const total = bookingUsage(paymentRows, cache.services).total;
+  const gift = Number($("f_gift").value) || 0;
+  if (card && (gift > 0 || force) && !typed) {
+    const fromCard = Math.min(total, card.balance), extra = total - fromCard;
+    $("f_gift").value = fromCard;
+    const others = ['f_golomt','f_khan','f_cash','f_barter'], paid = others.reduce((n, id) => n + (Number($(id).value) || 0), 0);
+    if (paid !== extra) { others.forEach(id => { $(id).value = 0; }); $("f_cash").value = extra; }
+  }
+  const now = Number($("f_gift").value) || 0, extraNow = Math.max(0, total - now);
+  hint.textContent = !card ? '' : now > card.balance ? `Картын үлдэгдэл ${money(card.balance)} — түүнээс ихийг хасахгүй.`
+    : extraNow > 0 ? `Картаас ${money(now)} · Нэмэлт төлбөр ${money(extraNow)} (доорх банк/бэлэнд оруулсан) — өнөөдрийн борлуулалтад орно.` : `Картаас ${money(now)} хасагдана · үлдэгдэл ${money(card.balance - now)}.`;
 }
 
 function setBookingCheckoutMode(on, usage = null) {

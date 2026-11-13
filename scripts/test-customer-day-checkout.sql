@@ -75,6 +75,11 @@ begin
  if (r->>'balance')::bigint<>50000 then raise exception 'balance wrong: %',r; end if;
  denied:=false; begin perform public.use_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000003','staff_id',employee,'card_id',b3,'amount',50001)); exception when raise_exception then denied:=true; end;
  if not denied then raise exception 'overspend accepted'; end if;
+ -- Spending more than the card holds: card emptied, the rest is an extra payment in today's sales.
+ denied:=false; begin perform public.use_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000004','staff_id',employee,'card_id',b3,'amount',20000,'extra_amount',5000,'extra_method','cash')); exception when raise_exception then denied:=true; end;
+ if not denied then raise exception 'extra accepted while card still has balance'; end if;
+ r:=public.use_gift_card(jsonb_build_object('request_id','00000000-0000-4000-8000-000000000005','staff_id',employee,'card_id',b3,'amount',50000,'extra_amount',30000,'extra_method','khan','service','OxyPro','used_on','2020-01-01'));
+ if (r->>'balance')::bigint<>0 or (r#>>'{sale,khan}')::bigint<>30000 or (r#>>'{sale,total}')::bigint<>30000 or (r#>>'{sale,gift_card}')::bigint<>50000 or (r#>>'{sale,sale_date}')::date<>(now() at time zone 'Asia/Ulaanbaatar')::date or (r#>>'{use,extra_amount}')::bigint<>30000 then raise exception 'extra payment wrong: %',r; end if;
  denied:=false; begin perform public.manage_gift_card(jsonb_build_object('action','archive','card_id',b3)); exception when insufficient_privilege then denied:=true; end;
  if not denied then raise exception 'staff archived a card'; end if;
 
@@ -109,6 +114,6 @@ begin
  -- Admin deletes a paid booking: the sale is archived, not lost.
  r:=public.delete_booking(b1);
  if exists(select 1 from public.bookings where id=b1) or not (r->>'sale_archived')::boolean or not exists(select 1 from public.sales where id=(r->>'sale_id')::bigint and archived_at is not null and booking_id is null) then raise exception 'admin paid delete failed: %',r; end if;
- raise notice 'PASS gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
+ raise notice 'PASS gift card extra payment, gift card register, service menu calendar, staff edit/delete, gift card, staff past visibility, same-day multi-slot checkout, auto customer registry, internal usage, admin backfill date, VIP';
 end $$;
 rollback;

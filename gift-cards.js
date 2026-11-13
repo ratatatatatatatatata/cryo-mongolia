@@ -133,15 +133,27 @@ function renderDetail() {
     <div class="kpis">${[['Үнийн дүн', money(card.amount)], ['Ашигласан', money(card.amount - left)], ['Үлдэгдэл', money(left)]].map(([l, v]) => `<div class="kpi"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div></div>`).join('')}</div>
     ${left > 0 && !card.archived_at ? `<div class="form-sub">Ашиглалт хасах</div><div class="form-grid">
       <div class="field"><label for="gcUseDate">Ашигласан өдөр *</label><input class="ctl" type="date" id="gcUseDate" value="${today()}"></div>
-      <div class="field"><label for="gcUseAmount">Хасах дүн (₮) *</label><input class="ctl" type="number" id="gcUseAmount" min="1" max="${left}" step="1000" value="${left}"></div>
+      <div class="field"><label for="gcUseAmount">Үйлчилгээний үнэ (₮) *</label><input class="ctl" type="number" id="gcUseAmount" min="1" step="1000" value="${left}"></div>
       <div class="field"><label for="gcUseService">Авсан үйлчилгээ</label><input class="ctl" id="gcUseService" maxlength="200"></div>
       <div class="field"><label for="gcUseNote">Тэмдэглэл</label><input class="ctl" id="gcUseNote" maxlength="500"></div>
-    </div><div class="form-actions"><button class="btn-sm primary" id="gcUseSave">Ашиглалт хасах</button></div>` : `<p class="page-sub">${card.archived_at ? 'Архивласан карт.' : 'Энэ картын үлдэгдэл дууссан.'}</p>`}
+      <div class="field" id="gcExtraField" hidden><label for="gcExtraMethod">Нэмэлт төлбөрийн хэлбэр *</label><select class="ctl" id="gcExtraMethod"><option value="">Сонгох</option><option value="cash">Бэлэн</option><option value="khan">Хаан</option><option value="golomt">Голомт</option><option value="barter">Бартер</option></select></div>
+    </div><p class="page-sub" id="gcUseSummary" role="status"></p><div class="form-actions"><button class="btn-sm primary" id="gcUseSave">Ашиглалт хасах</button></div>` : `<p class="page-sub">${card.archived_at ? 'Архивласан карт.' : 'Энэ картын үлдэгдэл дууссан.'}</p>`}
     <div class="form-sub">Ашиглалтын түүх</div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Өдөр</th><th>Дүн</th><th>Үйлчилгээ</th><th>Ажилтан</th><th>Тэмдэглэл</th><th></th></tr></thead><tbody>
-    ${history.length ? history.map(u => `<tr><td class="t-mono">${safe(u.used_on)}</td><td class="t-mono t-strong">${money(u.amount)}</td><td>${safe(u.service || '—')}</td><td>${safe(staff.find(s => Number(s.id) === Number(u.staff_id))?.name || '—')}</td><td class="record-note">${safe(u.note || '—')}</td><td>${isAdmin ? `<button class="btn-sm ghost" data-use="${u.id}">Буцаах</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="6"><div class="empty">Ашиглалт бүртгэгдээгүй.</div></td></tr>'}
+    ${history.length ? history.map(u => `<tr><td class="t-mono">${safe(u.used_on)}</td><td class="t-mono t-strong">${money(u.amount)}${Number(u.extra_amount) > 0 ? `<div style="font-size:11.5px;color:var(--text-muted)">+ нэмэлт ${money(u.extra_amount)} · ${safe(METHODS[u.extra_method] || '')}</div>` : ''}</td><td>${safe(u.service || '—')}</td><td>${safe(staff.find(s => Number(s.id) === Number(u.staff_id))?.name || '—')}</td><td class="record-note">${safe(u.note || '—')}</td><td>${isAdmin ? `<button class="btn-sm ghost" data-use="${u.id}">Буцаах</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="6"><div class="empty">Ашиглалт бүртгэгдээгүй.</div></td></tr>'}
     </tbody></table></div></div>`;
-  if ($('gcUseSave')) $('gcUseSave').onclick = () => deduct(card);
+  if ($('gcUseSave')) {
+    $('gcUseSave').onclick = () => deduct(card);
+    const sync = () => {
+      const total = Number($('gcUseAmount').value) || 0, extra = Math.max(0, total - left);
+      $('gcExtraField').hidden = !extra; $('gcUseDate').disabled = !!extra;
+      if (extra) $('gcUseDate').value = today();
+      $('gcUseSummary').textContent = extra
+        ? `Картаас ${money(left)} хасагдаж дуусна · Нэмэлт төлбөр ${money(extra)} — өнөөдрийн борлуулалтад орно.`
+        : total > 0 ? `Картаас ${money(total)} хасагдана · Үлдэгдэл ${money(left - total)}.` : '';
+    };
+    $('gcUseAmount').oninput = sync; sync();
+  }
   if ($('gcArchive')) $('gcArchive').onclick = () => manage({ action: card.archived_at ? 'restore' : 'archive', card_id: card.id }, card.archived_at ? null : `${card.code} картыг архивлах уу?`);
   host.querySelectorAll('[data-use]').forEach(button => button.onclick = () => manage({ action: 'remove_use', use_id: Number(button.dataset.use) }, 'Энэ ашиглалтыг буцааж, үлдэгдэлд нэмэх үү?'));
 }
@@ -177,15 +189,18 @@ async function issue() {
 async function deduct(card) {
   const button = $('gcUseSave');
   if (button.disabled) return;
-  const amount = Number($('gcUseAmount').value), who = employee();
-  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > balance(card)) return alert(`Хасах дүн үлдэгдлээс (${money(balance(card))}) хэтрэхгүй байна.`);
+  const total = Number($('gcUseAmount').value), who = employee(), left = balance(card);
+  if (!Number.isSafeInteger(total) || total <= 0) return alert('Үйлчилгээний үнээ оруулна уу.');
+  const amount = Math.min(total, left), extra = total - amount;
+  if (extra > 0 && !$('gcExtraMethod').value) return alert(`Нэмэлт төлбөр ${money(extra)}-ийн төлбөрийн хэлбэрээ сонгоно уу.`);
   if (!who && !isAdmin) return alert('Бүртгэх ажилтны нэрээ сонгоно уу.');
   button.disabled = true;
   try {
-    const { data, error } = await sb.rpc('use_gift_card', { p: { request_id: useRequest, staff_id: who?.id || null, card_id: card.id, amount, used_on: $('gcUseDate').value, service: $('gcUseService').value.trim(), note: $('gcUseNote').value.trim() } });
+    const { data, error } = await sb.rpc('use_gift_card', { p: { request_id: useRequest, staff_id: who?.id || null, card_id: card.id, amount, extra_amount: extra, extra_method: extra ? $('gcExtraMethod').value : null, used_on: $('gcUseDate').value, service: $('gcUseService').value.trim(), note: $('gcUseNote').value.trim() } });
     if (error) throw error;
     useRequest = crypto.randomUUID();
     uses = [...uses.filter(u => u.id !== data.use.id), data.use];
+    if (data.sale) { window.dispatchEvent(new CustomEvent('cryo:sale-saved', { detail: data.sale })); say(`Нэмэлт төлбөр ${money(extra)} өнөөдрийн борлуулалтад бүртгэгдлээ.`); }
     render();
   } catch (error) { alert('Ашиглалт хасаж чадсангүй: ' + error.message); button.disabled = false; }
 }
