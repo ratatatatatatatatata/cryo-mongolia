@@ -5249,6 +5249,9 @@ function asstFind(parsed) {
     /* a name with a number that is not on file is one tap away from being a customer */
     const offer = parsed.name && parsed.phone ? [asstType("Шинээр бүртгэх", `шинэ үйлчлүүлэгч ${parsed.name} ${parsed.phone}`)] : [];
     const similar = parsed.name ? similarCustomers(parsed.name, cache.customers, 6) : [];
+    // Free-form text falls back to a name search. If that also fails, report
+    // an unresolved request (not a diagnosed product defect), without its text.
+    if (!parsed.explicit && !parsed.phone && !similar.length) void improvementInbox?.report('unsupported','unknown');
     return void asstSay(`«${asked}» — үйлчлүүлэгч олдсонгүй.${similar.length ? " Ойролцоо нэрс:" : ""}`, {
       actions: [...similar.map((customer) => asstType(asstCustomerLine(customer), customer.phone || customer.full_name)), ...offer],
     });
