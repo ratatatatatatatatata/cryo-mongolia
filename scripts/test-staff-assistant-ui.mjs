@@ -120,13 +120,86 @@ try {
   assert.match(await a.reply(), /3 үйлчлүүлэгч байна|2 үйлчлүүлэгч байна/, 'a partial name asks which one');
   await a.press('Болих');
 
+  // a name that is not on file is booked as typed — no phone is demanded, only the confirmation
   await a.say('Тэмүүлэн маргааш cabin 16:30');
-  assert.match(await a.reply(), /бүртгэлгүй байна/);
-  await a.say('99887766');
-  assert.match(await a.reply(), /Тэмүүлэн · 99887766[\s\S]*|Шинэ үйлчлүүлэгчээр/);
+  text = await a.reply();
+  assert.match(text, /Ингэж бүртгэх үү/, 'it goes straight to the confirmation');
+  assert.match(text, /Тэмүүлэн · утасгүй/);
   await a.press('Бүртгэх');
   inserted = await a.count(() => window.inserted);
-  assert.ok(inserted.some((row) => row.table === 'customers' && row.full_name === 'Тэмүүлэн'), 'the new customer is saved');
+  assert.deepEqual([inserted.at(-1).customer_name, inserted.at(-1).phone], ['Тэмүүлэн', null]);
+  assert.ok(!inserted.some((row) => row.table === 'customers'), 'a customer record needs a phone, so none is made');
+  // with a phone on the line the new customer is saved too
+  await a.say('Ганболд 99887766 маргааш cabin 17:00');
+  assert.match(await a.reply(), /Ганболд · 99887766[\s\S]*Шинэ үйлчлүүлэгчээр|Шинэ үйлчлүүлэгчээр[\s\S]*Ганболд · 99887766/);
+  await a.press('Бүртгэх');
+  inserted = await a.count(() => window.inserted);
+  assert.ok(inserted.some((row) => row.table === 'customers' && row.full_name === 'Ганболд' && row.phone === '99887766'), 'the new customer is saved');
+
+  /* ── a mistyped name, or a number that belongs to someone else ── */
+  // the number is on file under another name: say whose it is
+  await a.say('Бат 88001122 маргааш 18:00 cabin');
+  text = await a.reply();
+  assert.match(text, /88001122 дугаар дээр «Батболд» бүртгэлтэй байна\. Нэрийг буруу бичсэн үү/);
+  assert.equal(await a.last().locator('button', { hasText: '«Бат» нэрээр бүртгэх' }).count(), 1, 'the name as typed stays on offer — people share phones');
+  await a.press('Батболд · 88001122');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Батболд · 88001122/);
+  await a.press('Болих');
+  // a slip of a name on file: offer the name it probably is
+  await a.say('Сарая маргааш 18:00 cabin');
+  text = await a.reply();
+  assert.match(text, /«Сарая» жагсаалтад алга\. Эдгээрийн аль нэг мөн үү/);
+  await a.press('Сараа · 95556677');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Сараа · 95556677/);
+  await a.press('Болих');
+  // …or keep it exactly as typed
+  await a.say('Сарая маргааш 18:00 cabin');
+  await a.press('«Сарая» нэрээр бүртгэх');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Сарая · утасгүй/);
+  await a.press('Болих');
+  // the same help when looking someone up, and when acting on a booking
+  await a.say('Сарая хайх');
+  text = await a.reply();
+  assert.match(text, /олдсонгүй\. Ойролцоо нэрс/);
+  assert.equal(await a.last().locator('button', { hasText: 'Сараа · 95556677' }).count(), 1);
+  await a.say('Дорж 99112233');
+  assert.match(await a.reply(), /99112233 дугаар дээр «Дорж» биш, ийм хүн бүртгэлтэй байна:[\s\S]*Бат · 99112233/);
+  await a.say('Сарая цуцал');
+  assert.match(await a.reply(), /тохирох захиалга олдсонгүй\. Эдгээрийн аль нэг мөн үү/);
+  await a.press('Сараа');
+  assert.match(await a.reply(), /Цуцлах үү[\s\S]*Сараа/);
+  await a.press('Болих');
+  await a.say('Сарая багц');
+  assert.match(await a.reply(), /үйлчлүүлэгч олдсонгүй\. Эдгээрийн аль нэг мөн үү/);
+  await a.say('болих');
+
+  // a walk-in: just the name and the device — the time is now, and nothing is asked but the confirmation
+  {
+    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ulaanbaatar', hour: '2-digit', hour12: false }).format(new Date()));
+    await a.say('Батболд cabin');
+    text = await a.reply();
+    if (hour >= 9 && hour < 21) {
+      assert.match(text, /Ингэж бүртгэх үү/, 'no question about the time during opening hours');
+      assert.match(text, /одоогийн цагт авлаа|хамгийн ойрын сул цагт авлаа/);
+      assert.match(text, new RegExp(today));
+    } else assert.match(text, /Хэдэн цагт вэ/, 'outside opening hours there is no "now" to take');
+    await a.press('Болих');
+  }
+
+  // earlier hours of today are offered and can be booked (a visit written up afterwards)
+  await a.say('өнөөдөр cabin сул цаг');
+  assert.match(await a.reply(), /09:00/, 'the morning is listed even once it has passed');
+  await a.say('Батболд өнөөдөр 09:00 cabin');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү/);
+  await a.press('Болих');
+
+  // moving a booking that has no phone: the edit function insists on one, so that — and only that — is asked for
+  await a.say('Тэмүүлэн 16:30-г 17:30 болго');
+  assert.match(await a.reply(), /утас шаарддаг/);
+  await a.say('99887700');
+  assert.match(await a.reply(), new RegExp(`Шинэ ${tomorrow} 17:30 · Cabin · Тэмүүлэн`));
+  await a.press('Өөрчлөх');
+  assert.deepEqual([(await a.rpc('edit_booking')).p_patch.phone, (await a.rpc('edit_booking')).p_patch.starts_at], ['99887700', `${tomorrow}T17:30:00+08:00`]);
 
   await a.say('Бат маргааш 15:00 cabin багцаар');
   assert.match(await a.reply(), /Багцын эрхээр/);

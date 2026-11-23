@@ -226,6 +226,65 @@ export function findCustomers(name, phone, customers) {
   return hits;
 }
 
+/* the same person's name, allowing for a case ending: «Болд» and «Болдод» */
+export function sameName(a, b) {
+  const x = key(a), y = key(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  return NAME_ENDINGS.some((ending) => long === short + ending);
+}
+
+/* how many single-letter slips apart two spellings are */
+function editDistance(a, b) {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    row = next;
+  }
+  return row[b.length];
+}
+
+/**
+ * Names that look like a slip of the one typed — «Болт» for «Болд»,
+ * "Saraa" for «Сара». Cyrillic and Latin are compared in one spelling, so a
+ * name typed in the other script still finds its match. A short name may be
+ * one letter off, a longer one two or three; nearest first.
+ */
+export function similarNames(name, names, limit = 5) {
+  const wanted = key(name);
+  if (wanted.length < 2) return [];
+  const seen = new Set([wanted]);
+  const scored = [];
+  for (const candidate of names || []) {
+    const k = key(candidate);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    const longest = Math.max(wanted.length, k.length);
+    const allowed = longest <= 5 ? 1 : longest <= 10 ? 2 : 3;
+    const d = editDistance(wanted, k);
+    /* the start of a name typed short, or a longer form of it */
+    const partial = wanted.length >= 3 && (k.startsWith(wanted) || wanted.startsWith(k));
+    /* A slip keeps the first letter. Without that, two letters apart would
+       pair up different names that merely rhyme — Ганболд and Батболд. */
+    const slip = d <= allowed && (d <= 1 || wanted[0] === k[0]);
+    if (slip || partial) scored.push({ candidate, score: partial ? Math.min(d, 1.5) : d });
+  }
+  return scored.sort((a, b) => a.score - b.score || a.candidate.length - b.candidate.length).slice(0, limit).map((entry) => entry.candidate);
+}
+
+/* the customers behind similarNames, one per person */
+export function similarCustomers(name, customers, limit = 5) {
+  const list = customers || [];
+  const names = similarNames(name, list.map((c) => c.full_name), limit * 2);
+  const out = [];
+  for (const candidate of names) for (const c of list) if (c.full_name === candidate && out.length < limit) out.push(c);
+  return out;
+}
+
 const ruleHit = (rules, k) => rules.find((rule) => rule.exact.includes(k) || rule.starts.some((prefix) => k.startsWith(prefix)));
 
 /**
@@ -472,7 +531,8 @@ export function freeTimes({ day, duration, bookings, blockedMinutes, now = Date.
 export const HELP_GROUPS = [
   ['Захиалга', [
     '«Болд маргааш 14:00 cryo cabin» — цаг захиалах',
-    '«Сараа 99112233 өнөөдөр 16:30 led» — шинэ үйлчлүүлэгчтэй',
+    '«Болд cc» — яг одоо ирсэн бол: одоогийн цагт бүртгэнэ',
+    '«Сараа 99112233 өнөөдөр 16:30 led» — утастай нь бичвэл үйлчлүүлэгчээр хадгална',
     '«Болд 14:00-г 15:30 болго» — цаг зөөх',
     '«Болд 14:00 цуцал» · «Болд 14:00 устга»',
     '«Болд ирсэн» — биелсэн гэж тэмдэглэх',
