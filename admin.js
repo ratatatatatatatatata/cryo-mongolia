@@ -4707,7 +4707,8 @@ function asstHandle(text) {
   asstDraft = null;
   if (parsed.problems.length) return asstBad(parsed.problems.join("\n"));
   const handlers = {
-    schedule: asstSchedule, free: asstFree, find: asstFind, balance: asstBalance, sales: asstSales,
+    schedule: asstSchedule, free: asstFree, find: asstFind, balance: asstBalance,
+    sales: (p) => asstAnswerIncome(asstSpan(p)), ask: asstAnswer,
     cancel: (p, l) => asstStatus(p, l, "cancelled"), confirm: (p, l) => asstStatus(p, l, "confirmed"), done: (p, l) => asstStatus(p, l, "done"),
     delete: asstDelete, move: asstMove, provider: asstProvider, pay: asstPay, income: asstIncome,
     clockin: () => asstClock(true), clockout: () => asstClock(false), customer: asstCustomer,
@@ -5321,19 +5322,6 @@ function asstBalance(parsed, line) {
   }, "Хэний багцыг харах вэ? Жишээ: «Болд багц»");
 }
 
-function asstSales() {
-  const today = bookingDateToday();
-  const own = selectedSharedStaff();
-  const rows = cache.sales.filter((sale) => sale.sale_date === today && isReportableSale(sale) && (!own || saleBelongsToStaff(sale, own)));
-  if (!rows.length) return void asstSay(`Өнөөдөр (${today}) борлуулалт бүртгэгдээгүй байна.`);
-  const sum = (column) => rows.reduce((total, sale) => total + Number(sale[column] || 0), 0);
-  const parts = [["khan", "khan"], ["golomt", "golomt"], ["cash", "cash"], ["invoice", "invoice"], ["barter", "barter"], ["gift_card", "gift_card"], ["internal", "internal_amount"]]
-    .map(([method, column]) => [method, sum(column)]).filter(([, amount]) => amount > 0);
-  asstSay(`Өнөөдрийн борлуулалт (${today})${own ? " · " + own.name : ""}\n\n${rows.length} гүйлгээ · нийт ${money(sum("total"))}\n${parts.map(([method, amount]) => `${METHOD_LABEL[method]}: ${money(amount)}`).join("\n")}`, {
-    actions: [{ label: "Тайланг нээх", run: () => switchView("reports") }],
-  });
-}
-
 /* ── gift cards: look up, issue, deduct ── */
 async function asstGift(parsed, line) {
   const today = bookingDateToday();
@@ -5555,6 +5543,225 @@ async function asstTeam(parsed, line) {
   asstSay(rest && !close.length ? `${team.name} багт «${rest}» гэсэн гишүүн алга. Аль гишүүн бэ?` : `${team.name} — аль гишүүн бэ?`, {
     actions: [...(close.length ? close : roster).slice(0, 14).map((member) => ({ label: member.full_name, run: () => { asstUser(member.full_name); visit(member); } })), asstCancel()],
   });
+}
+
+/* ══ answering questions ══
+   «өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ», «энэ сарын орлого хэд вэ».
+   Every answer is worked out from the rows already loaded for the
+   dashboard — the same rows the screens show — so the assistant can only
+   say what the employee is allowed to see, and nothing is ever written. */
+
+/* the day or stretch of days a question is about; today when none was said */
+function asstSpan(parsed) {
+  const today = bookingDateToday();
+  if (parsed.range) return { ...parsed.range, single: false, title: `${parsed.range.label} (${parsed.range.from} – ${parsed.range.to})` };
+  const day = parsed.date || today;
+  return { from: day, to: day, single: true, label: describeDay(day, today), title: describeDay(day, today) };
+}
+const asstIn = (day, span) => !!day && day >= span.from && day <= span.to;
+const asstWho = (name) => String(name || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("mn");
+const asstUbDay = (iso) => (iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ulaanbaatar" }).format(new Date(iso)) : "");
+const asstList = (items, limit = 20) => items.slice(0, limit).join(", ") + (items.length > limit ? ` … (+${items.length - limit})` : "");
+/* bookings of the span that were not cancelled */
+const asstBooked = (span) => cache.bookings.filter((row) => row.status !== "cancelled" && asstIn(asstDay(row), span));
+/* has this booking actually happened — its time has come, or it is marked so */
+const asstHappened = (row) => Date.parse(row.starts_at) <= Date.now() || row.status === "done" || row.payment_status === "paid" || !!row.performed_by;
+
+function asstAnswer(parsed, line) {
+  const span = asstSpan(parsed);
+  const topics = {
+    served: asstAnswerServed, bookings: asstAnswerBookings, income: asstAnswerIncome, devices: asstAnswerDevices,
+    staff: asstAnswerStaff, working: asstAnswerWorking, pending: asstAnswerPending, unpaid: asstAnswerUnpaid,
+    next: asstAnswerNext, newcustomers: asstAnswerNewCustomers, cancelled: asstAnswerCancelled, packages: asstAnswerPackages,
+  };
+  if (parsed.topic === "history") return asstAnswerHistory(parsed, line);
+  return (topics[parsed.topic] || asstAnswerServed)(span, parsed);
+}
+
+/* how many customers were served */
+function asstAnswerServed(span) {
+  const rows = asstBooked(span);
+  const came = rows.filter(asstHappened);
+  const waiting = rows.length - came.length;
+  const people = new Map();
+  came.forEach((row) => people.set(asstWho(row.customer_name), row.customer_name));
+  const viaBooking = people.size;
+  /* a package visit written up with no booking behind it is a customer served too */
+  const contracts = new Map(cache.contracts.map((contract) => [Number(contract.id), contract]));
+  const visits = cache.redemptions.filter((visit) => asstIn(visit.used_on, span));
+  visits.forEach((visit) => {
+    const name = contracts.get(Number(visit.contract_id))?.customer_label;
+    if (name && !people.has(asstWho(name))) people.set(asstWho(name), name);
+  });
+  const paid = came.filter((row) => row.payment_status === "paid").length;
+  const lines = [`${span.title}: ${people.size} үйлчлүүлэгч үйлчлүүлсэн.`, ""];
+  lines.push(`Захиалгаар: ${viaBooking} хүн · ${came.length} цаг`);
+  if (visits.length) lines.push(`Багцын оролт: ${visits.reduce((sum, visit) => sum + (Number(visit.units) || 1), 0)}${people.size > viaBooking ? ` (үүнээс захиалгагүй ${people.size - viaBooking} хүн)` : ""}`);
+  if (came.length) lines.push(`Төлбөр бүртгэгдсэн: ${paid} цаг`);
+  if (waiting) lines.push(`Цаг нь болоогүй: ${waiting} захиалга`);
+  if (people.size) lines.push("", "Нэрс: " + asstList([...people.values()]));
+  asstSay(lines.join("\n"), { actions: span.single ? [asstType("Хуваарь харах", `${span.from} хуваарь`)] : [] });
+}
+
+/* how many bookings, and on what */
+function asstAnswerBookings(span) {
+  const rows = asstBooked(span);
+  const cancelled = cache.bookings.filter((row) => row.status === "cancelled" && asstIn(asstDay(row), span)).length;
+  const lines = [`${span.title}: ${rows.length} захиалга.`];
+  if (rows.length) {
+    const done = rows.filter(asstHappened).length;
+    lines.push("", `Болсон: ${done} · Цаг нь болоогүй: ${rows.length - done}`);
+    lines.push(...asstByDevice(rows).map(([name, count]) => `${name}: ${count}`));
+  }
+  if (cancelled) lines.push("", `Цуцлагдсан: ${cancelled}`);
+  asstSay(lines.join("\n"), { actions: span.single ? [asstType("Хуваарь харах", `${span.from} хуваарь`)] : [] });
+}
+
+/* bookings counted under the device whose calendar they sit on, busiest first */
+function asstByDevice(rows) {
+  const counts = new Map();
+  rows.forEach((row) => {
+    const calendar = cache.services.find((service) => Number(service.id) === bookingCalendar(row));
+    const name = calendar?.name || asstServiceOf(row)?.name || row.service || "—";
+    counts.set(name, (counts.get(name) || 0) + 1);
+  });
+  return [...counts.entries()].sort((x, y) => y[1] - x[1]);
+}
+
+function asstAnswerDevices(span) {
+  const ranked = asstByDevice(asstBooked(span).filter(asstHappened));
+  if (!ranked.length) return void asstSay(`${span.title}: төхөөрөмж ашигласан захиалга алга.`);
+  asstSay(`${span.title} — төхөөрөмжийн ачаалал:\n\n${ranked.map(([name, count], i) => `${i + 1}. ${name} — ${count} цаг`).join("\n")}`);
+}
+
+/* money taken, by how it was paid */
+function asstAnswerIncome(span) {
+  const own = selectedSharedStaff();
+  const rows = cache.sales.filter((sale) => asstIn(sale.sale_date, span) && isReportableSale(sale) && (!own || saleBelongsToStaff(sale, own)));
+  const scope = own ? ` · ${own.name}` : me?.role === "staff" ? " · таны бүртгэсэн" : "";
+  if (!rows.length) return void asstSay(`${span.title}${scope}: борлуулалт бүртгэгдээгүй байна.`);
+  const sum = (column) => rows.reduce((total, sale) => total + Number(sale[column] || 0), 0);
+  const parts = [["khan", "khan"], ["golomt", "golomt"], ["cash", "cash"], ["invoice", "invoice"], ["barter", "barter"], ["gift_card", "gift_card"], ["internal", "internal_amount"]]
+    .map(([method, column]) => [method, sum(column)]).filter(([, amount]) => amount > 0);
+  asstSay(`${span.title} — борлуулалт${scope}: нийт ${money(sum("total"))} · ${rows.length} гүйлгээ\n\n${parts.map(([method, amount]) => `${METHOD_LABEL[method]}: ${money(amount)}`).join("\n")}`, {
+    actions: [{ label: "Тайланг нээх", run: () => switchView("reports") }],
+  });
+}
+
+/* what each employee did */
+function asstAnswerStaff(span) {
+  const sessions = new Map(), takings = new Map();
+  asstBooked(span).forEach((row) => { if (row.performed_by) sessions.set(Number(row.performed_by), (sessions.get(Number(row.performed_by)) || 0) + 1); });
+  cache.sales.filter((sale) => asstIn(sale.sale_date, span) && isReportableSale(sale) && sale.staff_id).forEach((sale) => takings.set(Number(sale.staff_id), (takings.get(Number(sale.staff_id)) || 0) + Number(sale.total || 0)));
+  const rows = cache.staff.filter((person) => sessions.has(Number(person.id)) || takings.has(Number(person.id)))
+    .map((person) => ({ name: person.name, sessions: sessions.get(Number(person.id)) || 0, total: takings.get(Number(person.id)) || 0 }))
+    .sort((x, y) => y.sessions - x.sessions || y.total - x.total);
+  if (!rows.length) return void asstSay(`${span.title}: ажилтнаар бүртгэгдсэн үйлчилгээ, борлуулалт алга.`);
+  asstSay(`${span.title} — ажилтнаар:\n\n${rows.map((row) => `${row.name} — ${row.sessions} үйлчилгээ үзүүлсэн · борлуулалт ${money(row.total)}`).join("\n")}`);
+}
+
+/* who is at work right now */
+function asstAnswerWorking() {
+  const today = localDateKey(new Date());
+  const at = (iso) => new Date(iso).toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" });
+  const rows = cache.attendance.filter((row) => row.work_date === today && row.clock_in);
+  if (!rows.length) return void asstSay("Өнөөдөр ирсэн цагаа бүртгэсэн ажилтан алга.");
+  const latest = new Map();
+  rows.forEach((row) => { const seen = latest.get(Number(row.staff_id)); if (!seen || String(row.clock_in) > String(seen.clock_in)) latest.set(Number(row.staff_id), row); });
+  const lines = [...latest.values()].map((row) => {
+    const name = cache.staff.find((person) => Number(person.id) === Number(row.staff_id))?.name || row.staff_name || "—";
+    return row.clock_out ? `${name} — ${at(row.clock_in)}–${at(row.clock_out)} (гарсан)` : `${name} — ${at(row.clock_in)}-оос ажиллаж байна`;
+  });
+  const working = [...latest.values()].filter((row) => !row.clock_out).length;
+  asstSay(`Одоо ${working} ажилтан ажиллаж байна.\n\n${lines.join("\n")}`);
+}
+
+/* the time has passed but nothing says the customer came */
+function asstAnswerPending(span) {
+  const rows = asstBooked(span).filter((row) => Date.parse(row.starts_at) <= Date.now() && row.status !== "done" && row.payment_status !== "paid" && !row.performed_by && row.booking_kind !== "package")
+    .sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
+  if (!rows.length) return void asstSay(`${span.title}: цаг нь өнгөрсөн бүх захиалга биелсэн эсвэл төлөгдсөн гэж тэмдэглэгдсэн.`);
+  asstSay(`${span.title}: ${rows.length} захиалгын цаг өнгөрсөн ч ирсэн, төлсөн гэж тэмдэглээгүй байна.\n\n${rows.slice(0, 20).map(asstBookingLine).join("\n")}`);
+}
+
+/* served, not on a package, and no payment recorded */
+function asstAnswerUnpaid(span) {
+  const rows = asstBooked(span).filter((row) => row.payment_status !== "paid" && row.booking_kind !== "package" && Date.parse(row.starts_at) <= Date.now());
+  if (!rows.length) return void asstSay(`${span.title}: төлбөр нь бүртгэгдээгүй захиалга алга.`);
+  const owing = new Map();
+  rows.forEach((row) => {
+    const entry = owing.get(asstWho(row.customer_name)) || { name: row.customer_name, total: 0, count: 0 };
+    entry.total += Number(asstServiceOf(row)?.price || 0);
+    entry.count += 1;
+    owing.set(asstWho(row.customer_name), entry);
+  });
+  const list = [...owing.values()].sort((x, y) => y.total - x.total);
+  const total = list.reduce((sum, entry) => sum + entry.total, 0);
+  asstSay(`${span.title}: ${list.length} үйлчлүүлэгчийн төлбөр бүртгэгдээгүй · нийт ${money(total)}\n\n${list.slice(0, 20).map((entry) => `${entry.name} — ${entry.count} цаг · ${money(entry.total)}`).join("\n")}`, {
+    /* one tap from the answer to recording the payment */
+    actions: span.single && span.from === bookingDateToday() ? list.slice(0, 6).map((entry) => asstType(`${entry.name} төлбөр`)) : [],
+  });
+}
+
+function asstAnswerNext() {
+  const rows = cache.bookings.filter((row) => row.status !== "cancelled" && Date.parse(row.starts_at) > Date.now())
+    .sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
+  if (!rows.length) return void asstSay("Урд хүлээгдэж буй захиалга алга.");
+  asstSay(`Дараагийн захиалга:\n\n${rows.slice(0, 5).map(asstBookingLine).join("\n")}`);
+}
+
+function asstAnswerNewCustomers(span) {
+  const rows = cache.customers.filter((customer) => asstIn(asstUbDay(customer.created_at), span));
+  if (!rows.length) return void asstSay(`${span.title}: шинээр бүртгэгдсэн үйлчлүүлэгч алга.`);
+  asstSay(`${span.title}: ${rows.length} шинэ үйлчлүүлэгч бүртгэгдсэн.\n\n${asstList(rows.map((customer) => customer.full_name))}`);
+}
+
+function asstAnswerCancelled(span) {
+  const rows = cache.bookings.filter((row) => row.status === "cancelled" && asstIn(asstDay(row), span)).sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
+  if (!rows.length) return void asstSay(`${span.title}: цуцлагдсан захиалга алга.`);
+  asstSay(`${span.title}: ${rows.length} захиалга цуцлагдсан.\n\n${rows.slice(0, 20).map(asstBookingLine).join("\n")}`);
+}
+
+function asstAnswerPackages(span) {
+  const all = contractRows().map((row) => ({ ...row, __state: packageStateOf(row) }));
+  const sold = all.filter((row) => asstIn(row.purchased_on, span));
+  const active = all.filter((row) => row.__state === "active").length;
+  const visits = cache.redemptions.filter((visit) => asstIn(visit.used_on, span)).reduce((sum, visit) => sum + (Number(visit.units) || 1), 0);
+  const lines = [`${span.title}: ${sold.length} багц зарагдсан · багцын ${visits} оролт.`];
+  if (sold.length) lines.push("", ...sold.slice(0, 15).map((row) => `${row.__customer} — ${row.__label}`));
+  lines.push("", `Одоо идэвхтэй багц: ${active}`);
+  asstSay(lines.join("\n"));
+}
+
+/* one customer: how often, and when last */
+function asstAnswerHistory(parsed, line) {
+  /* «сүүлд хэзээ ирсэн бэ» with no name is about the customer in hand */
+  if (!parsed.name && !parsed.phone) {
+    const known = asstRecall();
+    if (known) { parsed.name = known.full_name; parsed.customers = [known]; }
+  }
+  asstOneCustomer(parsed, line, (customer) => {
+    const mine = (name, phone) => asstSame(name, customer.full_name) && (!phone || !customer.phone || normalizePhone(phone) === normalizePhone(customer.phone));
+    const rows = cache.bookings.filter((row) => row.status !== "cancelled" && mine(row.customer_name, row.phone));
+    const past = rows.filter(asstHappened).sort((x, y) => String(y.starts_at).localeCompare(String(x.starts_at)));
+    const ahead = rows.filter((row) => !asstHappened(row)).sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
+    const contractIds = new Set(asstContractsOf(customer).map((row) => Number(row.id)));
+    const visits = cache.redemptions.filter((visit) => contractIds.has(Number(visit.contract_id))).sort((x, y) => String(y.used_on).localeCompare(String(x.used_on)));
+    const sales = cache.sales.filter((sale) => isReportableSale(sale) && mine(sale.customer_name, sale.phone));
+    const lastDay = [past[0] && asstDay(past[0]), visits[0]?.used_on, sales.map((sale) => sale.sale_date).sort().at(-1)].filter(Boolean).sort().at(-1);
+    const lines = [asstCustomerLine(customer), ""];
+    if (!lastDay) lines.push("Ирсэн бүртгэл алга.");
+    else {
+      lines.push(`Сүүлд ирсэн: ${describeDay(lastDay, bookingDateToday())}${past[0] && asstDay(past[0]) === lastDay ? ` · ${asstServiceOf(past[0])?.name || past[0].service || ""}` : ""}`);
+      lines.push(`Захиалгаар ирсэн: ${past.length} удаа`);
+      if (visits.length) lines.push(`Багцын оролт: ${visits.reduce((sum, visit) => sum + (Number(visit.units) || 1), 0)}`);
+      if (sales.length) lines.push(`Төлсөн: ${money(sales.reduce((sum, sale) => sum + Number(sale.total || 0), 0))} · ${sales.length} гүйлгээ`);
+    }
+    if (ahead.length) lines.push("", "Урд байгаа захиалга:", ...ahead.slice(0, 3).map(asstBookingLine));
+    const packs = asstContractsOf(customer).filter((row) => row.__state === "active");
+    if (packs.length) lines.push("", "Идэвхтэй багц:", ...packs.slice(0, 4).map(asstContractLine));
+    asstSay(lines.join("\n"));
+  }, "Хэний тухай вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
 }
 
 /* ── go to a page ── */

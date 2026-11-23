@@ -232,6 +232,46 @@ assert.deepEqual([r.intent, r.target], ['open', 'захиалга']);
 assert.equal(read('багц руу оч').target, 'багц');
 assert.equal(read('Хаанаа 99112200').intent, 'find', 'a name is not a payment method');
 
+// ── questions about what has been going on ──
+const ask = (text) => { const q = read(text); return [q.intent, q.topic]; };
+assert.deepEqual(ask('өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ'), ['ask', 'served']);
+assert.deepEqual(ask('hichneen uilchluulegch unuudur uilchluulsen be'), ['ask', 'served'], 'the same question typed in Latin');
+assert.equal(read('hichneen uilchluulegch unuudur uilchluulsen be').date, '2026-11-24');
+assert.deepEqual(ask('өчигдөр хэдэн хүн ирсэн бэ'), ['ask', 'served']);
+assert.equal(read('өчигдөр хэдэн хүн ирсэн бэ').date, '2026-11-23');
+assert.deepEqual(ask('маргааш хэдэн захиалга байна'), ['ask', 'bookings']);
+assert.deepEqual(ask('өнөөдрийн орлого хэд вэ'), ['ask', 'income']);
+assert.deepEqual(ask('энэ долоо хоногт хэдэн төгрөг орсон бэ'), ['ask', 'income']);
+assert.deepEqual(ask('аль төхөөрөмж хамгийн их вэ'), ['ask', 'devices']);
+assert.deepEqual(ask('хэн ажиллаж байна'), ['ask', 'working']);
+assert.deepEqual(ask('ажилтан бүр хэдэн үйлчилгээ хийсэн бэ'), ['ask', 'staff']);
+assert.deepEqual(ask('хэн төлөөгүй байна'), ['ask', 'unpaid']);
+assert.deepEqual(ask('хэн ирээгүй вэ'), ['ask', 'pending']);
+assert.deepEqual(ask('дараагийн захиалга хэн бэ'), ['ask', 'next']);
+assert.deepEqual(ask('хэдэн захиалга цуцлагдсан бэ'), ['ask', 'cancelled'], 'a question about cancellations cancels nothing');
+assert.deepEqual(ask('энэ сард хэдэн багц зарагдсан бэ'), ['ask', 'packages'], 'nor does one about sales sell anything');
+assert.deepEqual(ask('шинэ үйлчлүүлэгч хэд вэ'), ['ask', 'newcustomers']);
+r = read('Болд сүүлд хэзээ ирсэн бэ');
+assert.deepEqual([r.intent, r.topic, r.name, r.customers.map((c) => c.id)], ['ask', 'history', 'Болд', [1]]);
+r = read('Болд хэдэн удаа ирсэн бэ');
+assert.deepEqual([r.topic, r.name], ['history', 'Болд'], '«хэдэн удаа» is about one person');
+// the stretch of days a question is about
+const span = (text) => { const q = read(text).range; return q && [q.from, q.to]; };
+assert.deepEqual(span('энэ долоо хоногийн орлого хэд вэ'), ['2026-11-23', '2026-11-29'], 'Monday to Sunday');
+assert.deepEqual(span('өнгөрсөн долоо хоногт хэдэн хүн ирсэн бэ'), ['2026-11-16', '2026-11-22']);
+assert.deepEqual(span('энэ сарын орлого хэд вэ'), ['2026-11-01', '2026-11-30']);
+assert.deepEqual(span('өнгөрсөн сард хэдэн захиалга байсан бэ'), ['2026-10-01', '2026-10-31']);
+assert.deepEqual(span('сүүлийн 7 хоногт хэдэн хүн ирсэн бэ'), ['2026-11-18', '2026-11-24']);
+assert.equal(span('өнөөдөр хэдэн хүн ирсэн бэ'), null);
+// things that only look like questions stay what they were
+assert.equal(read('Болд байна уу').intent, 'find');
+assert.equal(read('өнөөдрийн борлуулалт').intent, 'sales');
+assert.equal(read('Болд 14:00 цуцал').intent, 'cancel');
+assert.equal(read('шинэ үйлчлүүлэгч Тэмүүлэн 99887766').intent, 'customer');
+assert.equal(read('Шинэбаяр 99001122').intent, 'find', 'a name that starts with «шинэ» is a name');
+assert.equal(read('шинэ үйлчлүүлэгч Хэн нэгэн 99112233').intent, 'customer', 'a line with a phone number is details being entered, not a question');
+assert.equal(read('12 сарын 5 14:00 cc Болд').date, '2026-12-05', 'a dated line is not a month range');
+
 // ── names that look like a slip of the one typed ──
 const people = ['Болд', 'Болдбаатар', 'Сараа', 'Даваа', 'Баасан', 'Нямаа', 'Тэмүүлэн', 'Оюунчимэг', 'Бат'];
 assert.deepEqual(similarNames('Болт', people), ['Болд'], 'one letter off');

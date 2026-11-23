@@ -420,6 +420,52 @@ try {
   assert.match(await a.reply(), /борлуулалт/);
   await a.say('багц хуудас нээ');
   assert.match(await a.reply(), /Багц» хуудсыг нээлээ/);
+  /* ── questions about what has been going on: answered, never acted on ── */
+  const writes = () => a.count(() => window.rpcs.filter((c) => c.name !== 'is_admin').length + window.inserted.length + window.updates.length);
+  const writesBefore = await writes();
+  // Сараа came on a booking; Mandakh and Бат went in on their packages with no booking
+  await a.say('өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ');
+  text = await a.reply();
+  assert.match(text, /: 3 үйлчлүүлэгч үйлчлүүлсэн/);
+  assert.match(text, /Захиалгаар: 1 хүн · 1 цаг/);
+  assert.match(text, /Багцын оролт: 4 \(үүнээс захиалгагүй 2 хүн\)/);
+  assert.match(text, /Нэрс: [\s\S]*Сараа[\s\S]*Mandakh Jiremsen eej/);
+  await a.say('hichneen uilchluulegch unuudur uilchluulsen be');
+  assert.match(await a.reply(), /: 3 үйлчлүүлэгч үйлчлүүлсэн/, 'the same question typed in Latin');
+  await a.say('маргааш хэдэн захиалга байна');
+  text = await a.reply();
+  assert.match(text, /: 3 захиалга\./);
+  assert.match(text, /Cabin: 3/);
+  assert.match(text, /Цуцлагдсан: 1/);
+  await a.say('өнөөдрийн орлого хэд вэ');
+  text = await a.reply();
+  assert.match(text, /нийт ₮194,000 · 2 гүйлгээ/, 'the booking payment and the extra income');
+  assert.match(text, /Хаан: ₮100,000/);
+  assert.match(text, /Бэлэн: ₮94,000/);
+  await a.say('энэ долоо хоногийн орлого хэд вэ');
+  assert.match(await a.reply(), /энэ долоо хоног \(\d{4}-\d\d-\d\d – \d{4}-\d\d-\d\d\)[\s\S]*нийт ₮194,000/);
+  await a.say('аль төхөөрөмж хамгийн их вэ');
+  assert.match(await a.reply(), /1\. Cabin — 1 цаг/);
+  await a.say('хэн төлөөгүй байна');
+  assert.match(await a.reply(), /төлбөр нь бүртгэгдээгүй захиалга алга/);
+  await a.say('хэн ажиллаж байна');
+  assert.match(await a.reply(), /Одоо 0 ажилтан ажиллаж байна[\s\S]*Чимгээ — [\s\S]*гарсан/);
+  await a.say('дараагийн захиалга хэн бэ');
+  assert.match(await a.reply(), /Дараагийн захиалга:[\s\S]*Cabin/);
+  await a.say('маргааш хэдэн захиалга цуцлагдсан бэ');
+  assert.match(await a.reply(), /: 1 захиалга цуцлагдсан[\s\S]*Батболд/);
+  await a.say('энэ сард хэдэн багц зарагдсан бэ');
+  assert.match(await a.reply(), /: 1 багц зарагдсан · багцын 7 оролт[\s\S]*Бат — Recovery/, 'four today plus the three earlier this month');
+  // one customer's history, then a follow-up with no name
+  await a.say('Сараа сүүлд хэзээ ирсэн бэ');
+  text = await a.reply();
+  assert.match(text, new RegExp(`Сүүлд ирсэн: ${today}`));
+  assert.match(text, /Захиалгаар ирсэн: 1 удаа/);
+  assert.match(text, /Төлсөн: ₮149,000 · 1 гүйлгээ/);
+  await a.say('хэдэн удаа ирсэн бэ');
+  assert.match(await a.reply(), /Сараа · 95556677[\s\S]*Захиалгаар ирсэн: 1 удаа/, 'no name: still about Сараа');
+  assert.equal(await writes(), writesBefore, 'questions write nothing — not even ones that mention cancelling or selling');
+
   await a.say('цаг агаар ямар байна');
   assert.match(await a.reply(), /Ойлгосонгүй|олдсонгүй/);
   assert.deepEqual(a.errors, [], 'no script errors for an admin');

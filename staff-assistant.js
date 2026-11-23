@@ -95,6 +95,34 @@ const FILLER = new Set(keys('дээр', 'der', 'д', 'т', 'нэрээр', 'нэ
   'захиалгыг', 'захиалгаа', 'руу', 'рүү', 'ruu', 'болон', 'өнөөдрийн', 'эрхээр', 'рт', 'аас', 'ээс', 'хаанаас',
   'одоо', 'яг', 'энэ', 'тэр', 'удаа', 'удаагаа', 'дахиад', 'дахин', 'байгаа', 'бна', 'baina', 'л', 'ээ'));
 
+/* ── questions about what has been going on ──
+   «өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ», «энэ сарын орлого хэд вэ».
+   A line is a question when it holds a question word and one of these
+   topics; the first topic that fits wins, so the narrower ones come first.
+   Words are written both ways a Latin typist spells ө/ү. */
+const QUESTION_STARTS = keys('хэд', 'хичнээн', 'hicheen', 'hichneen');
+const QUESTION_EXACT = new Set(keys('хэн', 'хэнд', 'хэний', 'хэзээ', 'аль', 'вэ', 'бэ', 'уу', 'үү', 'юу', 'ямар', 've', 'be', 'uu', 'yu', 'yamar', 'hezee', 'hen'));
+const TOPICS = [
+  ['history', ['сүүлд', 'suuld', 'хэзээ', 'hezee', 'түүх', 'tuuh']],
+  ['working', ['ажиллаж', 'ajillaj']],
+  ['staff', ['ажилтан', 'ажилчид', 'ajiltan', 'ajilchid']],
+  ['pending', ['ирээгүй', 'ireegui', 'хүлээгд', 'huleegd']],
+  ['unpaid', ['төлөөгүй', 'tuluugui', 'tuluugvi', 'төлбөргүй', 'tulburgui', 'төлөгдөөгүй']],
+  ['next', ['дараагийн', 'дараачийн', 'daraagiin', 'daraachiin']],
+  ['cancelled', ['цуцлагд', 'цуцалсан', 'tsutslagd', 'tsutsalsan']],
+  ['newcustomers', [], ['шинэ', 'shine', 'шинээр', 'shineer']], // whole word only: «Шинэбаяр» is a person
+  ['packages', ['багц', 'bagts']],
+  ['devices', ['төхөөрөмж', 'tuhuurumj', 'tuhuuromj', 'аппарат', 'apparat']],
+  ['income', ['орлого', 'orlogo', 'борлуулалт', 'borluulalt', 'мөнгө', 'mungu', 'mongo', 'төгрөг', 'tugrug', 'tugrig', 'ашиг']],
+  ['bookings', ['захиалга', 'zahialga']],
+  ['served', ['үйлчлүүл', 'uilchluul', 'ирсэн', 'irsen', 'орсон', 'orson', 'үйлчилсэн', 'uilchilsen'], ['хүн', 'hun', 'хүмүүс']],
+].map(([name, starts, exact = []]) => ({ name, starts: keys(...starts), exact: keys(...exact) }));
+const topicHit = (rule, k) => rule.exact.includes(k) || rule.starts.some((prefix) => k.startsWith(prefix));
+/* words that belong to the question, not to anybody's name */
+const ASK_FILLER = new Set(keys('хамгийн', 'hamgiin', 'их', 'ih', 'бага', 'сүүлийн', 'suuliin', 'нийт', 'niit', 'хоног', 'honog', 'удаа', 'udaa',
+  'зарагдсан', 'zaragdsan', 'идэвхтэй', 'idevhtei', 'буй', 'bui', 'боллоо', 'болсон', 'болж', 'гарсан', 'хийсэн', 'hiisen', 'ирсэн', 'irsen',
+  'орсон', 'orson', 'ирлээ', 'байсан', 'baisan', 'өдөр', 'долоо', 'doloo', 'сар', 'sar', 'сард', 'сарын', 'онд', 'жил', 'хэр', 'her', 'вэ', 'бэ', 'уу', 'үү'));
+
 /* «нэгээр орж байна» — how many sessions, when it is said */
 const COUNTS = Object.fromEntries([
   [1, ['нэг', 'нэгээр', 'нэгийг', 'ганц', 'ганцаар']], [2, ['хоёр', 'хоёроор', 'хоёрыг']], [3, ['гурав', 'гурваар', 'гурвыг']],
@@ -307,6 +335,7 @@ export function parseCommand(text, ctx = {}) {
     date: null, time: null, dates: [], times: [],
     service: null, services: [], name: '', phone: null, customers: [], staff: null,
     payments: [], amounts: [], incomeKind: null, byPackage: false, count: null, target: '', problems: [],
+    topic: null, range: null,
   };
   const line = String(text || '').normalize('NFKC');
   let rest = ` ${line} `;
@@ -397,6 +426,23 @@ export function parseCommand(text, ctx = {}) {
     return true;
   });
 
+  /* a stretch of days, for questions: this week, last month, the last 7 days */
+  const asked = /\?\s*$/.test(line);
+  {
+    const weekday = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+    const monday = shiftDay(today, -weekday);
+    const monthStart = (y, m) => `${y}-${pad(m)}-01`;
+    const monthEnd = (y, m) => new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+    const last = /(?:өнгөрсөн|өмнөх|ungursun|ongorson|umnuh|omnoh)/.source, week = /(?:долоо\s*хоног|7\s*хоног|doloo\s*honog|7\s*honog)[а-яөүa-z]*/.source, month = /(?:сар|sar)(?:ын|д|ийн|iin|d)?(?![а-яөүa-z])/.source;
+    /* first, so that «сүүлийн 7 хоног» is seven days back and not "this week" */
+    take(/(?:сүүлийн|suuliin)\s+(\d{1,3})\s*(?:хоног|өдөр|honog|udur|odor)[а-яөүa-z]*/i, (mm, n) => { out.range = { from: shiftDay(today, -(Number(n) - 1)), to: today, label: `сүүлийн ${Number(n)} хоног` }; });
+    take(new RegExp(`${last}\\s+${week}`, 'i'), () => { if (out.range) return false; out.range = { from: shiftDay(monday, -7), to: shiftDay(monday, -1), label: 'өнгөрсөн долоо хоног' }; return true; });
+    take(new RegExp(`(?:(?:энэ|ene)\\s+)?${week}`, 'i'), () => { if (out.range) return false; out.range = { from: monday, to: shiftDay(monday, 6), label: 'энэ долоо хоног' }; return true; });
+    take(new RegExp(`${last}\\s+${month}`, 'i'), () => { if (out.range) return false; const pm = m === 1 ? 12 : m - 1, py = m === 1 ? y - 1 : y; out.range = { from: monthStart(py, pm), to: monthEnd(py, pm), label: 'өнгөрсөн сар' }; return true; });
+    take(new RegExp(`(?:энэ|ene)\\s+${month}`, 'i'), () => { if (out.range) return false; out.range = { from: monthStart(y, m), to: monthEnd(y, m), label: 'энэ сар' }; return true; });
+  }
+
   /* what is left is words */
   let tokens = rest.split(/[\s,;!?()«»"“”]+/).filter(Boolean);
 
@@ -417,6 +463,21 @@ export function parseCommand(text, ctx = {}) {
   });
   out.date = out.dates[0] || null;
   out.time = out.times[0] || null;
+
+  /* Is this a question about what has been going on? Decided here, on the
+     words as typed, before the request words below are taken out of them. */
+  let topic = null;
+  {
+    const ks = tokens.map(key);
+    /* a line carrying a phone number is somebody's details being entered, not a question */
+    const question = asked || (!out.phone && ks.some((k) => QUESTION_EXACT.has(k) || QUESTION_STARTS.some((prefix) => k.startsWith(prefix))));
+    if (question) {
+      /* «Болд хэдэн удаа ирсэн бэ» counts one person's visits, not the day's customers */
+      if (ks.some((k) => k.startsWith(key('удаа')))) topic = TOPICS[0];
+      else if (addCustomer) topic = TOPICS.find((rule) => rule.name === 'newcustomers');
+      else topic = TOPICS.find((rule) => ks.some((k) => topicHit(rule, k))) || null;
+    }
+  }
 
   /* One pass in the order typed, so «хаан 100000 бэлэн 49000» pairs each
      amount with the method beside it. */
@@ -505,6 +566,20 @@ export function parseCommand(text, ctx = {}) {
     else if (m !== 0 && m !== 30) out.problems.push(`Цаг 30 минутын зайтай: ${pad(h)}:00 эсвэл ${pad(h)}:30 гэж бичнэ үү.`);
   }
 
+  /* a question is answered, never acted on — whatever request words it happens to contain */
+  if (topic) {
+    out.intent = 'ask';
+    out.topic = topic.name;
+    out.explicit = true;
+    out.sub = null;
+    out.name = tokens.filter((token) => {
+      const k = key(token);
+      return !FILLER.has(k) && !ASK_FILLER.has(k) && !QUESTION_EXACT.has(k) && !QUESTION_STARTS.some((prefix) => k.startsWith(prefix)) && !topicHit(topic, k) && /[a-zа-яөүё]/i.test(token);
+    }).join(' ').trim();
+    out.customers = findCustomers(out.name, out.phone, ctx.customers);
+    return out;
+  }
+
   /* a package with no verb is a look at the balance; «…багцаар» on a booking line is a booking */
   if (out.intent === 'package' && !out.sub) {
     if (out.time && out.service) { out.intent = 'book'; out.byPackage = true; } else out.intent = 'balance';
@@ -564,6 +639,12 @@ export const HELP_GROUPS = [
     '«gift card Болд 99112233 олго 200000 хаан»',
     '«gift card Болд хас 149000» · «gift card Болд»',
     '«баг Аварга Бат cc» — багийн гишүүний оролт',
+  ]],
+  ['Асуулт', [
+    '«өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ»',
+    '«энэ долоо хоногийн орлого хэд вэ» · «маргааш хэдэн захиалга байна»',
+    '«хэн төлөөгүй байна» · «хэн ажиллаж байна» · «дараагийн захиалга хэн бэ»',
+    '«Болд сүүлд хэзээ ирсэн бэ» · «аль төхөөрөмж хамгийн их вэ»',
   ]],
   ['Бусад', [
     '«ирлээ» · «явлаа» — өөрийн ирц',
