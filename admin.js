@@ -10,7 +10,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { customerPicker } from "./customer-picker.js";
 import { matchesName, nameKey } from "./name-search.js";
 import "./booking-time.js";
-import { parseCommand, freeTimes, describeDay, findNamed, findCustomers, HELP_GROUPS, METHOD_LABEL } from "./staff-assistant.js";
+import { parseCommand, freeTimes, describeDay, findNamed, findCustomers, sameName, similarCustomers, similarNames, HELP_GROUPS, METHOD_LABEL } from "./staff-assistant.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const $ = (id) => document.getElementById(id);
@@ -4664,6 +4664,7 @@ function asstHandle(text) {
     if (parsed.name || (parsed.phone && !asstDraft.name)) {
       if (parsed.name) asstDraft.name = parsed.name;
       asstDraft.customer = null;
+      asstDraft.asTyped = false;
       asstDraft.customers = parsed.customers;
     }
     if (parsed.phone) {
@@ -4715,7 +4716,15 @@ function asstBook() {
   }
 
   /* who */
-  if (!draft.customer) {
+  if (!draft.customer && !draft.asTyped) {
+    const pick = (customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); draft.customer = customer; draft.customers = []; asstBook(); } });
+    const asTyped = { label: `«${draft.name}» нэрээр бүртгэх`, run: () => { asstUser(draft.name); draft.asTyped = true; draft.customers = []; asstBook(); } };
+    /* The number is on file under another name: most likely the name was
+       mistyped, so say whose number it is. People do share a phone, so the
+       name as typed stays on offer. */
+    if (draft.phone && draft.name && draft.customers.length && !draft.customers.some((customer) => sameName(draft.name, customer.full_name))) {
+      return void asstSay(`${draft.phone} дугаар дээр ${draft.customers.map((customer) => `«${customer.full_name}»`).join(", ")} бүртгэлтэй байна. Нэрийг буруу бичсэн үү?`, { actions: [...draft.customers.slice(0, 4).map(pick), asTyped, cancel] });
+    }
     if (draft.customers.length === 1) draft.customer = draft.customers[0];
     else if (draft.customers.length > 1) {
       const shown = draft.customers.slice(0, 6);
@@ -4726,6 +4735,12 @@ function asstBook() {
       );
     } else if (!draft.name) {
       return void asstSay("Хэний нэр дээр бүртгэх вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.", { actions: [cancel] });
+    } else {
+      /* nobody by that name: offer the names it could be a slip of before booking it as typed */
+      const similar = similarCustomers(draft.name, cache.customers, 5);
+      if (similar.length) {
+        return void asstSay(`«${draft.name}» жагсаалтад алга. Эдгээрийн аль нэг мөн үү?`, { actions: [...similar.map(pick), asTyped, cancel] });
+      }
     }
   }
   /* A phone is not asked for: the table does not need one, and a walk-in
@@ -4877,7 +4892,13 @@ function asstNarrow(rows, { day = null, time = null, service = null } = {}) {
 /* settle on one booking — ask which when the line fits several */
 function asstPick(parsed, line, rows, question, then) {
   if (!parsed.name && !parsed.phone) return asstAsk(line, "Хэний захиалга вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
-  if (!rows.length) return asstBad(`«${parsed.name || parsed.phone}» — тохирох захиалга олдсонгүй${parsed.date ? ` (${parsed.date})` : ""}. «${parsed.name || parsed.phone} хайх» эсвэл «өнөөдрийн хуваарь» гэж шалгаарай.`);
+  if (!rows.length) {
+    /* perhaps the name is a slip: offer the people who do have a live booking */
+    const booked = [...new Set(cache.bookings.filter((row) => row.status !== "cancelled" && !row.team_id).map((row) => row.customer_name).filter(Boolean))];
+    const similar = parsed.name && line.includes(parsed.name) ? similarNames(parsed.name, booked, 5) : [];
+    return asstBad(`«${parsed.name || parsed.phone}» — тохирох захиалга олдсонгүй${parsed.date ? ` (${parsed.date})` : ""}.${similar.length ? " Эдгээрийн аль нэг мөн үү?" : ` «${parsed.name || parsed.phone} хайх» эсвэл «өнөөдрийн хуваарь» гэж шалгаарай.`}`,
+      similar.map((name) => asstType(name, line.replace(parsed.name, name))));
+  }
   if (rows.length === 1) return then(rows[0]);
   const shown = rows.slice(0, 8);
   asstSay(`${question}${rows.length > shown.length ? `\n(${rows.length}-аас эхний ${shown.length}; цаг эсвэл өдрөө нэмж бичвэл нарийсна.)` : ""}`, {
@@ -5171,7 +5192,9 @@ function asstCustomer(parsed, line) {
   if (!parsed.phone) return asstAsk(line, `${parsed.name} — 8 оронтой утасны дугаарыг бичнэ үү.`);
   const known = cache.customers.find((customer) => normalizePhone(customer.phone) === parsed.phone);
   if (known) return void asstSay(`Энэ дугаар бүртгэлтэй байна: ${asstCustomerLine(known)}`);
-  asstConfirm("Шинэ үйлчлүүлэгч бүртгэх үү?", [["Нэр", parsed.name], ["Утас", parsed.phone]], "Бүртгэх", async () => {
+  /* the same person may already be on file under another number */
+  const alike = [...new Set(cache.customers.filter((customer) => sameName(parsed.name, customer.full_name)).concat(similarCustomers(parsed.name, cache.customers, 3)))].slice(0, 3);
+  asstConfirm("Шинэ үйлчлүүлэгч бүртгэх үү?" + (alike.length ? "\nАнхаар: ойролцоо нэртэй хүн бүртгэлтэй байна." : ""), [["Нэр", parsed.name], ["Утас", parsed.phone], alike.length ? ["Бүртгэлтэй", alike.map(asstCustomerLine).join("; ")] : null], "Бүртгэх", async () => {
     const customer = await ensureCustomer(parsed.name, parsed.phone);
     asstSay(`Бүртгэлээ: ${asstCustomerLine(customer)}`, { tone: "ok" });
   });
@@ -5216,12 +5239,17 @@ function asstFind(parsed) {
   if (!found.length) {
     /* a name with a number that is not on file is one tap away from being a customer */
     const offer = parsed.name && parsed.phone ? [asstType("Шинээр бүртгэх", `шинэ үйлчлүүлэгч ${parsed.name} ${parsed.phone}`)] : [];
-    return void asstSay(`«${asked}» — үйлчлүүлэгч олдсонгүй.`, { actions: offer });
+    const similar = parsed.name ? similarCustomers(parsed.name, cache.customers, 6) : [];
+    return void asstSay(`«${asked}» — үйлчлүүлэгч олдсонгүй.${similar.length ? " Ойролцоо нэрс:" : ""}`, {
+      actions: [...similar.map((customer) => asstType(asstCustomerLine(customer), customer.phone || customer.full_name)), ...offer],
+    });
   }
   const shown = found.slice(0, 8);
   const one = shown.length === 1 ? shown[0] : null;
   const tag = one ? (one.phone || one.full_name) : "";
-  asstSay(`«${asked}» — ${found.length} үйлчлүүлэгч:\n\n${shown.map(asstCustomerLine).join("\n")}${found.length > shown.length ? `\n… бусад ${found.length - shown.length}` : ""}`, {
+  /* looked up by number, but a different name was typed with it */
+  const renamed = parsed.phone && parsed.name && !found.some((customer) => sameName(parsed.name, customer.full_name));
+  asstSay(`${renamed ? `${parsed.phone} дугаар дээр «${parsed.name}» биш, ийм хүн бүртгэлтэй байна:` : `«${asked}» — ${found.length} үйлчлүүлэгч:`}\n\n${shown.map(asstCustomerLine).join("\n")}${found.length > shown.length ? `\n… бусад ${found.length - shown.length}` : ""}`, {
     actions: one ? [asstType("Багц харах", `${tag} багц`), asstType("Цаг захиалах", `${tag} захиал`)] : [],
   });
 }
@@ -5248,7 +5276,13 @@ const asstContractLine = (row) => {
 function asstOneCustomer(parsed, line, then, ask = "Хэн бэ? Нэр эсвэл утасны дугаарыг бичнэ үү.") {
   const found = parsed.customers;
   if (!parsed.name && !parsed.phone) return asstAsk(line, ask);
-  if (!found.length) return asstBad(`«${parsed.name || parsed.phone}» — үйлчлүүлэгч олдсонгүй.`);
+  if (!found.length) {
+    const similar = parsed.name ? similarCustomers(parsed.name, cache.customers, 5) : [];
+    if (!similar.length) return asstBad(`«${parsed.name || parsed.phone}» — үйлчлүүлэгч олдсонгүй.`);
+    return void asstSay(`«${parsed.name}» — үйлчлүүлэгч олдсонгүй. Эдгээрийн аль нэг мөн үү?`, {
+      actions: [...similar.map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); then(customer); } })), asstCancel()],
+    });
+  }
   if (found.length === 1) return then(found[0]);
   asstSay(`«${parsed.name}» нэртэй ${found.length} үйлчлүүлэгч байна. Аль нь вэ?`, {
     actions: [...found.slice(0, 6).map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); then(customer); } })), asstCancel()],

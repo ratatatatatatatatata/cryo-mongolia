@@ -1,7 +1,7 @@
 // The staff assistant's reader, on the kinds of lines staff actually type.
 // Pure functions only — no browser, no database.
 import assert from 'node:assert/strict';
-import { parseCommand, freeTimes, describeDay } from '../staff-assistant.js';
+import { parseCommand, freeTimes, describeDay, similarNames, similarCustomers, sameName } from '../staff-assistant.js';
 
 const services = [
   { id: 1, slug: 'cryocabin', name: 'Cryo°Cabin™', duration_minutes: 3 },
@@ -220,6 +220,22 @@ r = read('захиалга хуудас нээ');
 assert.deepEqual([r.intent, r.target], ['open', 'захиалга']);
 assert.equal(read('багц руу оч').target, 'багц');
 assert.equal(read('Хаанаа 99112200').intent, 'find', 'a name is not a payment method');
+
+// ── names that look like a slip of the one typed ──
+const people = ['Болд', 'Болдбаатар', 'Сараа', 'Даваа', 'Баасан', 'Нямаа', 'Тэмүүлэн', 'Оюунчимэг', 'Бат'];
+assert.deepEqual(similarNames('Болт', people), ['Болд'], 'one letter off');
+assert.deepEqual(similarNames('Сара', people), ['Сараа'], 'a letter short');
+assert.deepEqual(similarNames('Temulen', people), ['Тэмүүлэн'], 'a slip typed in the other script still finds it');
+assert.deepEqual(read('Temuulen').customers.length, 0, 'not on file in this list…');
+assert.deepEqual(parseCommand('Bold', ctx).customers.map((c) => c.id), [1], '…while the same name in Latin is simply the same name');
+assert.deepEqual(similarNames('Тэмүлэн', people), ['Тэмүүлэн']);
+assert.deepEqual(similarNames('Оюунчимиг', people), ['Оюунчимэг']);
+assert.deepEqual(similarNames('Болдб', people), ['Болд', 'Болдбаатар'], 'a near miss first, then the longer name it could be the start of');
+assert.deepEqual(similarNames('Ганзориг', people), [], 'an unrelated name suggests nobody');
+assert.deepEqual(similarNames('Ганболд', ['Батболд', 'Ганбат', 'Ганбаатар', 'Ганболт']), ['Ганболт'], 'a slip is suggested; different names that merely rhyme are not');
+assert.deepEqual(similarNames('Болд', people).includes('Болд'), false, 'the name itself is not its own suggestion');
+assert.deepEqual(similarCustomers('Болт', customers).map((c) => c.id), [1]);
+assert.ok(sameName('Болд', 'Болдод') && sameName('bold', 'Болд') && !sameName('Болд', 'Болдбаатар'));
 
 // ── free times follow the booking grid ──
 const block = (d) => Math.max(30, Math.ceil((Number(d) || 30) / 30) * 30);

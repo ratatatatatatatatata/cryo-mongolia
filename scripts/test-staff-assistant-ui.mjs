@@ -136,6 +136,43 @@ try {
   inserted = await a.count(() => window.inserted);
   assert.ok(inserted.some((row) => row.table === 'customers' && row.full_name === 'Ганболд' && row.phone === '99887766'), 'the new customer is saved');
 
+  /* ── a mistyped name, or a number that belongs to someone else ── */
+  // the number is on file under another name: say whose it is
+  await a.say('Бат 88001122 маргааш 18:00 cabin');
+  text = await a.reply();
+  assert.match(text, /88001122 дугаар дээр «Батболд» бүртгэлтэй байна\. Нэрийг буруу бичсэн үү/);
+  assert.equal(await a.last().locator('button', { hasText: '«Бат» нэрээр бүртгэх' }).count(), 1, 'the name as typed stays on offer — people share phones');
+  await a.press('Батболд · 88001122');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Батболд · 88001122/);
+  await a.press('Болих');
+  // a slip of a name on file: offer the name it probably is
+  await a.say('Сарая маргааш 18:00 cabin');
+  text = await a.reply();
+  assert.match(text, /«Сарая» жагсаалтад алга\. Эдгээрийн аль нэг мөн үү/);
+  await a.press('Сараа · 95556677');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Сараа · 95556677/);
+  await a.press('Болих');
+  // …or keep it exactly as typed
+  await a.say('Сарая маргааш 18:00 cabin');
+  await a.press('«Сарая» нэрээр бүртгэх');
+  assert.match(await a.reply(), /Ингэж бүртгэх үү[\s\S]*Сарая · утасгүй/);
+  await a.press('Болих');
+  // the same help when looking someone up, and when acting on a booking
+  await a.say('Сарая хайх');
+  text = await a.reply();
+  assert.match(text, /олдсонгүй\. Ойролцоо нэрс/);
+  assert.equal(await a.last().locator('button', { hasText: 'Сараа · 95556677' }).count(), 1);
+  await a.say('Дорж 99112233');
+  assert.match(await a.reply(), /99112233 дугаар дээр «Дорж» биш, ийм хүн бүртгэлтэй байна:[\s\S]*Бат · 99112233/);
+  await a.say('Сарая цуцал');
+  assert.match(await a.reply(), /тохирох захиалга олдсонгүй\. Эдгээрийн аль нэг мөн үү/);
+  await a.press('Сараа');
+  assert.match(await a.reply(), /Цуцлах үү[\s\S]*Сараа/);
+  await a.press('Болих');
+  await a.say('Сарая багц');
+  assert.match(await a.reply(), /үйлчлүүлэгч олдсонгүй\. Эдгээрийн аль нэг мөн үү/);
+  await a.say('болих');
+
   // a walk-in: just the name and the device — the time is now, and nothing is asked but the confirmation
   {
     const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ulaanbaatar', hour: '2-digit', hour12: false }).format(new Date()));
