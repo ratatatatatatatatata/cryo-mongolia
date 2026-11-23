@@ -8,9 +8,12 @@
    profile than the brand blues sampled from the official PNG. */
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const PDF = process.argv[2] || "E:/download/fwdcryomongolialogo/logo_file.pdf";
-const OUT = new URL("../logo.svg", import.meta.url).pathname.replace(/^//, "");
+/* fileURLToPath, not .pathname: the project folder has a space in it, which
+   .pathname leaves as %20, and on Windows it also keeps a leading slash */
+const OUT = fileURLToPath(new URL("../logo.svg", import.meta.url));
 
 /* colours read off cryo-mongolia-symbol.png */
 const LIGHT = process.argv[3] || "#69ADFF";
