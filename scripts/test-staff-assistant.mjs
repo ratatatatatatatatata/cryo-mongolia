@@ -136,6 +136,91 @@ assert.deepEqual(read('Сарааг маргааш 14:00 cc').customers.map((c) 
 assert.deepEqual(read('Болдбаатарт 14:00 cc').customers.map((c) => c.id), [2], 'the ending comes off the longer name too');
 assert.equal(read('Сараа нэр дээр led бүртгэ 15:00').name, 'Сараа');
 
+// ── everything else a staff member does ──
+const staff = [{ id: 7, name: 'Чимгээ' }, { id: 8, name: 'Denis' }];
+const readS = (text) => parseCommand(text, { ...ctx, staff });
+const pays = (r) => r.payments.map((p) => `${p.method}:${p.amount}`).join(' ');
+
+// payment: one method, split, amount before or after the method, with separators and thousands
+r = read('Болд төлбөр хаан');
+assert.deepEqual([r.intent, r.name, pays(r)], ['pay', 'Болд', 'khan:null']);
+assert.equal(pays(read('Болд төлбөр хаан 100000 бэлэн 49000')), 'khan:100000 cash:49000');
+assert.equal(pays(read('Болд төлбөр 149000 голомт')), 'golomt:149000', 'the amount may come first');
+assert.equal(pays(read('Болд төлбөр хаан 149,000')), 'khan:149000');
+assert.equal(pays(read('Болд төлбөр бэлнээр 149к')), 'cash:149000');
+assert.equal(pays(read('Болд tulbur khan 1.5 сая')), 'khan:1500000');
+assert.equal(pays(read('Болд төлбөр дотоод')), 'internal:null');
+r = read('Болд төлбөр gift');
+assert.deepEqual([r.intent, pays(r)], ['pay', 'gift_card:null'], 'on a payment line "gift" is the method');
+assert.equal(read('Болд төллөө нэхэмжлэхээр').payments[0].method, 'invoice');
+
+// changing a booking
+r = read('Болд 14:00 цуцал');
+assert.deepEqual([r.intent, r.name, r.time], ['cancel', 'Болд', '14:00']);
+assert.equal(read('Болдын захиалгыг цуцал').intent, 'cancel', 'a cancellation, not a booking');
+assert.deepEqual(read('Болдын захиалгыг цуцал').customers.map((c) => c.id), [1]);
+r = read('Болд 14:00 устга');
+assert.deepEqual([r.intent, r.name], ['delete', 'Болд']);
+r = read('Болд 14:00-г 15:30 болго');
+assert.deepEqual([r.intent, r.name, r.times], ['move', 'Болд', ['14:00', '15:30']], 'the ending on a time is not part of the name');
+r = read('Болдын цагийг маргааш 15:00 руу зөө');
+assert.deepEqual([r.intent, r.date, r.times, r.customers.map((c) => c.id)], ['move', '2026-11-25', ['15:00'], [1]]);
+r = read('Болд cc-г led болго');
+assert.deepEqual([r.intent, r.services.map((s) => s.slug)], ['move', ['cryocabin', 'ledpro']]);
+r = read('Болд cc-г бүтэн биеийн массаж болго');
+assert.deepEqual(r.services.map((s) => s.slug), ['cryocabin', 'massage'], 'services stay in the order typed, however long their names');
+r = read('Болд ирсэн');
+assert.deepEqual([r.intent, r.name], ['done', 'Болд']);
+assert.equal(read('Болд 14:00 баталгаажуул').intent, 'confirm');
+r = readS('Болд cc Чимгээ хийсэн');
+assert.deepEqual([r.intent, r.name, slug(r), r.staff?.id], ['provider', 'Болд', 'cryocabin', 7], 'the staff name is not the customer');
+r = read('Болд маргааш 14:00 cc багцаар');
+assert.deepEqual([r.intent, r.byPackage, slug(r)], ['book', true, 'cryocabin']);
+
+// the employee's own shift — only when said alone
+assert.equal(read('ирлээ').intent, 'clockin');
+assert.equal(read('ажил эхэллээ').intent, 'clockin');
+assert.equal(read('явлаа').intent, 'clockout');
+assert.equal(read('гарлаа').intent, 'clockout');
+assert.equal(read('Болд ирлээ').intent, 'done', 'with a name it is the customer who arrived');
+
+// extra income
+r = read('нэмэлт орлого balloon Бат 45000 бэлэн');
+assert.deepEqual([r.intent, r.incomeKind, r.name, pays(r), r.service], ['income', 'oxygen_balloon', 'Бат', 'cash:45000', null]);
+r = read('нэмэлт орлого oxygen balloon Клуб 90000 хаан');
+assert.deepEqual([r.incomeKind, r.name, r.service], ['oxygen_balloon', 'Клуб', null], '"oxygen balloon" is income, not a session');
+assert.equal(read('нэмэлт орлого нэхэмжлэл МТ ХХК 500000 нэхэмжлэх').incomeKind, 'invoice');
+
+// gift cards
+r = read('gift card Тэмүүлэн 99887766 олго 200000 хаан');
+assert.deepEqual([r.intent, r.sub, r.name, r.phone, pays(r)], ['gift', 'sell', 'Тэмүүлэн', '99887766', 'khan:200000']);
+r = read('gift card Болд хас 149000 cc');
+assert.deepEqual([r.intent, r.sub, r.name, r.amounts, slug(r)], ['gift', 'use', 'Болд', [149000], 'cryocabin']);
+assert.deepEqual([read('gift card Болд').intent, read('gift card Болд').sub], ['gift', 'balance']);
+assert.equal(read('гифт карт Болд').intent, 'gift');
+
+// packages
+r = read('Болд багц зар Recovery хаан 500000');
+assert.deepEqual([r.intent, r.sub, r.name, pays(r)], ['package', 'sell', 'Болд Recovery', 'khan:500000'], 'the package name is left for the caller to find');
+r = read('Болд багц оролт cc led');
+assert.deepEqual([r.intent, r.sub, r.name, r.services.map((s) => s.slug)], ['package', 'use', 'Болд', ['cryocabin', 'ledpro']]);
+assert.equal(read('Болд багц').intent, 'balance');
+
+// teams
+r = read('баг Аварга Бат cc led');
+assert.deepEqual([r.intent, r.sub, r.name, r.services.length], ['team', 'visit', 'Аварга Бат', 2]);
+r = read('баг Аварга гишүүн нэм Тэмүүлэн');
+assert.deepEqual([r.intent, r.sub, r.name], ['team', 'member', 'Аварга Тэмүүлэн']);
+
+// the rest
+r = read('шинэ үйлчлүүлэгч Тэмүүлэн 99887766');
+assert.deepEqual([r.intent, r.name, r.phone], ['customer', 'Тэмүүлэн', '99887766']);
+assert.equal(read('өнөөдрийн борлуулалт').intent, 'sales');
+r = read('захиалга хуудас нээ');
+assert.deepEqual([r.intent, r.target], ['open', 'захиалга']);
+assert.equal(read('багц руу оч').target, 'багц');
+assert.equal(read('Хаанаа 99112200').intent, 'find', 'a name is not a payment method');
+
 // ── free times follow the booking grid ──
 const block = (d) => Math.max(30, Math.ceil((Number(d) || 30) / 30) * 30);
 const at = (t) => `2026-11-25T${t}:00+08:00`;

@@ -421,6 +421,8 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pkgVisitSave").addEventListener("click", saveVisit);
   $("sharedStaffSelect")?.addEventListener("change", () => { options(); renderLeads(); });
   window.addEventListener("cryo:staff-changed", () => { options(); renderLeads(); });
+  /* the staff assistant sells packages and records visits through the same tables */
+  window.addEventListener("cryo:assistant-changed", () => { load(); });
   sb.auth.onAuthStateChange((_event, session) => {
     if (!session) { loadedUserId=null; return; }
     if (session.user.id !== loadedUserId) setTimeout(load, 0);

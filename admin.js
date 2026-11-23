@@ -8,9 +8,9 @@ import { bookingGroups, bookingUsage } from "./booking-groups.js";
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { customerPicker } from "./customer-picker.js";
-import { matchesName } from "./name-search.js";
+import { matchesName, nameKey } from "./name-search.js";
 import "./booking-time.js";
-import { parseCommand, freeTimes, describeDay, HELP_LINES } from "./staff-assistant.js";
+import { parseCommand, freeTimes, describeDay, findNamed, findCustomers, HELP_GROUPS, METHOD_LABEL } from "./staff-assistant.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const $ = (id) => document.getElementById(id);
@@ -4509,18 +4509,27 @@ async function runImport() {
 /* ══════════════════════════════════════════════════════════════
    STAFF ASSISTANT — typed commands
    staff-assistant.js reads the line; this decides what to do with it.
-   Everything goes through the signed-in employee's own session, so the
-   assistant can do nothing the employee could not do by hand, and a
-   booking is written only after they press «Бүртгэх».
+
+   The rule for everything below: the assistant does what the screens
+   do, the way the screens do it. Each action calls the same table or
+   RPC as its form, applies the same checks first, and runs through the
+   signed-in employee's own session — so it can do nothing they could
+   not do by hand. Nothing is written until they press the confirm
+   button on a card that says exactly what will be saved.
    ══════════════════════════════════════════════════════════════ */
-let asstDraft = null; // a booking being put together over several messages
+let asstDraft = null;   // a booking being put together over several messages
+let asstPending = null; // any other request still missing a piece; the next reply is added to it
 
 const asstServices = () => listedServices().filter((service) => service.active);
 const asstDay = (row) => row.booked_date || String(row.starts_at || "").slice(0, 10);
-const asstCalendarRows = (service) => {
+const asstServiceOf = (row) => cache.services.find((item) => Number(item.id) === Number(row.service_id));
+const asstSame = (a, b) => String(a || "").trim().toLocaleLowerCase("mn") === String(b || "").trim().toLocaleLowerCase("mn");
+const asstCalendarRows = (service, except = null) => {
   const calendar = calendarOf(service);
-  return cache.bookings.filter((row) => bookingCalendar(row) === calendar && row.status !== "cancelled");
+  return cache.bookings.filter((row) => bookingCalendar(row) === calendar && row.status !== "cancelled" && row !== except);
 };
+const asstCtx = () => ({ services: asstServices(), customers: cache.customers, staff: cache.staff.filter((person) => person.active), today: bookingDateToday() });
+const asstMethodsText = (parts) => parts.map(([method, amount]) => `${METHOD_LABEL[method] || method} ${money(amount)}`).join(" + ");
 
 function asstScroll() {
   const log = $("asstLog");
@@ -4549,7 +4558,7 @@ function asstSay(text, { tone = "", card = null, actions = [] } = {}) {
   if (card) {
     const box = document.createElement("div");
     box.className = "asst-card";
-    card.forEach(([label, value]) => {
+    card.filter(Boolean).forEach(([label, value]) => {
       const line = document.createElement("div");
       const small = document.createElement("span");
       small.textContent = label + " ";
@@ -4581,34 +4590,74 @@ function asstSay(text, { tone = "", card = null, actions = [] } = {}) {
   return bubble;
 }
 
+const asstBad = (text, actions = []) => void asstSay(text, { tone: "bad", actions });
 /* a button that types for the employee */
 const asstType = (label, text = label) => ({ label, run: () => { asstUser(text); asstHandle(text); } });
+/* a button that adds one word to the line being worked on */
+const asstAdd = (line, label, word = label) => asstType(label, `${line} ${word}`);
+const asstCancel = () => ({ label: "Болих", run: () => { asstDraft = null; asstPending = null; asstSay("За, болилоо."); } });
+
+/* ask for the piece that is missing; a typed reply is added to the same line */
+function asstAsk(line, text, actions = []) {
+  asstPending = line;
+  asstSay(text, { actions: [...actions, asstCancel()] });
+}
+
+/* the confirmation every write goes through */
+function asstConfirm(question, card, label, work) {
+  asstSay(question, {
+    card,
+    actions: [{
+      label, primary: true,
+      run: async () => {
+        try { await work(); }
+        catch (error) { asstBad("Хадгалж чадсангүй: " + (error?.message || error)); }
+      },
+    }, asstCancel()],
+  });
+}
+
+/* whoever is recorded as having done it; staff must be identified, an admin need not be */
+function asstEmployee() {
+  const employee = bookingEmployee();
+  if (!isAdminUser() && !employee) {
+    asstBad("Бүртгэх ажилтны нэрээ зүүн талын цэснээс сонгоод дахин бичнэ үү.");
+    return { ok: false, employee: null };
+  }
+  return { ok: true, employee };
+}
 
 function asstHelp(lead = "Би эдгээрийг хийж чадна:") {
-  asstSay(lead + "\n\n• " + HELP_LINES.join("\n• ") + "\n\nБичихдээ кирилл, латин аль нь ч болно. Бүртгэхийн өмнө заавал асууна.");
+  const body = HELP_GROUPS.map(([title, lines]) => `${title}\n${lines.map((line) => "• " + line).join("\n")}`).join("\n\n");
+  asstSay(`${lead}\n\n${body}\n\nКирилл, латин аль нь ч болно. Хадгалахын өмнө заавал асууна. Зогсоохдоо «болих».`);
 }
 
 function asstCustomerLine(customer) {
   return `${customer.is_vip ? "★ VIP · " : ""}${customer.full_name} · ${customer.phone || "утас бүртгээгүй"}`;
 }
 
+function asstBookingLine(row) {
+  return `${asstDay(row)} ${row.booked_time || String(row.starts_at || "").slice(11, 16)} · ${asstServiceOf(row)?.name || row.service || "—"} · ${row.customer_name || "—"}`;
+}
+
 function asstHandle(text) {
   const line = String(text || "").trim();
   if (!line) return;
-  if (!me) return void asstSay("Эхлээд нэвтэрнэ үү.", { tone: "bad" });
+  if (!me) return asstBad("Эхлээд нэвтэрнэ үү.");
 
   if (/^(болих|болъё|болио|цуцал|цуцлах|bolih|boliyo|tsutsal|cancel)$/i.test(line)) {
     asstDraft = null;
+    asstPending = null;
     return void asstSay("За, болилоо.");
   }
 
-  const parsed = parseCommand(line, { services: asstServices(), customers: cache.customers, today: bookingDateToday() });
+  const parsed = parseCommand(line, asstCtx());
 
   /* A reply to a question — "14:30", a phone number, a name — carries no
      request of its own: it fills in the booking already being put together. */
   if (asstDraft && !parsed.explicit) {
     const filled = parsed.date || parsed.time || parsed.service || parsed.phone || parsed.name;
-    if (!filled && !parsed.problems.length) return void asstSay("Ойлгосонгүй. Дутуу мэдээллээ бичнэ үү, эсвэл «болих» гэж бичнэ үү.", { tone: "bad" });
+    if (!filled && !parsed.problems.length) return asstBad("Ойлгосонгүй. Дутуу мэдээллээ бичнэ үү, эсвэл «болих» гэж бичнэ үү.");
     if (parsed.date) asstDraft.date = parsed.date;
     if (parsed.time) asstDraft.time = parsed.time;
     if (parsed.service) asstDraft.service = parsed.service;
@@ -4625,32 +4674,44 @@ function asstHandle(text) {
     asstDraft.problems = parsed.problems;
     return void asstBook();
   }
+  /* the same for every other request: the reply completes the line that asked for it */
+  if (asstPending && !parsed.explicit) {
+    const whole = `${asstPending} ${line}`;
+    asstPending = null;
+    return void asstHandle(whole);
+  }
+  asstPending = null;
 
   if (parsed.intent === "book") {
-    asstDraft = { date: parsed.date, time: parsed.time, service: parsed.service, name: parsed.name, phone: parsed.phone, customer: null, customers: parsed.customers, problems: parsed.problems };
+    asstDraft = { date: parsed.date, time: parsed.time, service: parsed.service, name: parsed.name, phone: parsed.phone, customer: null, customers: parsed.customers, problems: parsed.problems, byPackage: parsed.byPackage };
     return void asstBook();
   }
   asstDraft = null;
-  if (parsed.problems.length) return void asstSay(parsed.problems.join("\n"), { tone: "bad" });
-  if (parsed.intent === "schedule") return void asstSchedule(parsed);
-  if (parsed.intent === "free") return void asstFree(parsed);
-  if (parsed.intent === "find") return void asstFind(parsed);
-  if (parsed.intent === "balance") return void asstBalance(parsed);
-  if (parsed.intent === "help") return void asstHelp();
-  asstHelp("Ойлгосонгүй. Ингэж бичээд үзээрэй:");
+  if (parsed.problems.length) return asstBad(parsed.problems.join("\n"));
+  const handlers = {
+    schedule: asstSchedule, free: asstFree, find: asstFind, balance: asstBalance, sales: asstSales,
+    cancel: (p, l) => asstStatus(p, l, "cancelled"), confirm: (p, l) => asstStatus(p, l, "confirmed"), done: (p, l) => asstStatus(p, l, "done"),
+    delete: asstDelete, move: asstMove, provider: asstProvider, pay: asstPay, income: asstIncome,
+    clockin: () => asstClock(true), clockout: () => asstClock(false), customer: asstCustomer,
+    gift: asstGift, package: asstPackage, team: asstTeam, open: asstOpenPage, help: () => asstHelp(),
+  };
+  const handler = handlers[parsed.intent];
+  if (!handler) return void asstHelp("Ойлгосонгүй. Ингэж бичээд үзээрэй:");
+  try { Promise.resolve(handler(parsed, line)).catch((error) => asstBad("Алдаа гарлаа: " + (error?.message || error))); }
+  catch (error) { asstBad("Алдаа гарлаа: " + (error?.message || error)); }
 }
 
 /* ── booking: ask for whatever is missing, check the slot, then confirm ── */
 function asstBook() {
   const draft = asstDraft;
   const today = bookingDateToday();
-  const cancel = { label: "Болих", run: () => { asstDraft = null; asstSay("За, болилоо."); } };
+  const cancel = asstCancel();
 
   if (draft.problems?.length) {
     const said = draft.problems.join("\n");
     draft.problems = [];
     draft.time = null;
-    return void asstSay(said + "\n\nЦагаа дахин бичнэ үү.", { tone: "bad", actions: [cancel] });
+    return asstBad(said + "\n\nЦагаа дахин бичнэ үү.", [cancel]);
   }
 
   /* who */
@@ -4688,44 +4749,26 @@ function asstBook() {
   if (!staffCanChange(draft.date)) {
     const said = `Ажилтан зөвхөн өнөөдөр, маргаашийн цагт захиалга бүртгэнэ. ${describeDay(draft.date, today)} боломжгүй.`;
     draft.date = null;
-    return void asstSay(said + "\n\nӨөр өдөр бичнэ үү.", { tone: "bad", actions: [asstType("өнөөдөр"), asstType("маргааш"), cancel] });
+    return asstBad(said + "\n\nӨөр өдөр бичнэ үү.", [asstType("өнөөдөр"), asstType("маргааш"), cancel]);
   }
-  const rows = asstCalendarRows(service);
-  const options = { day: draft.date, duration, bookings: rows, blockedMinutes: CryoSchedule.blockedMinutes };
-  const open = freeTimes(options);
+  const slot = asstSlot(service, draft.date, draft.time);
   if (!draft.time) {
-    if (!open.length) {
-      return void asstSay(`${service.name} · ${describeDay(draft.date, today)} — сул цаг үлдээгүй. Өөр өдөр бичнэ үү.`, { tone: "bad", actions: [cancel] });
-    }
-    return void asstSay(`Хэдэн цагт вэ? ${service.name} · ${describeDay(draft.date, today)} — сул цагууд:`, { actions: [...open.slice(0, 14).map((time) => asstType(time)), cancel] });
+    if (!slot.open.length) return asstBad(`${service.name} · ${describeDay(draft.date, today)} — сул цаг үлдээгүй. Өөр өдөр бичнэ үү.`, [cancel]);
+    return void asstSay(`Хэдэн цагт вэ? ${service.name} · ${describeDay(draft.date, today)} — сул цагууд:`, { actions: [...slot.open.slice(0, 14).map((time) => asstType(time)), cancel] });
+  }
+  if (slot.problem) {
+    draft.time = null;
+    return asstBad(slot.problem, [...slot.nearest.map((time) => asstType(time)), cancel]);
   }
 
-  /* the slot must be one the booking grid offers, and must be free */
-  const everySlot = freeTimes({ ...options, bookings: [], includePast: true });
-  const start = Date.parse(`${draft.date}T${draft.time}:00+08:00`);
-  const end = start + CryoSchedule.blockedMinutes(duration) * 60000;
-  const nearest = (list) => [...list].sort((a, b) => Math.abs(Date.parse(`${draft.date}T${a}:00+08:00`) - start) - Math.abs(Date.parse(`${draft.date}T${b}:00+08:00`) - start)).slice(0, 6).sort();
-  if (!everySlot.includes(draft.time)) {
-    const said = `${service.name} (${duration} мин) ${draft.time}-д эхлэх боломжгүй — энэ үйлчилгээний цаг ${everySlot[0]}-оос ${Math.max(30, CryoSchedule.blockedMinutes(duration))} минутын зайтай.`;
-    draft.time = null;
-    return void asstSay(said + "\n\nОйролцоох сул цаг:", { tone: "bad", actions: [...nearest(open).map((time) => asstType(time)), cancel] });
-  }
-  const taken = rows.find((row) => CryoSchedule.overlaps(start, end, Date.parse(row.starts_at), Date.parse(row.blocked_until || row.ends_at)));
-  if (taken) {
-    const said = `${service.name} · ${draft.date} ${draft.time} завгүй байна — ${taken.booked_time || ""} ${taken.customer_name || ""}.`;
-    draft.time = null;
-    return void asstSay(said + (open.length ? "\n\nОйролцоох сул цаг:" : "\n\nЭнэ өдөр сул цаг үлдээгүй."), { tone: "bad", actions: [...nearest(open).map((time) => asstType(time)), cancel] });
-  }
-
-  const employee = bookingEmployee();
-  if (isSharedStaffAccount() && !employee) {
-    return void asstSay("Бүртгэх ажилтны нэрээ зүүн талын цэснээс сонгоод дахин оролдоно уу.", { tone: "bad", actions: [{ label: "Дахин шалгах", run: asstBook }, cancel] });
-  }
+  const who = asstEmployee();
+  if (!who.ok) return;
 
   const notes = [];
   if (draft.assumedDay) notes.push("Өдөр хэлээгүй тул өнөөдөр гэж авлаа.");
-  if (start < Date.now()) notes.push("Өнгөрсөн цаг — нөхөж бүртгэнэ.");
+  if (slot.start < Date.now()) notes.push("Өнгөрсөн цаг — нөхөж бүртгэнэ.");
   if (!draft.customer) notes.push("Шинэ үйлчлүүлэгчээр хадгалагдана.");
+  if (draft.byPackage) notes.push("Багцын эрхээр — төлбөр авахгүй.");
   asstSay("Ингэж бүртгэх үү?" + (notes.length ? "\n" + notes.join("\n") : ""), {
     card: [
       ["Үйлчлүүлэгч", `${name} · ${phone}`],
@@ -4733,25 +4776,47 @@ function asstBook() {
       ["Өдөр", describeDay(draft.date, today)],
       ["Цаг", draft.time],
     ],
-    actions: [{ label: "Бүртгэх", primary: true, run: () => asstSaveBooking({ name, phone, service, day: draft.date, time: draft.time, known: !!draft.customer }) }, cancel],
+    actions: [{ label: "Бүртгэх", primary: true, run: () => asstSaveBooking({ name, phone, service, day: draft.date, time: draft.time, known: !!draft.customer, kind: draft.byPackage ? "package" : "standard" }) }, cancel],
   });
 }
 
+/* Is this start time one the booking grid offers, and is it free?
+   `except` is the booking being moved, which must not block its own new slot. */
+function asstSlot(service, day, time, except = null) {
+  const duration = Number(service.duration_minutes) || 30;
+  const rows = asstCalendarRows(service, except);
+  const options = { day, duration, bookings: rows, blockedMinutes: CryoSchedule.blockedMinutes };
+  const open = freeTimes(options);
+  if (!time) return { open, nearest: [], problem: null };
+  const every = freeTimes({ ...options, bookings: [], includePast: true });
+  const start = Date.parse(`${day}T${time}:00+08:00`);
+  const end = start + CryoSchedule.blockedMinutes(duration) * 60000;
+  const distance = (t) => Math.abs(Date.parse(`${day}T${t}:00+08:00`) - start);
+  const nearest = [...open].sort((a, b) => distance(a) - distance(b)).slice(0, 6).sort();
+  let problem = null;
+  if (!every.includes(time)) {
+    problem = `${service.name} (${duration} мин) ${time}-д эхлэх боломжгүй — энэ үйлчилгээний цаг ${every[0]}-оос ${Math.max(30, CryoSchedule.blockedMinutes(duration))} минутын зайтай.\n\nОйролцоох сул цаг:`;
+  } else {
+    const taken = rows.find((row) => CryoSchedule.overlaps(start, end, Date.parse(row.starts_at), Date.parse(row.blocked_until || row.ends_at)));
+    if (taken) problem = `${service.name} · ${day} ${time} завгүй байна — ${taken.booked_time || ""} ${taken.customer_name || ""}.` + (open.length ? "\n\nОйролцоох сул цаг:" : "\n\nЭнэ өдөр сул цаг үлдээгүй.");
+  }
+  return { open, nearest, problem, start };
+}
+
 /* the same insert the booking form makes, for one slot */
-async function asstSaveBooking({ name, phone, service, day, time, known }) {
+async function asstSaveBooking({ name, phone, service, day, time, known, kind }) {
   asstDraft = null;
-  if (!staffCanChange(day)) return void asstSay("Ажилтан зөвхөн өнөөдөр, маргаашийн цагт захиалга бүртгэнэ.", { tone: "bad" });
-  const employee = bookingEmployee();
-  if (isSharedStaffAccount() && !employee) return void asstSay("Бүртгэх ажилтны нэрээ сонгоно уу.", { tone: "bad" });
+  if (!staffCanChange(day)) return asstBad("Ажилтан зөвхөн өнөөдөр, маргаашийн цагт захиалга бүртгэнэ.");
+  const who = asstEmployee();
+  if (!who.ok) return;
   if (!known) ensureCustomer(name, phone).catch(() => {});
-  const startsAt = `${day}T${time}:00+08:00`;
   try {
     const { data, error } = await sb.from("bookings").insert({
       ref: "STAFF-" + crypto.randomUUID(), booking_group: crypto.randomUUID(), customer_name: name, phone,
-      team_id: null, service_id: service.id, starts_at: startsAt,
-      booking_kind: "standard", status: "confirmed", amount: 0, deposit: 0,
-      staff_id: employee?.id || null, user_id: null,
-      note: `Ажилтнаар бүртгэсэн: ${employee?.name || me?.full_name || me?.email || ""}. (Туслахаар)`,
+      team_id: null, service_id: service.id, starts_at: `${day}T${time}:00+08:00`,
+      booking_kind: kind, status: "confirmed", amount: 0, deposit: 0,
+      staff_id: who.employee?.id || null, user_id: null,
+      note: `Ажилтнаар бүртгэсэн: ${who.employee?.name || me?.full_name || me?.email || ""}. (Туслахаар)`,
     }).select();
     if (error) throw error;
     const ids = new Set(data.map((row) => row.id));
@@ -4761,10 +4826,340 @@ async function asstSaveBooking({ name, phone, service, day, time, known }) {
     refreshCustomers();
     asstSay(`Бүртгэлээ: ${name} · ${service.name} · ${day} ${time}`, { tone: "ok" });
   } catch (error) {
-    asstSay(error.code === "23P01" ? "Энэ цагийг яг одоо өөр хүн авчихлаа. Захиалга хадгалагдаагүй — өөр цаг сонгоно уу." : "Хадгалж чадсангүй: " + error.message, { tone: "bad" });
+    asstBad(error.code === "23P01" ? "Энэ цагийг яг одоо өөр хүн авчихлаа. Захиалга хадгалагдаагүй — өөр цаг сонгоно уу." : "Хадгалж чадсангүй: " + error.message);
     const refreshed = await fetchAll(() => sb.from("bookings").select("*").order("id"));
     if (!refreshed.error) { cache.bookings = refreshed.data || []; renderBookings(); }
   }
+}
+
+/* ── finding the booking a line is about ── */
+/* Every live booking of the person named. A booking can carry a name that is
+   not in the customer list, so the booking's own name is matched as well. */
+function asstRowsOf(parsed) {
+  const names = parsed.customers.map((customer) => customer.full_name);
+  return cache.bookings.filter((row) => {
+    if (row.status === "cancelled") return false;
+    if (names.some((name) => asstSame(name, row.customer_name))) return true;
+    if (parsed.name) return matchesName(row.customer_name, parsed.name);
+    return !!parsed.phone && normalizePhone(row.phone) === parsed.phone;
+  }).sort((a, b) => String(a.starts_at || "").localeCompare(String(b.starts_at || "")));
+}
+
+/* Narrow to the day, time and service that were said. With no day said,
+   today's bookings come first, then whatever is still ahead. */
+function asstNarrow(rows, { day = null, time = null, service = null } = {}) {
+  const today = bookingDateToday();
+  let list = rows;
+  if (day) list = list.filter((row) => asstDay(row) === day);
+  else {
+    const todays = list.filter((row) => asstDay(row) === today);
+    list = todays.length ? todays : list.filter((row) => asstDay(row) > today);
+  }
+  if (time) list = list.filter((row) => (row.booked_time || String(row.starts_at || "").slice(11, 16)) === time);
+  if (service) list = list.filter((row) => Number(row.service_id) === Number(service.id) || bookingCalendar(row) === calendarOf(service));
+  return list;
+}
+
+/* settle on one booking — ask which when the line fits several */
+function asstPick(parsed, line, rows, question, then) {
+  if (!parsed.name && !parsed.phone) return asstAsk(line, "Хэний захиалга вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
+  if (!rows.length) return asstBad(`«${parsed.name || parsed.phone}» — тохирох захиалга олдсонгүй${parsed.date ? ` (${parsed.date})` : ""}. «${parsed.name || parsed.phone} хайх» эсвэл «өнөөдрийн хуваарь» гэж шалгаарай.`);
+  if (rows.length === 1) return then(rows[0]);
+  const shown = rows.slice(0, 8);
+  asstSay(`${question}${rows.length > shown.length ? `\n(${rows.length}-аас эхний ${shown.length}; цаг эсвэл өдрөө нэмж бичвэл нарийсна.)` : ""}`, {
+    actions: [...shown.map((row) => ({ label: asstBookingLine(row), run: () => { asstUser(asstBookingLine(row)); then(row); } })), asstCancel()],
+  });
+}
+
+/* ── status: cancelled, confirmed, done ── */
+function asstStatus(parsed, line, status) {
+  const rows = asstNarrow(asstRowsOf(parsed), { day: parsed.date, time: parsed.time, service: parsed.service }).filter((row) => row.status !== status);
+  asstPick(parsed, line, rows, "Аль захиалга вэ?", (booking) => {
+    const who = asstEmployee();
+    if (!who.ok) return;
+    const verb = { cancelled: "Цуцлах", confirmed: "Баталгаажуулах", done: "Биелсэн болгох" }[status];
+    asstConfirm(`${verb} үү?`, [
+      ["Захиалга", asstBookingLine(booking)],
+      ["Төлөв", `${STATUS_MN[booking.status] || booking.status} → ${STATUS_MN[status]}`],
+    ], verb, async () => {
+      const { data, error } = await sb.rpc("set_booking_status", { p_booking_id: booking.id, p_status: status, p_staff_id: who.employee?.id || null });
+      if (error) throw error;
+      Object.assign(booking, data.booking);
+      if (data.sale) window.dispatchEvent(new CustomEvent("cryo:sale-saved", { detail: data.sale }));
+      renderOverview();
+      renderBookings();
+      asstSay(`${asstBookingLine(booking)} — ${STATUS_MN[status]}.`, { tone: "ok" });
+    });
+  });
+}
+
+/* ── delete ── */
+function asstDelete(parsed, line) {
+  const rows = asstNarrow(asstRowsOf(parsed), { day: parsed.date, time: parsed.time, service: parsed.service });
+  asstPick(parsed, line, rows, "Аль захиалгыг устгах вэ?", (booking) => {
+    if (!staffCanChange(asstDay(booking))) return asstBad("Ажилтан зөвхөн өнөөдөр, маргаашийн захиалгыг устгана.");
+    const paid = booking.payment_status === "paid";
+    if (paid && !isAdminUser()) return asstBad("Төлбөр бүртгэгдсэн захиалгыг зөвхөн админ устгана.");
+    asstConfirm("Энэ захиалгыг бүрмөсөн устгах уу? Буцаах боломжгүй." + (paid ? "\nТөлбөр нь бүртгэгдсэн: борлуулалтын бичлэг архивлагдаж, тайлангаас хасагдана." : ""), [
+      ["Захиалга", asstBookingLine(booking)],
+    ], "Устгах", async () => {
+      const { data, error } = await sb.rpc("delete_booking", { p_booking_id: booking.id });
+      if (error) throw error;
+      cache.bookings = cache.bookings.filter((row) => Number(row.id) !== Number(booking.id));
+      if (data?.sale_id) cache.sales = cache.sales.filter((sale) => Number(sale.id) !== Number(data.sale_id));
+      renderBookings(); renderOverview(); renderReports(); renderLedger();
+      asstSay(`Устгалаа: ${asstBookingLine(booking)}`, { tone: "ok" });
+    });
+  });
+}
+
+/* ── move: a new time, day or device for an existing booking ── */
+function asstMove(parsed, line) {
+  const all = asstRowsOf(parsed);
+  /* Two of a kind are "from … to …". One of a kind is where the booking is
+     now if the customer has one there, and where it should go if not. */
+  let fromDay = parsed.dates.length > 1 ? parsed.dates[0] : null, toDay = parsed.dates.length ? parsed.dates.at(-1) : null;
+  let fromTime = parsed.times.length > 1 ? parsed.times[0] : null, toTime = parsed.times.length ? parsed.times.at(-1) : null;
+  let fromService = parsed.services.length > 1 ? parsed.services[0] : null, toService = parsed.services.length ? parsed.services.at(-1) : null;
+  const timeOf = (row) => row.booked_time || String(row.starts_at || "").slice(11, 16);
+  const onService = (row, service) => Number(row.service_id) === Number(service.id) || bookingCalendar(row) === calendarOf(service);
+  if (parsed.dates.length === 1 && all.some((row) => asstDay(row) === toDay) && (toTime || toService)) { fromDay = toDay; toDay = null; }
+  if (parsed.services.length === 1 && all.some((row) => onService(row, toService)) && (toTime || toDay)) { fromService = toService; toService = null; }
+  if (parsed.times.length === 1 && all.some((row) => timeOf(row) === toTime) && (toDay || toService)) { fromTime = toTime; toTime = null; }
+
+  const rows = asstNarrow(all, { day: fromDay, time: fromTime, service: fromService });
+  asstPick(parsed, line, rows, "Аль захиалгыг өөрчлөх вэ?", (booking) => {
+    if (booking.payment_status === "paid") return asstBad("Төлөгдсөн захиалгын төхөөрөмж, цагийг өөрчлөхгүй.");
+    const current = asstServiceOf(booking);
+    const service = toService || current;
+    const day = toDay || asstDay(booking);
+    if (!service) return asstBad("Энэ захиалгын үйлчилгээ олдсонгүй. Захиалга хуудаснаас засна уу.");
+    if (!staffCanChange(asstDay(booking)) || !staffCanChange(day)) return asstBad("Ажилтан зөвхөн өнөөдөр, маргаашийн захиалгыг, мөн тэр өдрүүд рүү л засна.");
+
+    const propose = (time) => {
+      if (day === asstDay(booking) && time === timeOf(booking) && Number(service.id) === Number(booking.service_id)) {
+        return asstAsk(line, `${asstBookingLine(booking)}\n\nЮуг өөрчлөх вэ? Шинэ цаг, өдөр эсвэл төхөөрөмжөө бичнэ үү.`);
+      }
+      const slot = asstSlot(service, day, time, booking);
+      if (slot.problem) return asstBad(slot.problem, [...slot.nearest.map((t) => ({ label: t, run: () => { asstUser(t); propose(t); } })), asstCancel()]);
+      asstConfirm("Ингэж өөрчлөх үү?", [
+        ["Одоо", asstBookingLine(booking)],
+        ["Шинэ", `${day} ${time} · ${service.name} · ${booking.customer_name}`],
+      ], "Өөрчлөх", async () => {
+        const patch = { customer_name: booking.customer_name, phone: booking.phone, note: booking.note || null, service_id: service.id, starts_at: `${day}T${time}:00+08:00` };
+        const { data, error } = await sb.rpc("edit_booking", { p_booking_id: booking.id, p_patch: patch });
+        if (error) {
+          if (error.code === "23P01" || /overlap|bookings_no_device_overlap/.test(error.message || "")) throw new Error("тухайн цаг өөр захиалгатай давхцаж байна.");
+          throw error;
+        }
+        Object.assign(booking, data);
+        renderBookings(); renderOverview();
+        asstSay(`Өөрчиллөө: ${asstBookingLine(booking)}`, { tone: "ok" });
+      });
+    };
+    propose(toTime || timeOf(booking));
+  });
+}
+
+/* ── who performed the session ── */
+function asstProvider(parsed, line) {
+  const rows = asstNarrow(asstRowsOf(parsed), { day: parsed.date, time: parsed.time, service: parsed.service });
+  asstPick(parsed, line, rows, "Аль захиалга вэ?", (booking) => {
+    const save = (person) => asstConfirm("Үйлчилгээ үзүүлсэн ажилтныг бүртгэх үү?", [
+      ["Захиалга", asstBookingLine(booking)],
+      ["Ажилтан", person.name],
+    ], "Бүртгэх", async () => {
+      const { data, error } = await sb.rpc("record_booking_provider", { p_booking_id: booking.id, p_staff_id: Number(person.id) });
+      if (error) throw error;
+      Object.assign(booking, data);
+      renderBookings(); renderOverview();
+      asstSay(`${asstBookingLine(booking)} — ${person.name} үйлчилсэн.`, { tone: "ok" });
+    });
+    if (parsed.staff) return save(parsed.staff);
+    asstSay("Аль ажилтан үйлчилсэн бэ?", { actions: [...cache.staff.filter((person) => person.active).map((person) => ({ label: person.name, run: () => { asstUser(person.name); save(person); } })), asstCancel()] });
+  });
+}
+
+/* ── payment for a customer's bookings of the day ── */
+async function asstGiftCards() {
+  const [cards, uses] = await Promise.all([
+    sb.from("gift_cards").select("id,code,recipient_name,recipient_phone,amount").is("archived_at", null),
+    fetchAll(() => sb.from("gift_card_uses").select("card_id,amount").order("id")),
+  ]);
+  if (cards.error) throw cards.error;
+  if (uses.error) throw uses.error;
+  return (cards.data || []).map((card) => ({
+    ...card,
+    balance: Number(card.amount) - (uses.data || []).filter((use) => Number(use.card_id) === Number(card.id)).reduce((sum, use) => sum + Number(use.amount), 0),
+  }));
+}
+
+const asstCardsOf = (cards, name, phone) => cards.filter((card) =>
+  (name && (asstSame(card.code, name) || matchesName(card.recipient_name, name))) ||
+  (phone && normalizePhone(card.recipient_phone) === normalizePhone(phone)));
+
+function asstPay(parsed, line) {
+  const rows = asstNarrow(asstRowsOf(parsed), { day: parsed.date, time: parsed.time, service: parsed.service });
+  const unpaid = rows.filter((row) => row.payment_status !== "paid" && row.booking_kind !== "package");
+  if (rows.length && !unpaid.length) return asstBad(`«${parsed.name || parsed.phone}» — төлөх захиалга үлдээгүй (төлөгдсөн эсвэл багцын эрхээр).`);
+  /* same customer, same day: one checkout, the way the bookings list groups them */
+  const groups = [];
+  unpaid.forEach((row) => { if (!groups.some((group) => group.includes(row))) groups.push(paymentGroup(row)); });
+  const firsts = groups.map((group) => group[0]).filter(Boolean);
+  asstPick(parsed, line, firsts, "Аль өдрийн төлбөр вэ?", async (first) => {
+    const group = groups.find((rows2) => rows2.includes(first)) || [first];
+    const usage = bookingUsage(group, cache.services);
+    const total = usage.total;
+    if (!total) return asstBad("Төхөөрөмжийн үндсэн үнэ тохируулаагүй байна. «Үйлчилгээ, үнэ» хуудаснаас тохируулна уу.");
+    const who = asstEmployee();
+    if (!who.ok) return;
+    if (!first.phone) return asstBad("Энэ захиалгад утас бүртгэгдээгүй. Захиалгаа засаж утас нэмсний дараа төлбөр бүртгэнэ.");
+
+    if (!parsed.payments.length) {
+      return asstAsk(line, `${first.customer_name} · ${usage.label}\nНийт ${money(total)}. Яаж төлсөн бэ?`, [
+        asstAdd(line, "Хаан", "хаан"), asstAdd(line, "Голомт", "голомт"), asstAdd(line, "Бэлэн", "бэлэн"),
+        asstAdd(line, "Нэхэмжлэх", "нэхэмжлэх"), asstAdd(line, "Barter", "barter"), asstAdd(line, "Gift card", "gift"), asstAdd(line, "Дотоод", "дотоод"),
+      ]);
+    }
+
+    /* staff's own use: the price goes to internal sales, not to income */
+    if (parsed.payments.some((payment) => payment.method === "internal")) {
+      if (parsed.payments.length > 1) return asstBad("Дотоод хэрэглээг бусад төлбөрийн хэлбэртэй хольж болохгүй.");
+      return asstConfirm("Дотоод ажилтны хэрэглээ гэж бүртгэх үү? Үнийн дүн дотоод борлуулалтад орно (орлогод нэмэгдэхгүй).", [
+        ["Үйлчлүүлэгч", first.customer_name], ["Үйлчилгээ", usage.label], ["Дүн", money(total)],
+      ], "Бүртгэх", async () => {
+        const sale = { customer_name: first.customer_name, staff_id: who.employee?.id || null, internal_amount: total, is_internal: true, note: "Дотоод ажилтан" };
+        if (isAdminUser() && first.booked_date) sale.sale_date = first.booked_date;
+        const { data, error } = await sb.rpc("pay_bookings", { p_booking_ids: group.map((row) => row.id), p_sale: sale });
+        if (error) throw error;
+        applyCheckoutResult(data);
+        renderBookings(); renderReports();
+        asstSay(`${first.customer_name} · ${usage.label} — дотоод хэрэглээнд ${money(total)} бүртгэгдлээ.`, { tone: "ok" });
+      });
+    }
+
+    /* amounts: one method left blank takes whatever the others do not cover */
+    const blanks = parsed.payments.filter((payment) => payment.amount == null);
+    const stated = parsed.payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+    if (blanks.length > 1) return asstBad(`Нийт ${money(total)}. Хэд хэдэн хэлбэрээр төлсөн бол тус бүрийн дүнг бичнэ үү: «… хаан 100000 бэлэн 49000».`);
+    const split = new Map();
+    parsed.payments.forEach((payment) => split.set(payment.method, (split.get(payment.method) || 0) + (payment.amount ?? (total - stated))));
+    const paid = [...split.values()].reduce((sum, amount) => sum + amount, 0);
+    if ([...split.values()].some((amount) => amount <= 0)) return asstBad(`Нийт ${money(total)} — бичсэн дүн үүнээс их байна.`);
+    if (paid !== total) return asstBad(paid < total ? `Төлбөр ${money(total - paid)} дутуу байна (нийт ${money(total)}).` : `Төлбөр нийт дүнгээс ${money(paid - total)} илүү байна (нийт ${money(total)}).`);
+
+    /* a gift card has to be the right card with enough on it; anything less clear goes to the form */
+    let card = null;
+    const giftAmount = split.get("gift_card") || 0;
+    if (giftAmount) {
+      const cards = asstCardsOf(await asstGiftCards(), first.customer_name, first.phone).filter((item) => item.balance > 0);
+      if (cards.length !== 1 || cards[0].balance < giftAmount) {
+        openBookingPayment(first, group, "gift");
+        switchView("bookings");
+        return void asstSay(cards.length
+          ? "Gift card-ын үлдэгдэл хүрэхгүй эсвэл хэд хэдэн карт байна. Төлбөрийн маягтыг нээлээ — картаа сонгоод нэмэлт төлбөрөө оруулна уу."
+          : `${first.customer_name}-н нэр, утсаар gift card олдсонгүй. Төлбөрийн маягтыг нээлээ — картаа хайж сонгоно уу.`);
+      }
+      card = cards[0];
+    }
+
+    const parts = [...split.entries()];
+    asstConfirm("Төлбөрийг ингэж бүртгэх үү?", [
+      ["Үйлчлүүлэгч", `${first.customer_name} · ${first.phone}`],
+      ["Үйлчилгээ", usage.label],
+      ["Нийт", money(total)],
+      ["Төлбөр", asstMethodsText(parts)],
+      card ? ["Gift card", `${card.code} · үлдэгдэл ${money(card.balance)}`] : null,
+    ], "Төлсөн", async () => {
+      const patch = {
+        customer_name: first.customer_name, phone: first.phone, services: usage.label, note: first.note || null,
+        is_internal: false, therapist: who.employee?.name || null, staff_id: who.employee?.id || null,
+        therapist_amount: 0, needs_review: false, source: "manual",
+      };
+      PAYS.forEach(([column]) => { patch[column] = split.get(column) || 0; });
+      DEVICES.forEach(([column]) => { patch[column] = usage.counts[column] || 0; });
+      /* staff record today's takings; an administrator back-filling records it on the visit day */
+      if (isAdminUser()) patch.sale_date = first.booked_date || bookingDateToday();
+      const { data, error } = await sb.rpc("pay_bookings", { p_booking_ids: group.map((row) => row.id), p_sale: patch });
+      if (error) throw error;
+      applyCheckoutResult(data);
+      let cardNote = "";
+      if (card) {
+        const used = await sb.rpc("use_gift_card", { p: { request_id: crypto.randomUUID(), staff_id: patch.staff_id, card_id: card.id, amount: giftAmount, used_on: bookingDateToday(), service: patch.services, note: `Захиалга · ${patch.customer_name}` } });
+        if (used.error) cardNote = `\nАнхаар: төлбөр бүртгэгдсэн боловч ${card.code} картаас хасаж чадсангүй (${used.error.message}). Gift card цэснээс гараар хасна уу.`;
+        else window.dispatchEvent(new CustomEvent("cryo:gift-cards-changed"));
+      }
+      renderBookings(); renderReports(); refreshCustomers();
+      asstSay(`Төлбөр бүртгэгдлээ: ${first.customer_name} · ${usage.label} · ${asstMethodsText(parts)}${cardNote}`, { tone: cardNote ? "bad" : "ok" });
+    });
+  });
+}
+
+/* ── extra income: oxygen balloon, invoice ── */
+function asstIncome(parsed, line) {
+  const who = asstEmployee();
+  if (!who.ok) return;
+  if (!parsed.incomeKind) return asstAsk(line, "Ямар орлого вэ?", [asstAdd(line, "Oxygen balloon", "balloon"), asstAdd(line, "Нэхэмжлэл", "нэхэмжлэл")]);
+  if (!parsed.name) return asstAsk(line, "Хаанаас орсон бэ? Хүн эсвэл байгууллагын нэрийг бичнэ үү.");
+  const payment = parsed.payments[0];
+  const amount = payment?.amount ?? parsed.amounts[0];
+  if (!amount) return asstAsk(line, "Хэдэн төгрөг вэ? Жишээ: 45000");
+  if (!payment) return asstAsk(line, `${money(amount)} — төлбөрийн хэлбэр?`, [asstAdd(line, "Бэлэн", "бэлэн"), asstAdd(line, "Хаан", "хаан"), asstAdd(line, "Голомт", "голомт"), asstAdd(line, "Нэхэмжлэх", "нэхэмжлэх"), asstAdd(line, "Barter", "barter")]);
+  if (!["cash", "khan", "golomt", "invoice", "barter"].includes(payment.method)) return asstBad("Нэмэлт орлогыг бэлэн, Хаан, Голомт, нэхэмжлэх эсвэл barter-аар бүртгэнэ.");
+  const kind = parsed.incomeKind === "invoice" ? "Нэхэмжлэл" : "Oxygen balloon";
+  const request = crypto.randomUUID();
+  asstConfirm("Нэмэлт орлогыг бүртгэх үү?", [
+    ["Төрөл", kind], ["Хаанаас", parsed.name], ["Дүн", money(amount)], ["Төлбөр", METHOD_LABEL[payment.method]],
+  ], "Бүртгэх", async () => {
+    const { data, error } = await sb.rpc("add_extra_income", { p: { request_id: request, staff_id: who.employee?.id || null, kind: parsed.incomeKind, source: parsed.name, amount, payment_method: payment.method, note: "" } });
+    if (error) throw error;
+    window.dispatchEvent(new CustomEvent("cryo:sale-saved", { detail: data.sale }));
+    asstSay(`${kind} · ${parsed.name} · ${money(amount)} өнөөдрийн борлуулалтад бүртгэгдлээ.`, { tone: "ok" });
+  });
+}
+
+/* ── the employee's own shift ── */
+function asstClock(arriving) {
+  const employee = bookingEmployee();
+  if (!employee) return asstBad("Ирцээ бүртгэхийн тулд зүүн талын цэснээс өөрийн нэрийг сонгоно уу.");
+  const today = localDateKey(new Date());
+  const row = currentAttendanceSession(employee.id, today);
+  const open = row && row.clock_in && !row.clock_out;
+  const at = (iso) => new Date(iso).toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" });
+  if (arriving) {
+    if (open) return void asstSay(`${employee.name} — ${at(row.clock_in)}-д ирсэн гэж бүртгэгдсэн байна.`);
+    return asstConfirm("Ирсэн цагийг одоо бүртгэх үү?", [["Ажилтан", employee.name], ["Өдөр", today]], "Ирсэн", async () => {
+      const result = await sb.rpc("start_employee_attendance", { p_staff_id: employee.id });
+      if (result.error) throw result.error;
+      const saved = Array.isArray(result.data) ? result.data[0] : result.data;
+      const current = cache.attendance.find((item) => Number(item.id) === Number(saved.id));
+      if (current) Object.assign(current, saved); else cache.attendance.unshift(saved);
+      asstSay(`${employee.name} — ирсэн цаг бүртгэгдлээ.`, { tone: "ok" });
+      if (isSharedStaffAccount()) return setSharedStaffSelection("");
+      renderAttendance();
+    });
+  }
+  if (!open) return asstBad(`${employee.name} — өнөөдөр нээлттэй ирц алга. Эхлээд «ирлээ» гэж бүртгэнэ үү.`);
+  asstConfirm("Гарсан цагийг одоо бүртгэх үү?", [["Ажилтан", employee.name], ["Ирсэн", at(row.clock_in)]], "Гарсан", async () => {
+    const result = await sb.from("attendance").update({ clock_out: new Date().toISOString() }).eq("id", row.id).is("clock_out", null).not("clock_in", "is", null).select().maybeSingle();
+    if (result.error) throw result.error;
+    if (result.data) Object.assign(row, result.data);
+    asstSay(`${employee.name} — гарсан цаг бүртгэгдлээ.`, { tone: "ok" });
+    if (isSharedStaffAccount()) return setSharedStaffSelection("");
+    renderAttendance();
+  });
+}
+
+/* ── a new customer ── */
+function asstCustomer(parsed, line) {
+  if (!parsed.name) return asstAsk(line, "Үйлчлүүлэгчийн нэрийг бичнэ үү.");
+  if (!parsed.phone) return asstAsk(line, `${parsed.name} — 8 оронтой утасны дугаарыг бичнэ үү.`);
+  const known = cache.customers.find((customer) => normalizePhone(customer.phone) === parsed.phone);
+  if (known) return void asstSay(`Энэ дугаар бүртгэлтэй байна: ${asstCustomerLine(known)}`);
+  asstConfirm("Шинэ үйлчлүүлэгч бүртгэх үү?", [["Нэр", parsed.name], ["Утас", parsed.phone]], "Бүртгэх", async () => {
+    const customer = await ensureCustomer(parsed.name, parsed.phone);
+    asstSay(`Бүртгэлээ: ${asstCustomerLine(customer)}`, { tone: "ok" });
+  });
 }
 
 /* ── the read-only requests ── */
@@ -4778,8 +5173,8 @@ function asstSchedule(parsed) {
   const title = `${describeDay(day, today)}${parsed.service ? " · " + parsed.service.name : ""}`;
   if (!rows.length) return void asstSay(`${title}\n\nЗахиалга алга.`);
   const lines = rows.slice(0, 40).map((row) => {
-    const service = cache.services.find((item) => Number(item.id) === Number(row.service_id));
-    return `${row.booked_time || String(row.starts_at || "").slice(11, 16)} · ${service?.name || row.service || "—"} · ${row.customer_name || "—"}${row.status && row.status !== "confirmed" ? " · " + (STATUS_MN[row.status] || row.status) : ""}`;
+    const paid = row.booking_kind === "package" ? " · багцаар" : row.payment_status === "paid" ? " · төлсөн" : "";
+    return `${row.booked_time || String(row.starts_at || "").slice(11, 16)} · ${asstServiceOf(row)?.name || row.service || "—"} · ${row.customer_name || "—"}${row.status && row.status !== "confirmed" ? " · " + (STATUS_MN[row.status] || row.status) : ""}${paid}`;
   });
   asstSay(`${title} — ${rows.length} захиалга\n\n${lines.join("\n")}${rows.length > lines.length ? `\n… бусад ${rows.length - lines.length}` : ""}`);
 }
@@ -4792,7 +5187,7 @@ function asstFree(parsed) {
     return void asstSay(`Аль төхөөрөмжийн сул цагийг харах вэ? (${describeDay(day, today)})`, { actions: devices.map((service) => asstType(service.name, `${service.name} ${day} сул цаг`)) });
   }
   const service = parsed.service;
-  const open = freeTimes({ day, duration: Number(service.duration_minutes) || 30, bookings: asstCalendarRows(service), blockedMinutes: CryoSchedule.blockedMinutes });
+  const open = asstSlot(service, day, null).open;
   if (!open.length) return void asstSay(`${service.name} · ${describeDay(day, today)}\n\nСул цаг үлдээгүй.`);
   /* pressing a time starts a booking for it */
   asstSay(`${service.name} · ${describeDay(day, today)} — ${open.length} сул цаг. Цаг дээр дарвал захиалга эхэлнэ:`, {
@@ -4803,35 +5198,275 @@ function asstFree(parsed) {
 function asstFind(parsed) {
   const found = parsed.customers;
   const asked = parsed.name || parsed.phone;
-  if (!found.length) return void asstSay(`«${asked}» — үйлчлүүлэгч олдсонгүй.`);
+  if (!found.length) {
+    /* a name with a number that is not on file is one tap away from being a customer */
+    const offer = parsed.name && parsed.phone ? [asstType("Шинээр бүртгэх", `шинэ үйлчлүүлэгч ${parsed.name} ${parsed.phone}`)] : [];
+    return void asstSay(`«${asked}» — үйлчлүүлэгч олдсонгүй.`, { actions: offer });
+  }
   const shown = found.slice(0, 8);
+  const one = shown.length === 1 ? shown[0] : null;
+  const tag = one ? (one.phone || one.full_name) : "";
   asstSay(`«${asked}» — ${found.length} үйлчлүүлэгч:\n\n${shown.map(asstCustomerLine).join("\n")}${found.length > shown.length ? `\n… бусад ${found.length - shown.length}` : ""}`, {
-    actions: shown.length === 1 ? [asstType("Багц харах", `${shown[0].phone || shown[0].full_name} багц`)] : [],
+    actions: one ? [asstType("Багц харах", `${tag} багц`), asstType("Цаг захиалах", `${tag} захиал`)] : [],
   });
 }
 
-function asstBalance(parsed) {
+const asstContractsOf = (customer) => contractRows()
+  .filter((row) => Number(row.customer_id) === Number(customer.id) || (!row.customer_id && asstSame(row.customer_label, customer.full_name)))
+  .map((row) => ({ ...row, __state: packageStateOf(row) }))
+  .sort((a, b) => (a.__state === "active" ? 0 : 1) - (b.__state === "active" ? 0 : 1) || String(b.__last).localeCompare(String(a.__last)));
+
+/* the same rule the package screen uses to decide whether a contract can still be used */
+function packageStateOf(row) {
+  if (row.status === "completed") return "completed";
+  if (row.status === "expired" || (row.expires_on && row.expires_on < bookingDateToday())) return "expired";
+  if (row.__total != null && row.__used >= row.__total) return "completed";
+  return row.status === "cancelled" ? "cancelled" : "active";
+}
+
+const asstContractLine = (row) => {
+  const count = row.__total == null ? `${row.__used} удаа ашигласан` : `${row.__used}/${row.__total} ашигласан · ${row.__left} үлдсэн`;
+  return `${row.__label} — ${count} · ${(CPK_STATUS[row.__state] || [row.__state])[0]}`;
+};
+
+/* one customer out of a parsed line, or a question when it is not clear which */
+function asstOneCustomer(parsed, line, then, ask = "Хэн бэ? Нэр эсвэл утасны дугаарыг бичнэ үү.") {
   const found = parsed.customers;
-  if (!parsed.name && !parsed.phone) return void asstSay("Хэний багцыг харах вэ? Жишээ: «Болд багц»");
-  if (!found.length) return void asstSay(`«${parsed.name || parsed.phone}» — үйлчлүүлэгч олдсонгүй.`);
-  if (found.length > 1) {
-    const shown = found.slice(0, 6);
-    return void asstSay(`«${parsed.name}» нэртэй ${found.length} үйлчлүүлэгч байна. Аль нь вэ?`, {
-      actions: shown.map((customer) => asstType(asstCustomerLine(customer), `${customer.phone || customer.full_name} багц`)),
+  if (!parsed.name && !parsed.phone) return asstAsk(line, ask);
+  if (!found.length) return asstBad(`«${parsed.name || parsed.phone}» — үйлчлүүлэгч олдсонгүй.`);
+  if (found.length === 1) return then(found[0]);
+  asstSay(`«${parsed.name}» нэртэй ${found.length} үйлчлүүлэгч байна. Аль нь вэ?`, {
+    actions: [...found.slice(0, 6).map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); then(customer); } })), asstCancel()],
+  });
+}
+
+function asstBalance(parsed, line) {
+  asstOneCustomer(parsed, line, (customer) => {
+    const contracts = asstContractsOf(customer);
+    if (!contracts.length) return void asstSay(`${asstCustomerLine(customer)}\n\nБагц бүртгэгдээгүй.`);
+    asstSay(`${asstCustomerLine(customer)}\n\n${contracts.slice(0, 12).map(asstContractLine).join("\n")}`);
+  }, "Хэний багцыг харах вэ? Жишээ: «Болд багц»");
+}
+
+function asstSales() {
+  const today = bookingDateToday();
+  const own = selectedSharedStaff();
+  const rows = cache.sales.filter((sale) => sale.sale_date === today && isReportableSale(sale) && (!own || saleBelongsToStaff(sale, own)));
+  if (!rows.length) return void asstSay(`Өнөөдөр (${today}) борлуулалт бүртгэгдээгүй байна.`);
+  const sum = (column) => rows.reduce((total, sale) => total + Number(sale[column] || 0), 0);
+  const parts = [["khan", "khan"], ["golomt", "golomt"], ["cash", "cash"], ["invoice", "invoice"], ["barter", "barter"], ["gift_card", "gift_card"], ["internal", "internal_amount"]]
+    .map(([method, column]) => [method, sum(column)]).filter(([, amount]) => amount > 0);
+  asstSay(`Өнөөдрийн борлуулалт (${today})${own ? " · " + own.name : ""}\n\n${rows.length} гүйлгээ · нийт ${money(sum("total"))}\n${parts.map(([method, amount]) => `${METHOD_LABEL[method]}: ${money(amount)}`).join("\n")}`, {
+    actions: [{ label: "Тайланг нээх", run: () => switchView("reports") }],
+  });
+}
+
+/* ── gift cards: look up, issue, deduct ── */
+async function asstGift(parsed, line) {
+  const today = bookingDateToday();
+  if (parsed.sub === "sell") {
+    const who = asstEmployee();
+    if (!who.ok) return;
+    if (!parsed.name) return asstAsk(line, "Gift card авах хүний нэрийг бичнэ үү.");
+    const payment = parsed.payments[0];
+    const amount = payment?.amount ?? parsed.amounts[0];
+    if (!amount) return asstAsk(line, "Картын үнийн дүн? Жишээ: 200000");
+    if (!payment) return asstAsk(line, `${money(amount)} — төлбөрийн хэлбэр?`, [asstAdd(line, "Хаан", "хаан"), asstAdd(line, "Голомт", "голомт"), asstAdd(line, "Бэлэн", "бэлэн"), asstAdd(line, "Нэхэмжлэх", "нэхэмжлэх"), asstAdd(line, "Barter", "barter")]);
+    if (!["cash", "khan", "golomt", "invoice", "barter"].includes(payment.method)) return asstBad("Gift card-ыг бэлэн, Хаан, Голомт, нэхэмжлэх эсвэл barter-аар олгоно. Урамшууллын картыг Gift card хуудаснаас олгоно уу.");
+    const request = crypto.randomUUID();
+    return asstConfirm("Gift card олгох уу? Олгосон өдрөөр борлуулалтад орлого болно.", [
+      ["Авах хүн", `${parsed.name}${parsed.phone ? " · " + parsed.phone : ""}`], ["Дүн", money(amount)], ["Төлбөр", METHOD_LABEL[payment.method]], ["Өдөр", today],
+    ], "Олгох", async () => {
+      const { data, error } = await sb.rpc("issue_gift_card", { p: {
+        request_id: request, staff_id: who.employee?.id || null, issued_on: today, code: "", amount, payment_method: payment.method,
+        buyer_name: "", buyer_phone: "", recipient_name: parsed.name, recipient_phone: parsed.phone || "", note: "",
+      } });
+      if (error) throw error;
+      if (data.sale) window.dispatchEvent(new CustomEvent("cryo:sale-saved", { detail: data.sale }));
+      window.dispatchEvent(new CustomEvent("cryo:gift-cards-changed"));
+      asstSay(`${data.card.code} · ${data.card.recipient_name} · ${money(data.card.amount)} — gift card олгогдлоо.`, { tone: "ok" });
     });
   }
-  const customer = found[0];
-  const same = (value) => String(value || "").trim().toLocaleLowerCase("mn") === customer.full_name.trim().toLocaleLowerCase("mn");
-  const contracts = contractRows()
-    .filter((row) => Number(row.customer_id) === Number(customer.id) || (!row.customer_id && same(row.customer_label)))
-    .sort((a, b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1) || String(b.__last).localeCompare(String(a.__last)));
-  if (!contracts.length) return void asstSay(`${asstCustomerLine(customer)}\n\nБагц бүртгэгдээгүй.`);
-  const lines = contracts.slice(0, 12).map((row) => {
-    const state = (CPK_STATUS[row.status] || [row.status])[0];
-    const count = row.__total == null ? `${row.__used} удаа ашигласан` : `${row.__used}/${row.__total} ашигласан · ${row.__left} үлдсэн`;
-    return `${row.__label} — ${count} · ${state}`;
+
+  if (!parsed.name && !parsed.phone) return asstAsk(line, "Аль карт вэ? Авсан хүний нэр, утас эсвэл картын дугаарыг бичнэ үү.");
+  const cards = asstCardsOf(await asstGiftCards(), parsed.name, parsed.phone);
+  if (!cards.length) return asstBad(`«${parsed.name || parsed.phone}» — gift card олдсонгүй.`);
+  const cardLine = (card) => `${card.code} · ${card.recipient_name || "—"} · ${money(card.amount)} · үлдэгдэл ${money(card.balance)}`;
+
+  if (parsed.sub !== "use") return void asstSay(`${cards.length} gift card:\n\n${cards.slice(0, 10).map(cardLine).join("\n")}`);
+
+  const who = asstEmployee();
+  if (!who.ok) return;
+  const usable = cards.filter((card) => card.balance > 0);
+  if (!usable.length) return asstBad(`${cards[0].recipient_name || parsed.name} — картын үлдэгдэл дууссан.`);
+  const total = parsed.amounts[0] ?? parsed.payments.find((payment) => payment.amount != null)?.amount;
+  if (!total) return asstAsk(line, "Үйлчилгээний үнэ хэд вэ? Жишээ: 149000");
+  const deduct = (card) => {
+    const amount = Math.min(total, card.balance), extra = total - amount;
+    const method = parsed.payments[0]?.method;
+    if (extra > 0 && !method) return asstAsk(line, `Картын үлдэгдэл ${money(card.balance)}. Нэмэлт төлбөр ${money(extra)}-ийг яаж төлсөн бэ?`, [asstAdd(line, "Хаан", "хаан"), asstAdd(line, "Голомт", "голомт"), asstAdd(line, "Бэлэн", "бэлэн")]);
+    const service = parsed.services.map((item) => item.name).join(", ");
+    const request = crypto.randomUUID();
+    asstConfirm("Gift card-аас хасах уу?", [
+      ["Карт", cardLine(card)], ["Хасах", money(amount)], extra > 0 ? ["Нэмэлт төлбөр", `${money(extra)} · ${METHOD_LABEL[method]}`] : null,
+      service ? ["Үйлчилгээ", service] : null, ["Үлдэх", money(card.balance - amount)],
+    ], "Хасах", async () => {
+      const { data, error } = await sb.rpc("use_gift_card", { p: { request_id: request, staff_id: who.employee?.id || null, card_id: card.id, amount, extra_amount: extra, extra_method: extra ? method : null, used_on: today, service, note: "" } });
+      if (error) throw error;
+      if (data.sale) window.dispatchEvent(new CustomEvent("cryo:sale-saved", { detail: data.sale }));
+      window.dispatchEvent(new CustomEvent("cryo:gift-cards-changed"));
+      asstSay(`${card.code} — ${money(amount)} хасагдлаа. Үлдэгдэл ${money(card.balance - amount)}.${extra > 0 ? ` Нэмэлт ${money(extra)} борлуулалтад орлоо.` : ""}`, { tone: "ok" });
+    });
+  };
+  if (usable.length === 1) return deduct(usable[0]);
+  asstSay("Аль картаас хасах вэ?", { actions: [...usable.slice(0, 6).map((card) => ({ label: cardLine(card), run: () => { asstUser(card.code); deduct(card); } })), asstCancel()] });
+}
+
+/* ── packages: sell one, record a visit ── */
+function asstPackage(parsed, line) {
+  const today = bookingDateToday();
+  const who = asstEmployee();
+  if (!who.ok) return;
+
+  if (parsed.sub === "use") {
+    return asstOneCustomer(parsed, line, (customer) => {
+      const active = asstContractsOf(customer).filter((row) => row.__state === "active");
+      if (!active.length) return asstBad(`${customer.full_name} — идэвхтэй багц алга.`);
+      if (!who.employee) return asstBad("Багцын оролтод бүртгэх ажилтны нэр хэрэгтэй. Зүүн талын цэснээс нэрээ сонгоно уу.");
+      if (!parsed.services.length) return asstAsk(line, "Аль төхөөрөмжийг ашигласан бэ? Жишээ: cc led", asstServices().filter((service) => !service.parent_id).map((service) => asstAdd(line, service.name)));
+      const record = (contract) => {
+        if (contract.__left != null && parsed.services.length > contract.__left) return asstBad(`Энэ багцад ${contract.__left} эрх үлдсэн байна.`);
+        asstConfirm("Багцын оролтыг бүртгэх үү?", [
+          ["Үйлчлүүлэгч", customer.full_name], ["Багц", asstContractLine(contract)],
+          ["Ашигласан", parsed.services.map((service) => service.name).join(", ")], ["Өдөр", today],
+        ], "Бүртгэх", async () => {
+          const { data, error } = await sb.from("package_redemptions").insert(parsed.services.map((service) => ({
+            contract_id: contract.id, used_on: today, units: 1, service_id: service.id, service_label: service.name, staff_id: who.employee.id, notes: null,
+          }))).select();
+          if (error) throw error;
+          cache.redemptions.push(...(data || []).map((row) => ({ contract_id: row.contract_id, used_on: row.used_on, units: row.units })));
+          renderContracts();
+          window.dispatchEvent(new Event("cryo:assistant-changed"));
+          const left = contract.__left == null ? "" : ` Үлдсэн эрх: ${contract.__left - parsed.services.length}.`;
+          asstSay(`${customer.full_name} · ${contract.__label} — ${parsed.services.length} оролт бүртгэгдлээ.${left}`, { tone: "ok" });
+        });
+      };
+      if (active.length === 1) return record(active[0]);
+      asstSay("Аль багцаас хасах вэ?", { actions: [...active.slice(0, 6).map((contract) => ({ label: asstContractLine(contract), run: () => { asstUser(contract.__label); record(contract); } })), asstCancel()] });
+    }, "Хэний багцын оролт вэ?");
+  }
+
+  /* selling: the line holds two names — take the package out, the rest is the customer */
+  const offered = cache.packages.filter((item) => item.active && !item.archived_at);
+  const named = findNamed(parsed.name, offered);
+  const customerName = named.rest.join(" ");
+  const customers = findCustomers(customerName, parsed.phone, cache.customers);
+  if (!named.item) {
+    return asstAsk(line, "Аль багцыг зарах вэ?", offered.slice(0, 12).map((item) => asstAdd(line, `${item.name} · ${money(item.price)}`, item.name)));
+  }
+  const sold = named.item;
+  asstOneCustomer({ ...parsed, name: customerName, customers }, line, (customer) => {
+    if (!customer.phone) return asstBad("Үйлчлүүлэгчид хэсэгт утасны дугаарыг бүртгэнэ үү.");
+    const payment = parsed.payments[0];
+    if (!payment) return asstAsk(line, `${sold.name} · ${money(sold.price)} — төлбөрийн хэлбэр?`, [asstAdd(line, "Хаан", "хаан"), asstAdd(line, "Голомт", "голомт"), asstAdd(line, "Бэлэн", "бэлэн"), asstAdd(line, "Нэхэмжлэх", "нэхэмжлэх"), asstAdd(line, "Barter", "barter"), asstAdd(line, "Дотоод", "дотоод")]);
+    if (payment.method === "gift_card") return asstBad("Багцыг gift card-аар зарахгүй.");
+    const amount = payment.amount ?? Number(sold.price);
+    if (!Number.isSafeInteger(amount) || amount < 0 || amount > Number(sold.price)) return asstBad(`Дүн багцын үнээс (${money(sold.price)}) хэтрэхгүй байх ёстой.`);
+    const request = crypto.randomUUID();
+    asstConfirm("Багцыг зарах уу?", [
+      ["Үйлчлүүлэгч", asstCustomerLine(customer)], ["Багц", `${sold.name} · ${money(sold.price)}`],
+      ["Энэ удаа", `${money(amount)} · ${METHOD_LABEL[payment.method]}`],
+      amount < Number(sold.price) ? ["Үлдэгдэл", money(Number(sold.price) - amount)] : null, ["Өдөр", today],
+    ], "Зарах", async () => {
+      const { data, error } = await sb.rpc("package_checkout", { p: {
+        action: "sell", request_id: request, customer_id: customer.id, package_id: sold.id, booking_id: null,
+        package_name: "", items: [], base_price: 0, discount_percent: 0, sale_date: today,
+        staff_id: who.employee?.id || null, payment_method: payment.method, amount, note: null,
+      } });
+      if (error) throw error;
+      if (data.sale) window.dispatchEvent(new CustomEvent("cryo:sale-saved", { detail: data.sale }));
+      if (data.contract) cache.contracts = [data.contract, ...cache.contracts.filter((row) => Number(row.id) !== Number(data.contract.id))];
+      renderContracts();
+      window.dispatchEvent(new Event("cryo:assistant-changed"));
+      asstSay(`${customer.full_name} · ${sold.name} — багц бүртгэгдлээ. Энэ удаа ${money(amount)}, үлдэгдэл ${money(Number(sold.price) - amount)}.`, { tone: "ok" });
+    });
+  }, "Хэнд зарах вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
+}
+
+/* ── sports teams: a member's visit, a new member ── */
+async function asstTeam(parsed, line) {
+  const who = asstEmployee();
+  if (!who.ok) return;
+  const [teams, members] = await Promise.all([
+    sb.from("sports_teams").select("id,name,service_prices,archived_at").is("archived_at", null).order("name"),
+    fetchAll(() => sb.from("sports_team_members").select("id,team_id,full_name").order("id")),
+  ]);
+  if (teams.error) throw teams.error;
+  if (members.error) throw members.error;
+  const named = findNamed(parsed.name, teams.data || []);
+  if (!named.item) {
+    return asstAsk(line, "Аль баг вэ?", (teams.data || []).slice(0, 12).map((team) => asstAdd(line, team.name)));
+  }
+  const team = named.item;
+  const rest = named.rest.join(" ").trim();
+  const done = () => window.dispatchEvent(new Event("cryo:assistant-changed"));
+
+  if (parsed.sub === "member") {
+    if (!rest) return asstAsk(line, `${team.name} багт нэмэх гишүүний нэрийг бичнэ үү.`);
+    return asstConfirm("Багт гишүүн нэмэх үү?", [["Баг", team.name], ["Гишүүн", rest]], "Нэмэх", async () => {
+      const result = await sb.rpc("add_sports_member", { p_team: team.id, p_name: rest });
+      if (result.error) throw result.error;
+      done();
+      asstSay(`${rest} — ${team.name} багт нэмэгдлээ.`, { tone: "ok" });
+    });
+  }
+
+  const roster = (members.data || []).filter((member) => Number(member.team_id) === Number(team.id));
+  const exact = findNamed(rest, roster, (member) => member.full_name).item;
+  const close = exact ? [exact] : rest ? roster.filter((member) => matchesName(member.full_name, rest)) : [];
+  const visit = (member) => {
+    if (!who.employee) return asstBad("Багийн оролтод бүртгэх ажилтны нэр хэрэгтэй. Зүүн талын цэснээс нэрээ сонгоно уу.");
+    if (!parsed.services.length) return asstAsk(line, "Аль төхөөрөмж вэ? Жишээ: cc led", asstServices().filter((service) => !service.parent_id).map((service) => asstAdd(line, service.name)));
+    const devices = parsed.services.map((service) => ({ service, price: team.service_prices?.[service.id] }));
+    const unpriced = devices.filter((device) => device.price == null || device.price === "");
+    if (unpriced.length) {
+      switchView("sportsTeams");
+      return asstBad(`${team.name} багт ${unpriced.map((device) => device.service.name).join(", ")}-ийн үнэ тохируулаагүй байна. «Спортын баг» хуудсыг нээлээ — «Төхөөрөмжийн үнэ»-ээс тохируулаад дахин бичнэ үү.`);
+    }
+    const time = parsed.time || new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ulaanbaatar", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    const day = parsed.date || bookingDateToday();
+    const request = crypto.randomUUID();
+    asstConfirm("Багийн гишүүний оролтыг бүртгэх үү?", [
+      ["Баг", team.name], ["Гишүүн", member.full_name],
+      ["Төхөөрөмж", devices.map((device) => `${device.service.name} ${money(device.price)}`).join(" + ")],
+      ["Хэзээ", `${day} ${time}`],
+    ], "Бүртгэх", async () => {
+      const result = await sb.rpc("record_sports_member_visit", {
+        p_team_id: team.id, p_member_id: member.id, p_devices: devices.map((device) => ({ service_id: device.service.id, price: Number(device.price) })),
+        p_visited_at: `${day}T${time}:00+08:00`, p_staff_id: who.employee.id, p_note: "", p_request_id: request,
+      });
+      if (result.error) throw result.error;
+      done();
+      asstSay(`${team.name} · ${member.full_name} — ${devices.length} төхөөрөмжийн оролт бүртгэгдлээ.`, { tone: "ok" });
+    });
+  };
+  if (close.length === 1) return visit(close[0]);
+  if (!roster.length) return asstBad(`${team.name} багт гишүүн бүртгэгдээгүй. «баг ${team.name} гишүүн нэм Нэр» гэж нэмнэ үү.`);
+  asstSay(rest && !close.length ? `${team.name} багт «${rest}» гэсэн гишүүн алга. Аль гишүүн бэ?` : `${team.name} — аль гишүүн бэ?`, {
+    actions: [...(close.length ? close : roster).slice(0, 14).map((member) => ({ label: member.full_name, run: () => { asstUser(member.full_name); visit(member); } })), asstCancel()],
   });
-  asstSay(`${asstCustomerLine(customer)}\n\n${lines.join("\n")}`);
+}
+
+/* ── go to a page ── */
+function asstOpenPage(parsed) {
+  const wanted = nameKey(parsed.target).replace(/[^a-z0-9]/g, "");
+  const buttons = [...document.querySelectorAll(".nav-item[data-view]")].filter((button) => button.offsetParent !== null);
+  const hit = wanted.length >= 2 ? buttons.find((button) => nameKey(button.textContent).replace(/[^a-z0-9]/g, "").includes(wanted)) : null;
+  if (!hit) {
+    return void asstSay("Аль хуудас вэ?", { actions: buttons.map((button) => ({ label: button.textContent.replace(/^[^\p{L}]+/u, "").trim(), run: () => button.click() })) });
+  }
+  hit.click();
+  asstSay(`«${hit.textContent.replace(/^[^\p{L}]+/u, "").trim()}» хуудсыг нээлээ.`);
 }
 
 function wireAssistant() {
@@ -4843,7 +5478,7 @@ function wireAssistant() {
     opener.hidden = open;
     opener.setAttribute("aria-expanded", String(open));
     if (open) {
-      if (!greeted) { greeted = true; asstHelp("Сайн байна уу. Хүссэн зүйлээ бичээрэй — би эдгээрийг хийж чадна:"); }
+      if (!greeted) { greeted = true; asstHelp("Сайн байна уу. Хийх зүйлээ бичээрэй — ажилтны хийдэг бүх зүйлийг би бүртгэж чадна:"); }
       $("asstInput").focus();
     }
   };
