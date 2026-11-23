@@ -23,14 +23,14 @@ const dataFor = (role, paid) => ({
     { id: 1, full_name: 'Бат', phone: '99112233', is_vip: true },
     { id: 2, full_name: 'Батболд', phone: '88001122' },
     { id: 3, full_name: 'Сараа', phone: '95556677' },
-    { id: 4, full_name: 'Mandakh Jiremsen eej', phone: '85614211' },
+    { id: 4, full_name: 'Нарантуяа эгч', phone: '70001234' },
   ],
   bookings: [{ id: 1, ref: 'B1', customer_name: 'Сараа', phone: '95556677', service_id: 1, calendar_id: 1, service: 'Cabin', booked_date: today, booked_time: '10:00', starts_at: today + 'T10:00:00+08:00', blocked_until: today + 'T10:30:00+08:00', status: 'confirmed', payment_status: paid ? 'paid' : 'pending', booking_kind: 'standard' }],
   sales: [], attendance: [],
   packages: [{ id: 3, slug: 'recovery', name: 'Recovery', price: 500000, old_price: 600000, active: true, service_units: [] }],
   customer_package_contracts: [
     // an older, imported package: it lists no services, only its name says what it is for
-    { id: 60, customer_id: 4, customer_label: 'Mandakh Jiremsen eej', package_label: 'Jiremsen eejiin Oxygen bagts', total_units: 4, status: 'active', service_units: [] },
+    { id: 60, customer_id: 4, customer_label: 'Нарантуяа эгч', package_label: 'Эгчийн Oxygen багц', total_units: 4, status: 'active', service_units: [] },
     // a newer one that says exactly what it covers; the cabin sessions are used up
     { id: 61, customer_id: 2, customer_label: 'Батболд', package_label: 'Хосолсон', total_units: 3, status: 'active', service_units: [{ service_id: 1, service_name: 'Cabin', units: 2 }, { service_id: 9, service_name: 'Гоо сайхан', units: 1 }] },
   ],
@@ -40,6 +40,16 @@ const dataFor = (role, paid) => ({
   ],
   gift_cards: [{ id: 4, code: 'GC-1', recipient_name: 'Бат', recipient_phone: '99112233', amount: 300000 }],
   gift_card_uses: [{ id: 1, card_id: 4, amount: 100000 }],
+  // what the 2026 sheet import brings in: the shift plan, and package visits from the visit ledger
+  staff_schedule: [
+    { id: 1, staff_id: 7, staff_name: 'Чимгээ', work_date: today, shift_start: null, shift_end: null },
+    { id: 2, staff_id: 8, staff_name: 'Denis', work_date: today, shift_start: '09:00:00', shift_end: '15:00:00' },
+    { id: 3, staff_id: 8, staff_name: 'Denis', work_date: tomorrow, shift_start: null, shift_end: null },
+  ],
+  service_sessions: [
+    { id: 1, session_date: today, customer_label: 'Золбоо', service_id: 1, service_label: 'Cryo Cabin', notes: 'Багцаар · Pack' },
+    { id: 2, session_date: today, customer_label: 'Нарантуяа эгч', service_id: 7, service_label: 'Oxygen', notes: 'Багцаар · Pack' },
+  ],
   sports_teams: [{ id: 5, name: 'Аварга', service_prices: { 1: 25000 } }],
   sports_team_members: [{ id: 9, team_id: 5, full_name: 'Дорж' }],
 });
@@ -362,14 +372,14 @@ try {
   assert.match(await a.reply(), /Recovery — 1\/10 ашигласан · 9 үлдсэн/, 'the visit shows up in the balance straight away');
 
   /* ── the conversation from the floor: look someone up, then just say what is happening ── */
-  await a.say('mandakh jiremsen eej');
-  assert.match(await a.reply(), /Mandakh Jiremsen eej · 85614211/);
+  await a.say('нарантуяа эгч');
+  assert.match(await a.reply(), /Нарантуяа эгч · 70001234/);
   await a.press('Багц харах');
-  assert.match(await a.reply(), /Jiremsen eejiin Oxygen bagts — 1\/4 ашигласан · 3 үлдсэн/);
+  assert.match(await a.reply(), /Эгчийн Oxygen багц — 1\/4 ашигласан · 3 үлдсэн/);
   await a.say('odoo negeer orj baina');
   text = await a.reply();
   assert.match(text, /Багцын оролтыг бүртгэх үү/, 'no name on the line: it is about the customer just looked up');
-  assert.match(text, /Үйлчлүүлэгч Mandakh Jiremsen eej/);
+  assert.match(text, /Үйлчлүүлэгч Нарантуяа эгч/);
   assert.match(text, /Орох Oxygen/, 'the service comes from the package itself');
   assert.match(text, /Үлдэх 2 эрх/);
   await a.press('Бүртгэх');
@@ -423,15 +433,36 @@ try {
   /* ── questions about what has been going on: answered, never acted on ── */
   const writes = () => a.count(() => window.rpcs.filter((c) => c.name !== 'is_admin').length + window.inserted.length + window.updates.length);
   const writesBefore = await writes();
-  // Сараа came on a booking; Mandakh and Бат went in on their packages with no booking
+  // Сараа came on a booking; Нарантуяа and Бат went in on their packages with no booking;
+  // Золбоо is in the visit ledger only — and Нарантуяа, who is in both, is counted once
   await a.say('өнөөдөр хэдэн үйлчлүүлэгч үйлчлүүлсэн бэ');
   text = await a.reply();
-  assert.match(text, /: 3 үйлчлүүлэгч үйлчлүүлсэн/);
+  assert.match(text, /: 4 үйлчлүүлэгч үйлчлүүлсэн/);
   assert.match(text, /Захиалгаар: 1 хүн · 1 цаг/);
-  assert.match(text, /Багцын оролт: 4 \(үүнээс захиалгагүй 2 хүн\)/);
-  assert.match(text, /Нэрс: [\s\S]*Сараа[\s\S]*Mandakh Jiremsen eej/);
+  assert.match(text, /Багцын оролт: 4 \(үүнээс захиалгагүй 3 хүн\)/, 'Бат, Нарантуяа and Золбоо came without a booking');
+  assert.match(text, /Нэрс: [\s\S]*Сараа[\s\S]*Нарантуяа эгч[\s\S]*Золбоо/);
   await a.say('hichneen uilchluulegch unuudur uilchluulsen be');
-  assert.match(await a.reply(), /: 3 үйлчлүүлэгч үйлчлүүлсэн/, 'the same question typed in Latin');
+  assert.match(await a.reply(), /: 4 үйлчлүүлэгч үйлчлүүлсэн/, 'the same question typed in Latin');
+  // the shift plan
+  await a.say('маргааш хэн ажиллах вэ');
+  assert.match(await a.reply(), /ээлжинд: Denis$/m);
+  await a.say('өнөөдрийн ээлж');
+  assert.match(await a.reply(), /ээлжинд: Чимгээ, Denis 09:00–15:00/);
+  await a.say('Denis хэзээ ажиллах вэ');
+  assert.match(await a.reply(), new RegExp(`Denis — дараагийн ээлжүүд:[\\s\\S]*${today}[\\s\\S]*09:00–15:00[\\s\\S]*${tomorrow}`));
+  await a.say('энэ долоо хоногийн ээлжийн хуваарь');
+  assert.match(await a.reply(), /ээлжийн хуваарь:[\s\S]*Denis/);
+  // packages, the way the sheet tracks them: per device, and who is running out
+  await a.say('Батболд багц');
+  assert.match(await a.reply(), /Хосолсон — Cabin 2\/2 · Гоо сайхан 0\/1 · нийт 1 үлдсэн/, 'what is left of each device');
+  await a.say('хэний багц дуусах гэж байна');
+  text = await a.reply();
+  assert.match(text, /Дуусах дөхсөн багц: 1/);
+  assert.match(text, /Батболд — 1 үлдсэн · Хосолсон/);
+  await a.say('идэвхтэй багцтай хүмүүс хэн бэ');
+  text = await a.reply();
+  assert.match(text, /Идэвхтэй багц: 2/);
+  assert.match(text, /Бат — 9 үлдсэн · Recovery/);
   await a.say('маргааш хэдэн захиалга байна');
   text = await a.reply();
   assert.match(text, /: 3 захиалга\./);

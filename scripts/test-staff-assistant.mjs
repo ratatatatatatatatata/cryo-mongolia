@@ -255,6 +255,14 @@ r = read('Болд сүүлд хэзээ ирсэн бэ');
 assert.deepEqual([r.intent, r.topic, r.name, r.customers.map((c) => c.id)], ['ask', 'history', 'Болд', [1]]);
 r = read('Болд хэдэн удаа ирсэн бэ');
 assert.deepEqual([r.topic, r.name], ['history', 'Болд'], '«хэдэн удаа» is about one person');
+// the shift plan
+assert.deepEqual(ask('маргааш хэн ажиллах вэ'), ['ask', 'shift']);
+r = read('Чимгээ хэзээ ажиллах вэ');
+assert.deepEqual([r.intent, r.topic, r.name], ['ask', 'shift', 'Чимгээ'], 'the shift plan, not the customer-history «хэзээ»');
+assert.equal(read('маргаашийн ээлж').intent, 'shift');
+assert.equal(read('ээлжийн хуваарь').intent, 'shift', 'the shift plan, not the bookings list');
+assert.equal(read('өнөөдрийн хуваарь').intent, 'schedule');
+assert.deepEqual(ask('хэн ажиллаж байна'), ['ask', 'working']);
 // the stretch of days a question is about
 const span = (text) => { const q = read(text).range; return q && [q.from, q.to]; };
 assert.deepEqual(span('энэ долоо хоногийн орлого хэд вэ'), ['2026-11-23', '2026-11-29'], 'Monday to Sunday');

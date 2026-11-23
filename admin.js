@@ -63,7 +63,7 @@ let me = null; // { id, email, full_name, role }
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
-  contracts: [], redemptions: [], payroll: [], saleDeletionRequests: [],
+  contracts: [], redemptions: [], payroll: [], schedule: [], sessions: [], saleDeletionRequests: [],
 };
 let bkFilter = "all";
 let bkDevice = "all";
@@ -447,6 +447,9 @@ async function loadAll() {
     () => sb.from("package_redemptions").select("id,contract_id,session_id,used_on,units,service_id,service_label,staff_id,notes").order("id", { ascending: true }),
     () => sb.from("payroll").select("*").order("work_date", { ascending: false }).order("id", { ascending: false }),
     () => sb.from("sale_deletion_requests").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }),
+    /* the shift plan and the visit ledger; either table may not exist yet on an older database */
+    () => sb.from("staff_schedule").select("id,staff_id,staff_name,work_date,shift_start,shift_end,note").order("work_date", { ascending: true }).order("id", { ascending: true }),
+    () => sb.from("service_sessions").select("id,session_date,customer_label,service_id,service_label,notes").order("session_date", { ascending: false }).order("id", { ascending: false }),
   ];
   const PROFILE_AT = jobs.length;
   if (me.role === "owner") {
@@ -472,6 +475,9 @@ async function loadAll() {
   cache.redemptions = res[14].data || [];
   cache.payroll = res[15].data || [];
   cache.saleDeletionRequests = res[16].data || [];
+  cache.schedule = res[17].data || [];
+  cache.sessions = res[18].data || [];
+  renderShiftPlan();
   cache.users = res[PROFILE_AT] ? res[PROFILE_AT].data || [] : [];
 
   const firstErr = res.find((r) => r.error);
@@ -564,7 +570,11 @@ function renderCoverage() {
     ["Үйлчлүүлэгч", 120, cache.customers.length],
     ["Үйлчилгээний нэр", 35, cache.services.filter((x) => x.category === "legacy-import").length],
     ["Үйлчилгээний session (борлуулалтын мөр дотор)", 1041, devices],
-    ["Хэрэглэгчийн багц", 808, cache.contracts.length],
+    /* 2026 only, read from the Google Sheet by scripts/import-sheet-2026.mjs */
+    ["Хэрэглэгчийн багц (2026)", 169, cache.contracts.length],
+    ["Багцын оролт", 2203, cache.redemptions.length],
+    ["Багцаар орсон бүртгэл (CryoStart 2026)", 875, cache.sessions.length],
+    ["Ээлжийн хуваарь (Work Schedule)", 888, cache.schedule.length],
     ["Ирц", 526, cache.workdays.length + cache.attendance.length],
     ["Азот / бараа материал", 69, cache.inventory.length],
     ["Цалин", 648, cache.payroll.length],
@@ -4708,7 +4718,7 @@ function asstHandle(text) {
   if (parsed.problems.length) return asstBad(parsed.problems.join("\n"));
   const handlers = {
     schedule: asstSchedule, free: asstFree, find: asstFind, balance: asstBalance,
-    sales: (p) => asstAnswerIncome(asstSpan(p)), ask: asstAnswer,
+    sales: (p) => asstAnswerIncome(asstSpan(p)), ask: asstAnswer, shift: (p) => asstAnswerShift(asstSpan(p), p),
     cancel: (p, l) => asstStatus(p, l, "cancelled"), confirm: (p, l) => asstStatus(p, l, "confirmed"), done: (p, l) => asstStatus(p, l, "done"),
     delete: asstDelete, move: asstMove, provider: asstProvider, pay: asstPay, income: asstIncome,
     clockin: () => asstClock(true), clockout: () => asstClock(false), customer: asstCustomer,
@@ -5290,8 +5300,16 @@ function packageStateOf(row) {
 }
 
 const asstContractLine = (row) => {
+  const state = (CPK_STATUS[row.__state] || [row.__state])[0];
+  const items = Array.isArray(row.service_units) ? row.service_units : [];
+  if (items.length) {
+    /* the package says what it holds, so say what is left of each device */
+    const spent = (serviceId) => cache.redemptions.filter((visit) => Number(visit.contract_id) === Number(row.id) && Number(visit.service_id) === Number(serviceId)).reduce((sum, visit) => sum + (Number(visit.units) || 1), 0);
+    const parts = items.map((item) => `${item.service_name} ${spent(item.service_id)}/${Number(item.units)}`);
+    return `${row.__label} — ${parts.join(" · ")} · нийт ${row.__left ?? "?"} үлдсэн · ${state}`;
+  }
   const count = row.__total == null ? `${row.__used} удаа ашигласан` : `${row.__used}/${row.__total} ашигласан · ${row.__left} үлдсэн`;
-  return `${row.__label} — ${count} · ${(CPK_STATUS[row.__state] || [row.__state])[0]}`;
+  return `${row.__label} — ${count} · ${state}`;
 };
 
 /* one customer out of a parsed line, or a question when it is not clear which */
@@ -5573,9 +5591,10 @@ function asstAnswer(parsed, line) {
     served: asstAnswerServed, bookings: asstAnswerBookings, income: asstAnswerIncome, devices: asstAnswerDevices,
     staff: asstAnswerStaff, working: asstAnswerWorking, pending: asstAnswerPending, unpaid: asstAnswerUnpaid,
     next: asstAnswerNext, newcustomers: asstAnswerNewCustomers, cancelled: asstAnswerCancelled, packages: asstAnswerPackages,
+    shift: asstAnswerShift,
   };
   if (parsed.topic === "history") return asstAnswerHistory(parsed, line);
-  return (topics[parsed.topic] || asstAnswerServed)(span, parsed);
+  return (topics[parsed.topic] || asstAnswerServed)(span, parsed, line);
 }
 
 /* how many customers were served */
@@ -5592,6 +5611,9 @@ function asstAnswerServed(span) {
   visits.forEach((visit) => {
     const name = contracts.get(Number(visit.contract_id))?.customer_label;
     if (name && !people.has(asstWho(name))) people.set(asstWho(name), name);
+  });
+  cache.sessions.filter((session) => asstIn(session.session_date, span)).forEach((session) => {
+    if (session.customer_label && !people.has(asstWho(session.customer_label))) people.set(asstWho(session.customer_label), session.customer_label);
   });
   const paid = came.filter((row) => row.payment_status === "paid").length;
   const lines = [`${span.title}: ${people.size} үйлчлүүлэгч үйлчлүүлсэн.`, ""];
@@ -5665,7 +5687,10 @@ function asstAnswerWorking() {
   const today = localDateKey(new Date());
   const at = (iso) => new Date(iso).toLocaleTimeString("mn-MN", { hour: "2-digit", minute: "2-digit" });
   const rows = cache.attendance.filter((row) => row.work_date === today && row.clock_in);
-  if (!rows.length) return void asstSay("Өнөөдөр ирсэн цагаа бүртгэсэн ажилтан алга.");
+  if (!rows.length) {
+    const due = cache.schedule.filter((shift) => shift.work_date === bookingDateToday()).map(asstShiftName);
+    return void asstSay("Өнөөдөр ирсэн цагаа бүртгэсэн ажилтан алга." + (due.length ? `\n\nЭэлжийн хуваариар: ${due.join(", ")}` : ""));
+  }
   const latest = new Map();
   rows.forEach((row) => { const seen = latest.get(Number(row.staff_id)); if (!seen || String(row.clock_in) > String(seen.clock_in)) latest.set(Number(row.staff_id), row); });
   const lines = [...latest.values()].map((row) => {
@@ -5722,8 +5747,16 @@ function asstAnswerCancelled(span) {
   asstSay(`${span.title}: ${rows.length} захиалга цуцлагдсан.\n\n${rows.slice(0, 20).map(asstBookingLine).join("\n")}`);
 }
 
-function asstAnswerPackages(span) {
+function asstAnswerPackages(span, parsed, line = "") {
   const all = contractRows().map((row) => ({ ...row, __state: packageStateOf(row) }));
+  /* «идэвхтэй багцтай хүмүүс», «хэний багц дуусах гэж байна» — about the holders, not the period */
+  const nearlyDone = /дуусах|дуусч|дуусаж|duusah|duusch|duusaj/i.test(line);
+  if (nearlyDone || /идэвхтэй|idevhtei|үлдсэн|uldsen|үлдэгд|uldegd|хэн|hen\b/i.test(line)) {
+    let holders = all.filter((row) => row.__state === "active").sort((x, y) => (x.__left ?? 1e9) - (y.__left ?? 1e9));
+    if (nearlyDone) holders = holders.filter((row) => row.__left != null && row.__left <= 2);
+    if (!holders.length) return void asstSay(nearlyDone ? "Дуусах дөхсөн (2 ба түүнээс бага эрх үлдсэн) идэвхтэй багц алга." : "Идэвхтэй багц алга.");
+    return void asstSay(`${nearlyDone ? "Дуусах дөхсөн багц" : "Идэвхтэй багц"}: ${holders.length}\n\n${holders.slice(0, 25).map((row) => `${row.__customer} — ${row.__left == null ? "хязгааргүй" : row.__left + " үлдсэн"} · ${row.__label}`).join("\n")}${holders.length > 25 ? `\n… бусад ${holders.length - 25}` : ""}`);
+  }
   const sold = all.filter((row) => asstIn(row.purchased_on, span));
   const active = all.filter((row) => row.__state === "active").length;
   const visits = cache.redemptions.filter((visit) => asstIn(visit.used_on, span)).reduce((sum, visit) => sum + (Number(visit.units) || 1), 0);
@@ -5748,7 +5781,8 @@ function asstAnswerHistory(parsed, line) {
     const contractIds = new Set(asstContractsOf(customer).map((row) => Number(row.id)));
     const visits = cache.redemptions.filter((visit) => contractIds.has(Number(visit.contract_id))).sort((x, y) => String(y.used_on).localeCompare(String(x.used_on)));
     const sales = cache.sales.filter((sale) => isReportableSale(sale) && mine(sale.customer_name, sale.phone));
-    const lastDay = [past[0] && asstDay(past[0]), visits[0]?.used_on, sales.map((sale) => sale.sale_date).sort().at(-1)].filter(Boolean).sort().at(-1);
+    const ledger = cache.sessions.filter((session) => asstSame(session.customer_label, customer.full_name)).map((session) => session.session_date).sort();
+    const lastDay = [past[0] && asstDay(past[0]), visits[0]?.used_on, ledger.at(-1), sales.map((sale) => sale.sale_date).sort().at(-1)].filter(Boolean).sort().at(-1);
     const lines = [asstCustomerLine(customer), ""];
     if (!lastDay) lines.push("Ирсэн бүртгэл алга.");
     else {
@@ -5762,6 +5796,50 @@ function asstAnswerHistory(parsed, line) {
     if (packs.length) lines.push("", "Идэвхтэй багц:", ...packs.slice(0, 4).map(asstContractLine));
     asstSay(lines.join("\n"));
   }, "Хэний тухай вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
+}
+
+/* who is on shift — the plan from the Work Schedule sheet */
+const asstShiftName = (shift) => shift.staff_name + (shift.shift_start ? ` ${String(shift.shift_start).slice(0, 5)}–${String(shift.shift_end || "").slice(0, 5)}` : "");
+function asstAnswerShift(span, parsed) {
+  const today = bookingDateToday();
+  if (!cache.schedule.length) return void asstSay("Ээлжийн хуваарь ороогүй байна. Sheet-ийн «Work Schedule»-ийг импортлосны дараа харагдана.");
+  /* «Чимгээ хэзээ ажиллах вэ» — one person's coming shifts */
+  const person = parsed?.name ? findNamed(parsed.name, cache.staff).item : null;
+  if (person) {
+    const asked = !!(parsed.range || parsed.date);
+    const days = cache.schedule.filter((shift) => asstSame(shift.staff_name, person.name) && (asked ? asstIn(shift.work_date, span) : shift.work_date >= today)).slice(0, asked ? 40 : 10);
+    if (!days.length) return void asstSay(`${person.name} — ${asked ? span.title + ":" : "урд"} ээлж алга.`);
+    return void asstSay(`${person.name} — ${asked ? span.title : "дараагийн ээлжүүд"}:\n\n${days.map((shift) => describeDay(shift.work_date, today) + (shift.shift_start ? ` · ${String(shift.shift_start).slice(0, 5)}–${String(shift.shift_end || "").slice(0, 5)}` : "")).join("\n")}`);
+  }
+  const byDay = new Map();
+  cache.schedule.filter((shift) => asstIn(shift.work_date, span)).forEach((shift) => {
+    if (!byDay.has(shift.work_date)) byDay.set(shift.work_date, []);
+    byDay.get(shift.work_date).push(asstShiftName(shift));
+  });
+  if (!byDay.size) return void asstSay(`${span.title}: ээлжийн хуваарьт бүртгэл алга.`);
+  const days = [...byDay.keys()].sort();
+  if (span.single) return void asstSay(`${span.title} — ээлжинд: ${byDay.get(days[0]).join(", ")}`);
+  asstSay(`${span.title} — ээлжийн хуваарь:\n\n${days.slice(0, 31).map((day) => `${describeDay(day, today)}: ${byDay.get(day).join(", ")}`).join("\n")}`);
+}
+
+/* the next two weeks of the plan, on the attendance page */
+function renderShiftPlan() {
+  const host = $("shiftPlanBody");
+  if (!host) return;
+  const today = bookingDateToday();
+  const panel = $("shiftPlanPanel");
+  const rows = cache.schedule.filter((shift) => shift.work_date >= today);
+  if (panel) panel.style.display = cache.schedule.length ? "" : "none";
+  host.replaceChildren();
+  const byDay = new Map();
+  rows.forEach((shift) => { if (!byDay.has(shift.work_date)) byDay.set(shift.work_date, []); byDay.get(shift.work_date).push(asstShiftName(shift)); });
+  [...byDay.keys()].sort().slice(0, 14).forEach((day) => {
+    const tr = document.createElement("tr");
+    tr.appendChild(cell(describeDay(day, today), day === today ? "t-strong" : "t-mono"));
+    tr.appendChild(cell(byDay.get(day).join(", ")));
+    host.appendChild(tr);
+  });
+  if (!byDay.size) host.innerHTML = '<tr><td colspan="2"><div class="empty">Өнөөдрөөс хойш ээлжийн хуваарь алга.</div></td></tr>';
 }
 
 /* ── go to a page ── */

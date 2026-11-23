@@ -526,6 +526,11 @@
           <button class="btn-sm primary" id="attAdd">+ Ээлж, ирц нэмэх</button>
         </div>
       </div>
+      <!-- the shift plan from the Work Schedule sheet; hidden until one is imported -->
+      <div class="panel" id="shiftPlanPanel" style="display:none">
+        <div class="panel-head"><div><div class="panel-title">Ээлжийн хуваарь</div><div class="page-sub">Ойрын 14 хоног · Туслахаас «маргааш хэн ажиллах вэ» гэж асууж болно</div></div></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Өдөр</th><th>Ээлжинд</th></tr></thead><tbody id="shiftPlanBody"></tbody></table></div>
+      </div>
       <div class="panel attendance-date-panel" id="attendanceDatePanel">
         <div class="attendance-date-nav">
           <button class="btn-sm ghost" id="attPrevDay" aria-label="Өмнөх өдөр">← Өмнөх</button>

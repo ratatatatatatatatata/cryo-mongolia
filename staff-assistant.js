@@ -49,6 +49,7 @@ const INTENTS = [
   ['done', [], ['биелсэн', 'дууссан', 'үйлчлүүлсэн', 'ирсэн', 'ирлээ', 'irsen', 'irlee']],
   ['confirm', ['баталгааж'], []],
   ['sales', ['борлуулалт'], ['тайлан']],
+  ['shift', ['ээлж', 'eelj'], []], // «маргаашийн ээлж», «ээлжийн хуваарь» — ahead of the bookings list
   ['schedule', ['хуваар', 'huvaar', 'захиалгууд', 'жагсаалт'], []],
   ['free', ['чөлөөт'], ['сул', 'завтай']],
   ['balance', ['үлдэгд'], ['үлдсэн']],
@@ -103,6 +104,8 @@ const FILLER = new Set(keys('дээр', 'der', 'д', 'т', 'нэрээр', 'нэ
 const QUESTION_STARTS = keys('хэд', 'хичнээн', 'hicheen', 'hichneen');
 const QUESTION_EXACT = new Set(keys('хэн', 'хэнд', 'хэний', 'хэзээ', 'аль', 'вэ', 'бэ', 'уу', 'үү', 'юу', 'ямар', 've', 'be', 'uu', 'yu', 'yamar', 'hezee', 'hen'));
 const TOPICS = [
+  /* «маргааш хэн ажиллах вэ», «Чимгээ хэзээ ээлжтэй вэ» — the shift plan, ahead of «хэзээ» below */
+  ['shift', ['ээлж', 'eelj', 'ажиллах', 'ajillah', 'ажиллана', 'ajillana']],
   ['history', ['сүүлд', 'suuld', 'хэзээ', 'hezee', 'түүх', 'tuuh']],
   ['working', ['ажиллаж', 'ajillaj']],
   ['staff', ['ажилтан', 'ажилчид', 'ajiltan', 'ajilchid']],
@@ -473,7 +476,7 @@ export function parseCommand(text, ctx = {}) {
     const question = asked || (!out.phone && ks.some((k) => QUESTION_EXACT.has(k) || QUESTION_STARTS.some((prefix) => k.startsWith(prefix))));
     if (question) {
       /* «Болд хэдэн удаа ирсэн бэ» counts one person's visits, not the day's customers */
-      if (ks.some((k) => k.startsWith(key('удаа')))) topic = TOPICS[0];
+      if (ks.some((k) => k.startsWith(key('удаа')))) topic = TOPICS.find((rule) => rule.name === 'history');
       else if (addCustomer) topic = TOPICS.find((rule) => rule.name === 'newcustomers');
       else topic = TOPICS.find((rule) => ks.some((k) => topicHit(rule, k))) || null;
     }
@@ -645,6 +648,8 @@ export const HELP_GROUPS = [
     '«энэ долоо хоногийн орлого хэд вэ» · «маргааш хэдэн захиалга байна»',
     '«хэн төлөөгүй байна» · «хэн ажиллаж байна» · «дараагийн захиалга хэн бэ»',
     '«Болд сүүлд хэзээ ирсэн бэ» · «аль төхөөрөмж хамгийн их вэ»',
+    '«маргааш хэн ажиллах вэ» · «Чимгээ хэзээ ажиллах вэ» · «ээлжийн хуваарь»',
+    '«хэний багц дуусах гэж байна» · «идэвхтэй багцтай хүмүүс хэн бэ»',
   ]],
   ['Бусад', [
     '«ирлээ» · «явлаа» — өөрийн ирц',
