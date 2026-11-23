@@ -206,6 +206,17 @@ r = read('Болд багц оролт cc led');
 assert.deepEqual([r.intent, r.sub, r.name, r.services.map((s) => s.slug)], ['package', 'use', 'Болд', ['cryocabin', 'ledpro']]);
 assert.equal(read('Болд багц').intent, 'balance');
 
+// «going in» with no desk named is a package visit; the count and the filler words are not a name
+r = read('odoo negeer orj baina');
+assert.deepEqual([r.intent, r.sub, r.count, r.name, r.explicit], ['package', 'use', 1, '', true], 'the line from the floor: "now going in for one"');
+r = read('одоо нэгээр орж байна');
+assert.deepEqual([r.intent, r.sub, r.count, r.name], ['package', 'use', 1, '']);
+r = read('Болд орлоо');
+assert.deepEqual([r.intent, r.sub, r.name, r.count], ['package', 'use', 'Болд', null]);
+r = read('Болд 2 удаа орлоо oxygen');
+assert.deepEqual([r.intent, r.count, slug(r), r.name], ['package', 2, 'oxygen', 'Болд']);
+assert.equal(read('Болд хоёроор орно').count, 2);
+
 // teams
 r = read('баг Аварга Бат cc led');
 assert.deepEqual([r.intent, r.sub, r.name, r.services.length], ['team', 'visit', 'Аварга Бат', 2]);

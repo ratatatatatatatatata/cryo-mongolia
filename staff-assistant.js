@@ -61,7 +61,8 @@ const RANK = Object.fromEntries(INTENTS.map((rule, i) => [rule.name, i]));
 const SUBS = [
   /* «борлуулалт» is the sales report, so the verb is listed form by form rather than by its stem */
   ['sell', ['худалд', 'олго'], ['зар', 'зарах', 'зарлаа', 'зарсан', 'зарна', 'заръя', 'борлуул', 'борлуулах', 'борлууллаа', 'борлуулна', 'борлуулъя']],
-  ['use', ['ашигл', 'оруул'], ['хас', 'хасах', 'хаслаа', 'хасна', 'хасъя', 'оролт', 'орлоо']],
+  /* «орж байна», «орлоо», «оръё» — the customer is going in on their package */
+  ['use', ['ашигл', 'оруул'], ['хас', 'хасах', 'хаслаа', 'хасна', 'хасъя', 'оролт', 'орлоо', 'орж', 'орсон', 'орно', 'оръё', 'орох', 'ороод', 'оров', 'орчихлоо', 'орчлоо']],
   ['member', ['гишүүн', 'gishuun'], []],
   ['add', [], ['нэм', 'нэмэх', 'нэмлээ', 'нэмнэ', 'нэмье']],
 ].map(([name, starts, exact]) => ({ name, starts: keys(...starts), exact: keys(...exact) }));
@@ -91,7 +92,14 @@ const FILLER = new Set(keys('дээр', 'der', 'д', 'т', 'нэрээр', 'нэ
   'байна', 'bn', 'уу', 'юу', 'вэ', 'бэ', 'ямар', 'хэд', 'хэдэн', 'нь', 'өгөөч', 'uguuch', 'өг',
   'ав', 'авъя', 'авах', 'авлаа', 'авсан', 'хийж', 'хий', 'хийгээд', 'хийгээч', 'шалга', 'шалгаач', 'хүн', 'хүнийг',
   'үйлчлүүлэгч', 'үйлчлүүлэгчийн', 'төхөөрөмж', 'tuhuurumj', 'шинэ', 'орлого', 'орлогод', 'мөнгө',
-  'захиалгыг', 'захиалгаа', 'руу', 'рүү', 'ruu', 'болон', 'өнөөдрийн', 'эрхээр', 'рт', 'аас', 'ээс', 'хаанаас'));
+  'захиалгыг', 'захиалгаа', 'руу', 'рүү', 'ruu', 'болон', 'өнөөдрийн', 'эрхээр', 'рт', 'аас', 'ээс', 'хаанаас',
+  'одоо', 'яг', 'энэ', 'тэр', 'удаа', 'удаагаа', 'дахиад', 'дахин', 'байгаа', 'бна', 'baina', 'л', 'ээ'));
+
+/* «нэгээр орж байна» — how many sessions, when it is said */
+const COUNTS = Object.fromEntries([
+  [1, ['нэг', 'нэгээр', 'нэгийг', 'ганц', 'ганцаар']], [2, ['хоёр', 'хоёроор', 'хоёрыг']], [3, ['гурав', 'гурваар', 'гурвыг']],
+  [4, ['дөрөв', 'дөрвөөр']], [5, ['тав', 'таваар']],
+].flatMap(([n, words]) => keys(...words).map((word) => [word, n])));
 
 const WEEKDAYS = Object.fromEntries(
   [['ням', 0], ['даваа', 1], ['мягмар', 2], ['лхагва', 3], ['пүрэв', 4], ['баасан', 5], ['бямба', 6]]
@@ -298,7 +306,7 @@ export function parseCommand(text, ctx = {}) {
     intent: null, sub: null, explicit: false,
     date: null, time: null, dates: [], times: [],
     service: null, services: [], name: '', phone: null, customers: [], staff: null,
-    payments: [], amounts: [], incomeKind: null, byPackage: false, target: '', problems: [],
+    payments: [], amounts: [], incomeKind: null, byPackage: false, count: null, target: '', problems: [],
   };
   const line = String(text || '').normalize('NFKC');
   let rest = ` ${line} `;
@@ -414,7 +422,7 @@ export function parseCommand(text, ctx = {}) {
      amount with the method beside it. */
   const found = new Set();
   let giftWord = false, looseAmount = null;
-  tokens = tokens.filter((token) => {
+  tokens = tokens.filter((token, at, all) => {
     const k = key(token);
     if (/^\d{4,8}$/.test(token)) {
       const amount = Number(token);
@@ -425,6 +433,9 @@ export function parseCommand(text, ctx = {}) {
       return false;
     }
     if (BY_PACKAGE.has(k)) { out.byPackage = true; return false; }
+    if (k in COUNTS) { out.count = COUNTS[k]; return false; }
+    /* «2 удаа» */
+    if (/^\d$/.test(token) && Number(token) > 0 && key(all[at + 1] || '').startsWith(key('удаа'))) { out.count = Number(token); return false; }
     if (k in METHODS) {
       out.payments.push({ method: METHODS[k], amount: looseAmount });
       looseAmount = null;
@@ -453,6 +464,8 @@ export function parseCommand(text, ctx = {}) {
   out.explicit = !!out.intent;
   /* «Болд төлбөр gift» pays with a gift card; anywhere else the word names the gift-card desk */
   if (out.intent === 'pay' && giftWord) out.payments.push({ method: 'gift_card', amount: out.amounts.shift() ?? null });
+  /* «Болд орлоо», «одоо нэгээр орж байна» — going in, with no desk named, is a package visit */
+  if (!out.intent && out.sub === 'use') { out.intent = 'package'; out.explicit = true; }
 
   /* services, by their own name or by shorthand — a package visit can name several.
      An extra-income line is about money, and «oxygen balloon» there is not a session. */
@@ -545,7 +558,8 @@ export const HELP_GROUPS = [
     '«нэмэлт орлого balloon Бат 45000 бэлэн»',
   ]],
   ['Багц, gift card, баг', [
-    '«Болд багц» — үлдэгдэл · «Болд багц оролт cc led»',
+    '«Болд багц» — үлдэгдэл · дараа нь «одоо нэгээр орж байна»',
+    '«Болд орлоо» · «Болд багц оролт cc led» — багцын оролт',
     '«Болд багц зар Recovery хаан 500000»',
     '«gift card Болд 99112233 олго 200000 хаан»',
     '«gift card Болд хас 149000» · «gift card Болд»',

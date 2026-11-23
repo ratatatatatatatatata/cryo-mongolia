@@ -16,17 +16,28 @@ const dataFor = (role, paid) => ({
   services: [
     { id: 1, slug: 'cryocabin', name: 'Cabin', category: 'cryo', duration_minutes: 3, price: 149000, active: true, sort: 1 },
     { id: 9, slug: 'facial', name: 'Гоо сайхан', category: 'beauty', duration_minutes: 60, price: 150000, active: true, sort: 9 },
+    { id: 7, slug: 'oxygen', name: 'Oxygen', category: 'oxygen', duration_minutes: 30, price: 35000, active: true, sort: 7 },
   ],
   staff: [{ id: 7, name: 'Чимгээ', active: true, sort: 1, user_id: 'u1' }, { id: 8, name: 'Denis', active: true, sort: 2 }],
   customers: [
     { id: 1, full_name: 'Бат', phone: '99112233', is_vip: true },
     { id: 2, full_name: 'Батболд', phone: '88001122' },
     { id: 3, full_name: 'Сараа', phone: '95556677' },
+    { id: 4, full_name: 'Mandakh Jiremsen eej', phone: '85614211' },
   ],
   bookings: [{ id: 1, ref: 'B1', customer_name: 'Сараа', phone: '95556677', service_id: 1, calendar_id: 1, service: 'Cabin', booked_date: today, booked_time: '10:00', starts_at: today + 'T10:00:00+08:00', blocked_until: today + 'T10:30:00+08:00', status: 'confirmed', payment_status: paid ? 'paid' : 'pending', booking_kind: 'standard' }],
   sales: [], attendance: [],
   packages: [{ id: 3, slug: 'recovery', name: 'Recovery', price: 500000, old_price: 600000, active: true, service_units: [] }],
-  customer_package_contracts: [], package_redemptions: [],
+  customer_package_contracts: [
+    // an older, imported package: it lists no services, only its name says what it is for
+    { id: 60, customer_id: 4, customer_label: 'Mandakh Jiremsen eej', package_label: 'Jiremsen eejiin Oxygen bagts', total_units: 4, status: 'active', service_units: [] },
+    // a newer one that says exactly what it covers; the cabin sessions are used up
+    { id: 61, customer_id: 2, customer_label: 'Батболд', package_label: 'Хосолсон', total_units: 3, status: 'active', service_units: [{ service_id: 1, service_name: 'Cabin', units: 2 }, { service_id: 9, service_name: 'Гоо сайхан', units: 1 }] },
+  ],
+  package_redemptions: [
+    { id: 1, contract_id: 60, used_on: '2026-11-01', units: 1, service_id: 7, service_label: 'Oxygen' },
+    { id: 2, contract_id: 61, used_on: '2026-11-02', units: 2, service_id: 1, service_label: 'Cabin' },
+  ],
   gift_cards: [{ id: 4, code: 'GC-1', recipient_name: 'Бат', recipient_phone: '99112233', amount: 300000 }],
   gift_card_uses: [{ id: 1, card_id: 4, amount: 100000 }],
   sports_teams: [{ id: 5, name: 'Аварга', service_prices: { 1: 25000 } }],
@@ -349,6 +360,42 @@ try {
   assert.deepEqual([visit.table, visit.contract_id, visit.service_id, visit.service_label, visit.staff_id, visit.used_on, visit.units], ['package_redemptions', 50, 1, 'Cabin', 7, today, 1]);
   await a.say('Бат багц');
   assert.match(await a.reply(), /Recovery — 1\/10 ашигласан · 9 үлдсэн/, 'the visit shows up in the balance straight away');
+
+  /* ── the conversation from the floor: look someone up, then just say what is happening ── */
+  await a.say('mandakh jiremsen eej');
+  assert.match(await a.reply(), /Mandakh Jiremsen eej · 85614211/);
+  await a.press('Багц харах');
+  assert.match(await a.reply(), /Jiremsen eejiin Oxygen bagts — 1\/4 ашигласан · 3 үлдсэн/);
+  await a.say('odoo negeer orj baina');
+  text = await a.reply();
+  assert.match(text, /Багцын оролтыг бүртгэх үү/, 'no name on the line: it is about the customer just looked up');
+  assert.match(text, /Үйлчлүүлэгч Mandakh Jiremsen eej/);
+  assert.match(text, /Орох Oxygen/, 'the service comes from the package itself');
+  assert.match(text, /Үлдэх 2 эрх/);
+  await a.press('Бүртгэх');
+  let entry = (await a.count(() => window.inserted)).at(-1);
+  assert.deepEqual([entry.table, entry.contract_id, entry.service_id, entry.service_label, entry.units, entry.used_on], ['package_redemptions', 60, 7, 'Oxygen', 1, today]);
+  assert.match(await a.reply(), /Үлдсэн эрх: 2/);
+  // the memory carries on: a second visit, two at once
+  await a.say('дахиад 2 удаа орлоо');
+  assert.match(await a.reply(), /Орох Oxygen × 2[\s\S]*Үлдэх 0 эрх/);
+  await a.press('Бүртгэх');
+  assert.equal((await a.count(() => window.inserted)).at(-1).units, 2);
+  await a.say('орлоо');
+  assert.match(await a.reply(), /идэвхтэй багц алга/, 'a package that is used up takes no more visits');
+  // a package that names its services: the one with sessions left is taken, a used-up one is refused
+  await a.say('Батболд орлоо');
+  assert.match(await a.reply(), /Орох Гоо сайхан/);
+  await a.press('Болих');
+  await a.say('Батболд орлоо cabin');
+  assert.match(await a.reply(), /Cabin — энэ багцад 0 эрх үлдсэн/);
+  await a.say('Батболд орлоо oxygen');
+  assert.match(await a.reply(), /багцад Oxygen ороогүй/);
+  // «болих» lets go of the customer too
+  await a.say('болих');
+  await a.say('орлоо');
+  assert.match(await a.reply(), /Хэний багцын оролт вэ/);
+  await a.say('болих');
 
   /* ── sports teams ── */
   await a.say('баг Аварга Дорж cabin');

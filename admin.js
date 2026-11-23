@@ -4519,6 +4519,16 @@ async function runImport() {
    ══════════════════════════════════════════════════════════════ */
 let asstDraft = null;   // a booking being put together over several messages
 let asstPending = null; // any other request still missing a piece; the next reply is added to it
+/* Who the conversation is about. After «Болд багц», a line with no name —
+   «одоо нэгээр орж байна», «төлбөр хаан» — is about Болд. It lapses after a
+   while so a stale name is never picked up, and every card still shows the
+   name before anything is saved. */
+let asstLast = null;
+const ASST_MEMORY_MS = 15 * 60 * 1000;
+const asstRemember = (customer) => { if (customer?.full_name) asstLast = { customer, at: Date.now() }; };
+const asstRecall = () => (asstLast && Date.now() - asstLast.at < ASST_MEMORY_MS ? asstLast.customer : null);
+/* requests that are about one customer and can borrow the one in hand */
+const ASST_ABOUT_CUSTOMER = new Set(["book", "package", "balance", "pay", "cancel", "confirm", "done", "delete", "move", "provider"]);
 
 const asstServices = () => listedServices().filter((service) => service.active);
 const asstDay = (row) => row.booked_date || String(row.starts_at || "").slice(0, 10);
@@ -4648,6 +4658,7 @@ function asstHandle(text) {
   if (/^(болих|болъё|болио|цуцал|цуцлах|bolih|boliyo|tsutsal|cancel)$/i.test(line)) {
     asstDraft = null;
     asstPending = null;
+    asstLast = null;
     return void asstSay("За, болилоо.");
   }
 
@@ -4682,6 +4693,12 @@ function asstHandle(text) {
     return void asstHandle(whole);
   }
   asstPending = null;
+
+  /* no name on the line: it is about whoever was last looked up */
+  if (!parsed.name && !parsed.phone && (ASST_ABOUT_CUSTOMER.has(parsed.intent) || (parsed.intent === "gift" && parsed.sub !== "sell"))) {
+    const known = asstRecall();
+    if (known) { parsed.name = known.full_name; parsed.customers = [known]; }
+  }
 
   if (parsed.intent === "book") {
     asstDraft = { date: parsed.date, time: parsed.time, service: parsed.service, name: parsed.name, phone: parsed.phone, customer: null, customers: parsed.customers, problems: parsed.problems, byPackage: parsed.byPackage };
@@ -4745,6 +4762,7 @@ function asstBook() {
   }
   /* A phone is not asked for: the table does not need one, and a walk-in
      should not wait on it. A name that is not on file is booked as typed. */
+  if (draft.customer) asstRemember(draft.customer);
   const name = draft.customer?.full_name || draft.name;
   const digits = normalizePhone(draft.customer?.phone || draft.phone || "");
   const phone = digits.length === 8 ? digits : null;
@@ -4899,7 +4917,9 @@ function asstPick(parsed, line, rows, question, then) {
     return asstBad(`«${parsed.name || parsed.phone}» — тохирох захиалга олдсонгүй${parsed.date ? ` (${parsed.date})` : ""}.${similar.length ? " Эдгээрийн аль нэг мөн үү?" : ` «${parsed.name || parsed.phone} хайх» эсвэл «өнөөдрийн хуваарь» гэж шалгаарай.`}`,
       similar.map((name) => asstType(name, line.replace(parsed.name, name))));
   }
-  if (rows.length === 1) return then(rows[0]);
+  /* keep hold of the person, so the next line can go on about them */
+  const owner = (row) => asstRemember(cache.customers.find((customer) => asstSame(customer.full_name, row.customer_name) && (!row.phone || normalizePhone(customer.phone) === normalizePhone(row.phone))) || cache.customers.find((customer) => asstSame(customer.full_name, row.customer_name)));
+  if (rows.length === 1) { owner(rows[0]); return then(rows[0]); }
   const shown = rows.slice(0, 8);
   asstSay(`${question}${rows.length > shown.length ? `\n(${rows.length}-аас эхний ${shown.length}; цаг эсвэл өдрөө нэмж бичвэл нарийсна.)` : ""}`, {
     actions: [...shown.map((row) => ({ label: asstBookingLine(row), run: () => { asstUser(asstBookingLine(row)); then(row); } })), asstCancel()],
@@ -5246,6 +5266,7 @@ function asstFind(parsed) {
   }
   const shown = found.slice(0, 8);
   const one = shown.length === 1 ? shown[0] : null;
+  if (one) asstRemember(one);
   const tag = one ? (one.phone || one.full_name) : "";
   /* looked up by number, but a different name was typed with it */
   const renamed = parsed.phone && parsed.name && !found.some((customer) => sameName(parsed.name, customer.full_name));
@@ -5280,12 +5301,12 @@ function asstOneCustomer(parsed, line, then, ask = "Хэн бэ? Нэр эсвэ
     const similar = parsed.name ? similarCustomers(parsed.name, cache.customers, 5) : [];
     if (!similar.length) return asstBad(`«${parsed.name || parsed.phone}» — үйлчлүүлэгч олдсонгүй.`);
     return void asstSay(`«${parsed.name}» — үйлчлүүлэгч олдсонгүй. Эдгээрийн аль нэг мөн үү?`, {
-      actions: [...similar.map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); then(customer); } })), asstCancel()],
+      actions: [...similar.map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); asstRemember(customer); then(customer); } })), asstCancel()],
     });
   }
-  if (found.length === 1) return then(found[0]);
+  if (found.length === 1) { asstRemember(found[0]); return then(found[0]); }
   asstSay(`«${parsed.name}» нэртэй ${found.length} үйлчлүүлэгч байна. Аль нь вэ?`, {
-    actions: [...found.slice(0, 6).map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); then(customer); } })), asstCancel()],
+    actions: [...found.slice(0, 6).map((customer) => ({ label: asstCustomerLine(customer), run: () => { asstUser(customer.full_name); asstRemember(customer); then(customer); } })), asstCancel()],
   });
 }
 
@@ -5293,7 +5314,10 @@ function asstBalance(parsed, line) {
   asstOneCustomer(parsed, line, (customer) => {
     const contracts = asstContractsOf(customer);
     if (!contracts.length) return void asstSay(`${asstCustomerLine(customer)}\n\nБагц бүртгэгдээгүй.`);
-    asstSay(`${asstCustomerLine(customer)}\n\n${contracts.slice(0, 12).map(asstContractLine).join("\n")}`);
+    const usable = contracts.some((row) => row.__state === "active");
+    asstSay(`${asstCustomerLine(customer)}\n\n${contracts.slice(0, 12).map(asstContractLine).join("\n")}${usable ? "\n\nОролт бүртгэх бол «орлоо» гэж бичнэ үү." : ""}`, {
+      actions: usable ? [asstType("Оролт бүртгэх", "орлоо")] : [],
+    });
   }, "Хэний багцыг харах вэ? Жишээ: «Болд багц»");
 }
 
@@ -5382,27 +5406,54 @@ function asstPackage(parsed, line) {
       const active = asstContractsOf(customer).filter((row) => row.__state === "active");
       if (!active.length) return asstBad(`${customer.full_name} — идэвхтэй багц алга.`);
       if (!who.employee) return asstBad("Багцын оролтод бүртгэх ажилтны нэр хэрэгтэй. Зүүн талын цэснээс нэрээ сонгоно уу.");
-      if (!parsed.services.length) return asstAsk(line, "Аль төхөөрөмжийг ашигласан бэ? Жишээ: cc led", asstServices().filter((service) => !service.parent_id).map((service) => asstAdd(line, service.name)));
-      const record = (contract) => {
-        if (contract.__left != null && parsed.services.length > contract.__left) return asstBad(`Энэ багцад ${contract.__left} эрх үлдсэн байна.`);
+      const units = parsed.count || 1;
+      const record = (contract, chosen = null) => {
+        const spentOn = (serviceId) => cache.redemptions.filter((row) => Number(row.contract_id) === Number(contract.id) && Number(row.service_id) === Number(serviceId)).reduce((sum, row) => sum + (Number(row.units) || 1), 0);
+        /* what this package covers, where it says so */
+        const covered = (contract.service_units || []).map((item) => ({ service: cache.services.find((service) => Number(service.id) === Number(item.service_id)), limit: Number(item.units), left: Number(item.units) - spentOn(item.service_id) })).filter((item) => item.service);
+        let services = chosen || parsed.services;
+        if (!services.length) {
+          /* Nothing was named, so take it from the package: the one service it
+             covers that still has sessions left, or — for an older package
+             that lists none — the service its own name mentions. */
+          const open = covered.filter((item) => item.left > 0);
+          const fromName = covered.length ? [] : parseCommand(contract.__label, asstCtx()).services;
+          if (open.length === 1) services = [open[0].service];
+          else if (!covered.length && fromName.length === 1) services = fromName;
+          else {
+            const options = open.length ? open.map((item) => item.service) : asstServices().filter((service) => !service.parent_id);
+            return void asstSay(`${contract.__label} — аль үйлчилгээнд орж байна вэ?`, {
+              actions: [...options.slice(0, 12).map((service) => ({ label: service.name, run: () => { asstUser(service.name); record(contract, [service]); } })), asstCancel()],
+            });
+          }
+        }
+        /* the same limits the package screen applies */
+        for (const service of services) {
+          const item = covered.find((entry) => Number(entry.service.id) === Number(service.id));
+          if (covered.length && !item) return asstBad(`${contract.__label} багцад ${service.name} ороогүй.`);
+          if (item && units > item.left) return asstBad(`${service.name} — энэ багцад ${Math.max(0, item.left)} эрх үлдсэн байна.`);
+        }
+        const using = units * services.length;
+        if (contract.__left != null && using > contract.__left) return asstBad(`Энэ багцад ${contract.__left} эрх үлдсэн байна.`);
         asstConfirm("Багцын оролтыг бүртгэх үү?", [
           ["Үйлчлүүлэгч", customer.full_name], ["Багц", asstContractLine(contract)],
-          ["Ашигласан", parsed.services.map((service) => service.name).join(", ")], ["Өдөр", today],
+          ["Орох", services.map((service) => service.name).join(", ") + (units > 1 ? ` × ${units}` : "")],
+          contract.__left != null ? ["Үлдэх", `${contract.__left - using} эрх`] : null, ["Өдөр", today],
         ], "Бүртгэх", async () => {
-          const { data, error } = await sb.from("package_redemptions").insert(parsed.services.map((service) => ({
-            contract_id: contract.id, used_on: today, units: 1, service_id: service.id, service_label: service.name, staff_id: who.employee.id, notes: null,
+          const { data, error } = await sb.from("package_redemptions").insert(services.map((service) => ({
+            contract_id: contract.id, used_on: today, units, service_id: service.id, service_label: service.name, staff_id: who.employee.id, notes: null,
           }))).select();
           if (error) throw error;
-          cache.redemptions.push(...(data || []).map((row) => ({ contract_id: row.contract_id, used_on: row.used_on, units: row.units })));
+          cache.redemptions.push(...(data || []));
           renderContracts();
           window.dispatchEvent(new Event("cryo:assistant-changed"));
-          const left = contract.__left == null ? "" : ` Үлдсэн эрх: ${contract.__left - parsed.services.length}.`;
-          asstSay(`${customer.full_name} · ${contract.__label} — ${parsed.services.length} оролт бүртгэгдлээ.${left}`, { tone: "ok" });
+          const left = contract.__left == null ? "" : ` Үлдсэн эрх: ${contract.__left - using}.`;
+          asstSay(`${customer.full_name} · ${contract.__label} — ${services.map((service) => service.name).join(", ")}${units > 1 ? ` × ${units}` : ""} оролт бүртгэгдлээ.${left}`, { tone: "ok" });
         });
       };
       if (active.length === 1) return record(active[0]);
-      asstSay("Аль багцаас хасах вэ?", { actions: [...active.slice(0, 6).map((contract) => ({ label: asstContractLine(contract), run: () => { asstUser(contract.__label); record(contract); } })), asstCancel()] });
-    }, "Хэний багцын оролт вэ?");
+      asstSay("Аль багцаар орж байна вэ?", { actions: [...active.slice(0, 6).map((contract) => ({ label: asstContractLine(contract), run: () => { asstUser(contract.__label); record(contract); } })), asstCancel()] });
+    }, "Хэний багцын оролт вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.");
   }
 
   /* selling: the line holds two names — take the package out, the rest is the customer */
