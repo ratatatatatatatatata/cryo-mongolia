@@ -94,6 +94,7 @@
     <button class="nav-item on" data-view="overview" id="navOverview"><span class="ic">◈</span> Хяналтын самбар</button>
     <button class="nav-item" data-view="coverage" id="navCoverage"><span class="ic">✓</span> Excel шилжилт</button>
     <button class="nav-item" data-view="customers" id="navCustomers"><span class="ic">♙</span> Үйлчлүүлэгчид</button>
+    <button class="nav-item" data-view="staffRequests" id="navStaffRequests"><span class="ic">!</span> Сайжруулах хүсэлт <span id="staffRequestBadge" aria-label="Нээлттэй хүсэлтийн тоо"></span></button>
     <button class="nav-item" data-view="reports" id="navReports"><span class="ic">₮</span> Борлуулалт, тайлан</button>
     <button class="nav-item" data-view="ledger" id="navLedger" style="display:none"><span class="ic">₮</span> Борлуулалтын бүртгэл</button>
     <button class="nav-item" data-view="expenses" id="navExpenses"><span class="ic">▽</span> Зардал</button>
@@ -840,10 +841,16 @@
       </div>
     </section>
 
+    <section class="view" data-panel="staffRequests">
+      <div class="page-head"><div><h1 class="page-title">Сайжруулах хүсэлт</h1><p id="staffRequestScope" class="page-sub"></p></div><button class="btn-sm ghost" id="staffRequestRefresh">Дахин шалгах</button></div>
+      <p class="notice">Туслах ойлгоогүй эсвэл үйлдэл хадгалж чадаагүй үед ерөнхий мэдэгдэл энд бүртгэгдэнэ. Энэ нь заавал системийн алдаа гэсэн дүгнэлт биш; админ шалгаж шийднэ. Бүтэн яриа, үйлчлүүлэгчийн мэдээллийг автоматаар илгээхгүй.</p>
+      <form id="staffRequestForm" class="panel"><h2>Ямар боломж хэрэгтэй байна вэ?</h2><label for="staffRequestOperation">Хэсэг</label><select class="ctl" id="staffRequestOperation"><option value="package">Багц</option><option value="booking">Захиалга</option><option value="payment">Төлбөр</option><option value="attendance">Ирц</option><option value="customer">Үйлчлүүлэгч</option><option value="gift">Бэлгийн карт</option><option value="team">Спортын баг</option><option value="other">Бусад</option></select><label for="staffRequestSummary">Хийх гэсэн ажил, юу саад болсон, ямар өөрчлөлт хэрэгтэй вэ?</label><textarea id="staffRequestSummary" class="ctl" minlength="5" maxlength="600" required placeholder="Жишээ: Багцын урамшууллыг хувиар оруулахад нийт оролт харагдах хэрэгтэй байна."></textarea><p class="page-sub">Хүний нэр, утас, эрүүл мэндийн мэдээлэл, нууц үг оруулахгүй. Админ энэ тайлбарыг харна.</p><button class="btn-sm primary" id="staffRequestSend">Админд хүсэлт илгээх</button></form>
+      <p id="staffRequestStatus" role="status"></p><div id="staffRequestList"></div>
+    </section>
   </main>
   <button type="button" id="adminGuideOpen" class="guide-launcher" aria-haspopup="dialog" aria-controls="adminGuide" aria-expanded="false">? Гарын авлага</button>
 
-  <!-- ── STAFF ASSISTANT: typed commands, no AI, nothing leaves the browser ── -->
+  <!-- Typed-command assistant. Generic failure notices go to the private ERP inbox. -->
   <button type="button" id="asstOpen" class="asst-launcher" aria-controls="asstPanel" aria-expanded="false">✦ Туслах</button>
   <section id="asstPanel" class="asst-panel" aria-label="Ажилтны туслах" hidden>
     <header class="asst-head">
@@ -851,6 +858,7 @@
       <button type="button" id="asstClose" class="btn-sm ghost" aria-label="Туслахыг хаах">✕</button>
     </header>
     <div id="asstLog" class="asst-log" role="log" aria-live="polite"></div>
+    <div class="asst-escalation"><button type="button" class="btn-sm ghost" id="asstRequests">Хүсэлт / явц</button><small>Шийдээгүй үйлдлийн ерөнхий мэдэгдэл админд очно. Бүтэн яриаг илгээхгүй.</small><p id="asstEscalationStatus" role="status"></p></div>
     <form id="asstForm" class="asst-form" autocomplete="off">
       <input id="asstInput" class="ctl" maxlength="200" placeholder="Болд маргааш 14:00 cryo cabin" aria-label="Туслахад бичих"/>
       <button class="btn-sm primary" type="submit">Илгээх</button>

@@ -2,6 +2,7 @@ import { packageCustomerGroups, packageState } from "./package-customers.js";
 import { customerPicker } from "./customer-picker.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { matchesName } from "./name-search.js";
+import { createPackageEditor } from "./package-customization.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const sb = createClient(CFG.url, CFG.anonKey);
@@ -19,6 +20,7 @@ let loadedUserId = null;
 let selectedCustomerKey = null;
 let accountSales=[], accountEvents=[], checkoutBooking=null;
 const money = value => '₮' + Number(value || 0).toLocaleString('en-US');
+let packageEditor=null;
 
 function weekday(value) {
   const date = new Date(value + "T12:00:00");
@@ -227,6 +229,13 @@ function renderSelectedPackage() {
   }) : services.map(item=>`<label class="staff-check"><input type="checkbox" value="${item.id}" ${closed?'disabled':''}><span>${safe(item.name)}</span></label>`)).join('');
   $("pkgDetailKpis").innerHTML = [["Авсан багц", contract.package_label || "—", contract.status || "—"], ["Нийт орох эрх", total == null ? "—" : total, "үйлчилгээ"], ["Орсон", spent, `${history.length} бүртгэл`], ["Үлдсэн", left == null ? "—" : left, "үйлчилгээ"]].map(([label, value, note]) => `<div class="kpi"><div class="kpi-label">${safe(label)}</div><div class="kpi-value">${safe(value)}</div><div class="kpi-note">${safe(note)}</div></div>`).join("");
   renderAccount(contract);
+  let editButton=$('pkgCustomize');
+  if(!editButton){editButton=document.createElement('button');editButton.id='pkgCustomize';editButton.type='button';editButton.className='btn-sm primary';editButton.textContent='Авсан багцыг тохируулах';$('pkgDetailKpis').before(editButton);}
+  editButton.disabled=contract.status==='cancelled';
+  editButton.onclick=()=>packageEditor.open(contract.id);
+  let customHistory=$('pkgCustomHistory');
+  if(!customHistory){customHistory=document.createElement('details');customHistory.id='pkgCustomHistory';$('pkgDetailKpis').after(customHistory);}
+  customHistory.innerHTML='<summary>Багцын тохируулгын түүх</summary>'+accountEvents.filter(e=>Number(e.contract_id)===Number(contract.id)&&e.action==='custom_edit').map(e=>`<p>${safe(e.created_at)} · ${safe(staff.find(s=>Number(s.id)===Number(e.detail.staff_id))?.name||'Админ')} · ${safe(e.detail.before?.total_units??'тодорхойгүй')} → ${safe(e.detail.contract?.total_units)} оролт · ${safe(e.detail.note)}</p>`).join('');
   $("pkgVisitBody").innerHTML = history.length ? history.map((item) => {
     const employee = staff.find((person) => Number(person.id) === Number(item.staff_id));
     return `<tr><td class="t-mono">${safe(item.used_on)}</td><td class="t-strong">${safe(item.service_label || "—")}</td><td>${safe(item.units || 1)}</td><td>${safe(employee?.name || "—")}</td><td class="record-note">${safe(item.notes || "—")}</td></tr>`;
@@ -416,6 +425,7 @@ function renderAccount(contract){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  packageEditor=createPackageEditor({sb,getStaffId:()=>currentStaff()?.id||null,getActorKey:()=>user?.id||'',getServices:()=>services,onSaved:async()=>{await load();window.dispatchEvent(new Event('cryo:assistant-changed'));}});
   panels(); fixDay();
   $("pkgLeadSave").addEventListener("click", saveLead);
   $("pkgVisitSave").addEventListener("click", saveVisit);
@@ -424,7 +434,8 @@ document.addEventListener("DOMContentLoaded", () => {
   /* the staff assistant sells packages and records visits through the same tables */
   window.addEventListener("cryo:assistant-changed", () => { load(); });
   sb.auth.onAuthStateChange((_event, session) => {
-    if (!session) { loadedUserId=null; return; }
+    if (!session) { loadedUserId=null;user=null;packageEditor.reset(); return; }
+    if(user?.id&&session.user.id!==user.id)packageEditor.reset();
     if (session.user.id !== loadedUserId) setTimeout(load, 0);
   });
   load();

@@ -41,6 +41,7 @@ const mockClient = (role, paid) => `
   const blocked=(row)=>new Date(Date.parse(row.starts_at)+Math.max(30,Math.ceil(((data.services.find(s=>s.id===row.service_id)||{}).duration_minutes||30)/30)*30)*60000).toISOString();
   const answers={
     is_admin:()=>${role !== 'staff'},
+    staff_improvement_inbox:(a)=>a.p.action==='list'?{requests:[],is_admin:${role !== 'staff'},open_count:0}:{request:{id:1}},
     set_booking_status:(a)=>{const b=data.bookings.find(x=>x.id===a.p_booking_id);b.status=a.p_status;return{booking:{...b}}},
     delete_booking:(a)=>{data.bookings=data.bookings.filter(x=>x.id!==a.p_booking_id);return{}},
     edit_booking:(a)=>{const b=data.bookings.find(x=>x.id===a.p_booking_id);Object.assign(b,a.p_patch);b.booked_date=b.starts_at.slice(0,10);b.booked_time=b.starts_at.slice(11,16);b.blocked_until=blocked(b);return{...b}},
@@ -375,6 +376,12 @@ try {
   assert.match(await a.reply(), /Багц» хуудсыг нээлээ/);
   await a.say('цаг агаар ямар байна');
   assert.match(await a.reply(), /Ойлгосонгүй|олдсонгүй/);
+  const escalated=await a.rpc('staff_improvement_inbox');
+  assert.equal(escalated.p.action,'list');
+  const reports=await a.count(()=>window.rpcs.filter(c=>c.name==='staff_improvement_inbox'&&c.args?.p?.action==='report'));
+  assert.equal(reports.at(-1).args.p.category,'unsupported');
+  assert.deepEqual(Object.keys(reports.at(-1).args.p).sort(),['action','category','operation','request_id','staff_id']);
+  assert.match(await a.page.locator('#asstEscalationStatus').innerText(),/Админд #1/);
   assert.deepEqual(a.errors, [], 'no script errors for an admin');
 
   /* ══ a staff member: the same limits as on the screens ══ */

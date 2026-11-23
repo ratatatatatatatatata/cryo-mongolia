@@ -435,3 +435,19 @@ tr.review td{background:rgba(255,180,80,.05)}
 .asst-form .ctl{flex:1;min-width:0}
 @media(max-width:600px){.asst-launcher{right:12px;bottom:calc(64px + env(safe-area-inset-bottom,0px));padding:11px 15px}.asst-panel{right:12px;left:12px;width:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));height:min(560px,calc(100dvh - 24px))}}
 @media print{.asst-launcher,.asst-panel{display:none!important}}
+/* Customer-specific entitlement editor and private staff improvement inbox. */
+.package-editor{width:min(760px,calc(100vw - 24px));max-height:90dvh;overflow:auto;border:1px solid var(--border-strong,#406078);border-radius:12px;padding:24px;background:var(--panel,#0a1220);color:var(--text-primary,#e8f2fb);margin:auto;line-height:1.6}
+.package-editor::backdrop{background:rgba(5,18,30,.6)}
+.package-editor label,.staff-request label,#staffRequestForm label{display:block;margin-top:12px}
+.package-editor input,.package-editor select,.package-editor textarea,.staff-request .ctl{width:100%}
+.package-edit-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.package-edit-row{border:1px solid var(--border-mid,#406078);padding:16px;margin:16px 0;border-radius:8px}
+.package-edit-row output{display:block;margin-top:12px;font-weight:700;line-height:1.6}
+.package-editor [data-status]{min-height:24px;color:var(--danger-text,#ff9a9a)}
+.asst-escalation{padding:8px 14px;border-top:1px solid var(--line,#ccd8e1);font-size:12px;line-height:1.4}
+.asst-escalation small{display:block;margin-top:6px}
+.asst-escalation p{margin:4px 0}
+#staffRequestBadge:not(:empty){background:#215f85;color:#fff;border-radius:10px;padding:1px 7px}
+.staff-request{margin-top:16px;overflow-wrap:anywhere}
+.staff-request textarea{min-height:80px}
+@media(max-width:600px){.package-editor{padding:16px}.package-edit-fields{grid-template-columns:1fr}.package-edit-row{padding:12px}.package-editor button{min-height:44px}.asst-escalation{max-height:120px;overflow:auto}}

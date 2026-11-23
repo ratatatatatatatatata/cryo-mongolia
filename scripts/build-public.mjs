@@ -36,6 +36,8 @@ const publicFiles = [
   "admin.js",
   "admin-guide.js",
   "package-workspace.js",
+  "package-customization.js",
+  "staff-improvement-inbox.js",
   "package-customers.js",
   "name-search.js",
   "staff-assistant.js",
