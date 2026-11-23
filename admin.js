@@ -11,6 +11,7 @@ import { customerPicker } from "./customer-picker.js";
 import { matchesName, nameKey } from "./name-search.js";
 import "./booking-time.js";
 import { parseCommand, freeTimes, describeDay, findNamed, findCustomers, HELP_GROUPS, METHOD_LABEL } from "./staff-assistant.js";
+import { createImprovementInbox, assistantOperation } from "./staff-improvement-inbox.js";
 
 const CFG = window.CRYO_SUPABASE || {};
 const $ = (id) => document.getElementById(id);
@@ -60,6 +61,7 @@ const ADMIN_ONLY_NAV = [
 
 let sb = null;
 let me = null; // { id, email, full_name, role }
+let improvementInbox=null;
 let cache = {
   bookings: [], messages: [], services: [], packages: [], users: [], months: [],
   sales: [], expenses: [], staff: [], customers: [], attendance: [], workdays: [], dailyStatus: [], inventory: [],
@@ -188,6 +190,7 @@ async function route() {
 
   if (!session) {
     me = null;
+    void improvementInbox?.refresh();
     show($("authGate"));
     show($("denyGate"), false);
     show($("shell"), false);
@@ -258,6 +261,7 @@ async function route() {
   }
 
   await loadAll();
+  void improvementInbox?.refresh();
   setupBookingRealtime();
   setupAttendanceRealtime();
 }
@@ -4519,6 +4523,7 @@ async function runImport() {
    ══════════════════════════════════════════════════════════════ */
 let asstDraft = null;   // a booking being put together over several messages
 let asstPending = null; // any other request still missing a piece; the next reply is added to it
+let asstCurrentOperation='unknown';
 
 const asstServices = () => listedServices().filter((service) => service.active);
 const asstDay = (row) => row.booked_date || String(row.starts_at || "").slice(0, 10);
@@ -4605,13 +4610,14 @@ function asstAsk(line, text, actions = []) {
 
 /* the confirmation every write goes through */
 function asstConfirm(question, card, label, work) {
+  const operation=asstCurrentOperation;
   asstSay(question, {
     card,
     actions: [{
       label, primary: true,
       run: async () => {
         try { await work(); }
-        catch (error) { asstBad("Хадгалж чадсангүй: " + (error?.message || error)); }
+        catch (error) { asstBad("Хадгалж чадсангүй: " + (error?.message || error));void improvementInbox?.report('save_failed',operation); }
       },
     }, asstCancel()],
   });
@@ -4652,6 +4658,7 @@ function asstHandle(text) {
   }
 
   const parsed = parseCommand(line, asstCtx());
+  asstCurrentOperation=assistantOperation(parsed.intent);
 
   /* A reply to a question — "14:30", a phone number, a name — carries no
      request of its own: it fills in the booking already being put together. */
@@ -4696,9 +4703,10 @@ function asstHandle(text) {
     gift: asstGift, package: asstPackage, team: asstTeam, open: asstOpenPage, help: () => asstHelp(),
   };
   const handler = handlers[parsed.intent];
-  if (!handler) return void asstHelp("Ойлгосонгүй. Ингэж бичээд үзээрэй:");
-  try { Promise.resolve(handler(parsed, line)).catch((error) => asstBad("Алдаа гарлаа: " + (error?.message || error))); }
-  catch (error) { asstBad("Алдаа гарлаа: " + (error?.message || error)); }
+  if (!handler) {asstHelp("Ойлгосонгүй. Ингэж бичээд үзээрэй:");void improvementInbox?.report('unsupported','unknown');return;}
+  const operation=asstCurrentOperation;
+  try { Promise.resolve(handler(parsed, line)).catch((error) => {asstBad("Алдаа гарлаа: " + (error?.message || error));void improvementInbox?.report('save_failed',operation);}); }
+  catch (error) { asstBad("Алдаа гарлаа: " + (error?.message || error));void improvementInbox?.report('save_failed',operation); }
 }
 
 /* ── booking: ask for whatever is missing, check the slot, then confirm ── */
@@ -4827,6 +4835,7 @@ async function asstSaveBooking({ name, phone, service, day, time, known, kind })
     asstSay(`Бүртгэлээ: ${name} · ${service.name} · ${day} ${time}`, { tone: "ok" });
   } catch (error) {
     asstBad(error.code === "23P01" ? "Энэ цагийг яг одоо өөр хүн авчихлаа. Захиалга хадгалагдаагүй — өөр цаг сонгоно уу." : "Хадгалж чадсангүй: " + error.message);
+    if(error.code!=="23P01")void improvementInbox?.report('save_failed','booking');
     const refreshed = await fetchAll(() => sb.from("bookings").select("*").order("id"));
     if (!refreshed.error) { cache.bookings = refreshed.data || []; renderBookings(); }
   }
@@ -5470,6 +5479,7 @@ function asstOpenPage(parsed) {
 }
 
 function wireAssistant() {
+  improvementInbox=createImprovementInbox({getClient:()=>sb,getContext:()=>({userId:me?.id,staffId:bookingEmployee()?.id||null,admin:isAdminUser()}),openView:()=>switchView('staffRequests')});
   const panel = $("asstPanel"), opener = $("asstOpen");
   if (!panel || !opener) return;
   let greeted = false;
@@ -5478,7 +5488,7 @@ function wireAssistant() {
     opener.hidden = open;
     opener.setAttribute("aria-expanded", String(open));
     if (open) {
-      if (!greeted) { greeted = true; asstHelp("Сайн байна уу. Хийх зүйлээ бичээрэй — ажилтны хийдэг бүх зүйлийг би бүртгэж чадна:"); }
+      if (!greeted) { greeted = true; asstHelp("Сайн байна уу. Дараах ажлуудад тусалж чадна. Шийдэж чадахгүй зүйл гарвал админд хүсэлт дамжуулна:"); }
       $("asstInput").focus();
     }
   };
