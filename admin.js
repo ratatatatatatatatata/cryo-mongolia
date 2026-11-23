@@ -4726,15 +4726,13 @@ function asstBook() {
       );
     } else if (!draft.name) {
       return void asstSay("Хэний нэр дээр бүртгэх вэ? Нэр эсвэл утасны дугаарыг бичнэ үү.", { actions: [cancel] });
-    } else if (!draft.phone) {
-      return void asstSay(`«${draft.name}» бүртгэлгүй байна. Шинээр бүртгэхийн тулд 8 оронтой утасны дугаарыг бичнэ үү.`, { actions: [cancel] });
     }
   }
+  /* A phone is not asked for: the table does not need one, and a walk-in
+     should not wait on it. A name that is not on file is booked as typed. */
   const name = draft.customer?.full_name || draft.name;
-  const phone = normalizePhone(draft.customer?.phone || draft.phone || "");
-  if (phone.length !== 8) {
-    return void asstSay(`${name}-н утас бүртгэгдээгүй байна. Захиалгад холбоо барих утас хэрэгтэй — 8 оронтой дугаарыг бичнэ үү.`, { actions: [cancel] });
-  }
+  const digits = normalizePhone(draft.customer?.phone || draft.phone || "");
+  const phone = digits.length === 8 ? digits : null;
 
   /* what */
   if (!draft.service) {
@@ -4751,10 +4749,23 @@ function asstBook() {
     draft.date = null;
     return asstBad(said + "\n\nӨөр өдөр бичнэ үү.", [asstType("өнөөдөр"), asstType("маргааш"), cancel]);
   }
+  /* No time said, for today: the customer is here now, so take the slot the
+     clock is in — or the nearest free one — and let the card say so. Only
+     another day with no time has to be asked about. */
+  if (!draft.time && draft.date === today) {
+    const now = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ulaanbaatar", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    const grid = asstSlot(service, today, null);
+    const current = grid.every.filter((time) => time <= now).at(-1);
+    if (current) {
+      const minutes = (time) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+      const free = grid.open.includes(current) ? current : [...grid.open].sort((a, b) => Math.abs(minutes(a) - minutes(current)) - Math.abs(minutes(b) - minutes(current)))[0];
+      if (free) { draft.time = free; draft.assumedTime = free === current ? "now" : "nearest"; }
+    }
+  }
   const slot = asstSlot(service, draft.date, draft.time);
   if (!draft.time) {
     if (!slot.open.length) return asstBad(`${service.name} · ${describeDay(draft.date, today)} — сул цаг үлдээгүй. Өөр өдөр бичнэ үү.`, [cancel]);
-    return void asstSay(`Хэдэн цагт вэ? ${service.name} · ${describeDay(draft.date, today)} — сул цагууд:`, { actions: [...slot.open.slice(0, 14).map((time) => asstType(time)), cancel] });
+    return void asstSay(`Хэдэн цагт вэ? ${service.name} · ${describeDay(draft.date, today)} — сул цагууд:`, { actions: [...slot.open.slice(0, 24).map((time) => asstType(time)), cancel] });
   }
   if (slot.problem) {
     draft.time = null;
@@ -4765,13 +4776,15 @@ function asstBook() {
   if (!who.ok) return;
 
   const notes = [];
-  if (draft.assumedDay) notes.push("Өдөр хэлээгүй тул өнөөдөр гэж авлаа.");
-  if (slot.start < Date.now()) notes.push("Өнгөрсөн цаг — нөхөж бүртгэнэ.");
-  if (!draft.customer) notes.push("Шинэ үйлчлүүлэгчээр хадгалагдана.");
+  if (draft.assumedTime === "now") notes.push("Цаг хэлээгүй тул одоогийн цагт авлаа.");
+  else if (draft.assumedTime === "nearest") notes.push("Одоогийн цаг завгүй тул хамгийн ойрын сул цагт авлаа.");
+  else if (draft.assumedDay) notes.push("Өдөр хэлээгүй тул өнөөдөр гэж авлаа.");
+  if (!draft.assumedTime && slot.start < Date.now()) notes.push("Өнгөрсөн цаг — нөхөж бүртгэнэ.");
+  if (!draft.customer) notes.push(phone ? "Шинэ үйлчлүүлэгчээр хадгалагдана." : "Жагсаалтад байхгүй нэр — бичсэнээр нь бүртгэнэ.");
   if (draft.byPackage) notes.push("Багцын эрхээр — төлбөр авахгүй.");
   asstSay("Ингэж бүртгэх үү?" + (notes.length ? "\n" + notes.join("\n") : ""), {
     card: [
-      ["Үйлчлүүлэгч", `${name} · ${phone}`],
+      ["Үйлчлүүлэгч", phone ? `${name} · ${phone}` : `${name} · утасгүй`],
       ["Үйлчилгээ", `${service.name} · ${duration} мин`],
       ["Өдөр", describeDay(draft.date, today)],
       ["Цаг", draft.time],
@@ -4786,9 +4799,10 @@ function asstSlot(service, day, time, except = null) {
   const duration = Number(service.duration_minutes) || 30;
   const rows = asstCalendarRows(service, except);
   const options = { day, duration, bookings: rows, blockedMinutes: CryoSchedule.blockedMinutes };
-  const open = freeTimes(options);
-  if (!time) return { open, nearest: [], problem: null };
+  /* earlier hours of the day count as free: a visit is often written up after it happened */
+  const open = freeTimes({ ...options, includePast: true });
   const every = freeTimes({ ...options, bookings: [], includePast: true });
+  if (!time) return { open, every, nearest: [], problem: null };
   const start = Date.parse(`${day}T${time}:00+08:00`);
   const end = start + CryoSchedule.blockedMinutes(duration) * 60000;
   const distance = (t) => Math.abs(Date.parse(`${day}T${t}:00+08:00`) - start);
@@ -4800,7 +4814,7 @@ function asstSlot(service, day, time, except = null) {
     const taken = rows.find((row) => CryoSchedule.overlaps(start, end, Date.parse(row.starts_at), Date.parse(row.blocked_until || row.ends_at)));
     if (taken) problem = `${service.name} · ${day} ${time} завгүй байна — ${taken.booked_time || ""} ${taken.customer_name || ""}.` + (open.length ? "\n\nОйролцоох сул цаг:" : "\n\nЭнэ өдөр сул цаг үлдээгүй.");
   }
-  return { open, nearest, problem, start };
+  return { open, every, nearest, problem, start };
 }
 
 /* the same insert the booking form makes, for one slot */
@@ -4809,7 +4823,7 @@ async function asstSaveBooking({ name, phone, service, day, time, known, kind })
   if (!staffCanChange(day)) return asstBad("Ажилтан зөвхөн өнөөдөр, маргаашийн цагт захиалга бүртгэнэ.");
   const who = asstEmployee();
   if (!who.ok) return;
-  if (!known) ensureCustomer(name, phone).catch(() => {});
+  if (!known && phone) ensureCustomer(name, phone).catch(() => {});
   try {
     const { data, error } = await sb.from("bookings").insert({
       ref: "STAFF-" + crypto.randomUUID(), booking_group: crypto.randomUUID(), customer_name: name, phone,
@@ -4936,6 +4950,8 @@ function asstMove(parsed, line) {
     if (!service) return asstBad("Энэ захиалгын үйлчилгээ олдсонгүй. Захиалга хуудаснаас засна уу.");
     if (!staffCanChange(asstDay(booking)) || !staffCanChange(day)) return asstBad("Ажилтан зөвхөн өнөөдөр, маргаашийн захиалгыг, мөн тэр өдрүүд рүү л засна.");
 
+    const phone = booking.phone || parsed.phone;
+    if (!phone) return asstAsk(line, `${asstBookingLine(booking)}\n\nЭнэ захиалгад утас бүртгэгдээгүй. Захиалга засахад систем утас шаарддаг тул утасны дугаарыг нь бичнэ үү.`);
     const propose = (time) => {
       if (day === asstDay(booking) && time === timeOf(booking) && Number(service.id) === Number(booking.service_id)) {
         return asstAsk(line, `${asstBookingLine(booking)}\n\nЮуг өөрчлөх вэ? Шинэ цаг, өдөр эсвэл төхөөрөмжөө бичнэ үү.`);
@@ -4946,7 +4962,7 @@ function asstMove(parsed, line) {
         ["Одоо", asstBookingLine(booking)],
         ["Шинэ", `${day} ${time} · ${service.name} · ${booking.customer_name}`],
       ], "Өөрчлөх", async () => {
-        const patch = { customer_name: booking.customer_name, phone: booking.phone, note: booking.note || null, service_id: service.id, starts_at: `${day}T${time}:00+08:00` };
+        const patch = { customer_name: booking.customer_name, phone, note: booking.note || null, service_id: service.id, starts_at: `${day}T${time}:00+08:00` };
         const { data, error } = await sb.rpc("edit_booking", { p_booking_id: booking.id, p_patch: patch });
         if (error) {
           if (error.code === "23P01" || /overlap|bookings_no_device_overlap/.test(error.message || "")) throw new Error("тухайн цаг өөр захиалгатай давхцаж байна.");
@@ -5013,7 +5029,6 @@ function asstPay(parsed, line) {
     if (!total) return asstBad("Төхөөрөмжийн үндсэн үнэ тохируулаагүй байна. «Үйлчилгээ, үнэ» хуудаснаас тохируулна уу.");
     const who = asstEmployee();
     if (!who.ok) return;
-    if (!first.phone) return asstBad("Энэ захиалгад утас бүртгэгдээгүй. Захиалгаа засаж утас нэмсний дараа төлбөр бүртгэнэ.");
 
     if (!parsed.payments.length) {
       return asstAsk(line, `${first.customer_name} · ${usage.label}\nНийт ${money(total)}. Яаж төлсөн бэ?`, [
@@ -5065,14 +5080,14 @@ function asstPay(parsed, line) {
 
     const parts = [...split.entries()];
     asstConfirm("Төлбөрийг ингэж бүртгэх үү?", [
-      ["Үйлчлүүлэгч", `${first.customer_name} · ${first.phone}`],
+      ["Үйлчлүүлэгч", first.phone ? `${first.customer_name} · ${first.phone}` : first.customer_name],
       ["Үйлчилгээ", usage.label],
       ["Нийт", money(total)],
       ["Төлбөр", asstMethodsText(parts)],
       card ? ["Gift card", `${card.code} · үлдэгдэл ${money(card.balance)}`] : null,
     ], "Төлсөн", async () => {
       const patch = {
-        customer_name: first.customer_name, phone: first.phone, services: usage.label, note: first.note || null,
+        customer_name: first.customer_name, phone: first.phone || null, services: usage.label, note: first.note || null,
         is_internal: false, therapist: who.employee?.name || null, staff_id: who.employee?.id || null,
         therapist_amount: 0, needs_review: false, source: "manual",
       };
