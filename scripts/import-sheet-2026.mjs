@@ -279,6 +279,18 @@ const staffNames = new Set();
 }
 
 /* ══════════════ SQL ══════════════ */
+
+/* Has anybody worked on this package in the dashboard — recorded a visit by
+   hand, taken a payment, booked against it, changed or transferred it? Once
+   they have, the dashboard is where that package lives, and the sheet must
+   not overwrite it: every statement below leaves such a package whole. */
+const touched = (c) => `(
+       exists (select 1 from public.package_redemptions m where m.contract_id = ${c}.id
+                 and (m.source_key is null or (m.source_key not like 'sheet2026:%' and m.source_key not like 'Багц 20%')))
+    or exists (select 1 from public.sales s where s.package_contract_id = ${c}.id)
+    or exists (select 1 from public.bookings b where b.package_contract_id = ${c}.id)
+    or exists (select 1 from public.package_account_events e where e.contract_id = ${c}.id))`;
+
 const header = `-- ═══════════════════════════════════════════════════════════════
 --  °CRYO Mongolia — ${YEAR} from the Google Sheet
 --  Generated ${new Date().toISOString().slice(0, 10)} by scripts/import-sheet-2026.mjs
@@ -287,18 +299,26 @@ ${report.map((line) => "--  " + line).join("\n")}
 --
 --  LOCAL ONLY — customer names and phone numbers; supabase/local/ is gitignored.
 --  Run the staff_schedule migration first, then these parts in order.
---  Safe to run again: what an earlier run of this file put in is replaced.
+--  Safe to run again: packages are brought up to date with the sheet, except
+--  any that staff have since worked on in the dashboard — those are left whole.
 -- ═══════════════════════════════════════════════════════════════
 
--- Package rows from earlier imports of the workbook are replaced by this
--- reading, which follows the colours. Rows that staff have since worked on
--- — a visit recorded, a payment taken — are left alone.
-delete from public.package_redemptions
- where source_key like 'sheet2026:%' or source_key like 'Багц 2026:%' or source_key like 'Багц 2025:%';
+-- 1. The first import made one contract per device block and could not see
+--    the colours. Those rows are superseded — unless someone has used them.
+delete from public.package_redemptions r using public.customer_package_contracts c
+ where r.contract_id = c.id
+   and (c.source_key like 'Багц 2026:%' or c.source_key like 'Багц 2025:%')
+   and not ${touched("c")};
 delete from public.customer_package_contracts c
- where (c.source_key like 'sheet2026:%' or c.source_key like 'Багц 2026:%' or c.source_key like 'Багц 2025:%')
+ where (c.source_key like 'Багц 2026:%' or c.source_key like 'Багц 2025:%')
    and not exists (select 1 from public.package_redemptions r where r.contract_id = c.id)
-   and not exists (select 1 from public.sales s where s.package_contract_id = c.id);
+   and not ${touched("c")};
+
+-- 2. This file's own visits are re-read from the sheet each time.
+delete from public.package_redemptions r using public.customer_package_contracts c
+ where r.contract_id = c.id and r.source_key like 'sheet2026:%'
+   and not ${touched("c")};
+
 delete from public.service_sessions where source_key like 'sheet2026:%';
 delete from public.staff_schedule where source = 'workbook';
 
@@ -323,13 +343,19 @@ contracts.forEach((c) => {
     ? `coalesce((select jsonb_agg(jsonb_build_object('service_id', s.id, 'service_name', s.name, 'units', v.units) order by v.ord)\n     from (values ${c.units.map((item) => `(${q(item.slug)},${item.units},${item.order})`).join(", ")}) as v(slug, units, ord)\n     join public.services s on s.slug = v.slug), '[]'::jsonb)`
     : "'[]'::jsonb";
   chunks.push(
-    "insert into public.customer_package_contracts\n  (customer_id, customer_label, package_label, purchased_on, total_units, status, source_key, notes, service_units)\n" +
+    "insert into public.customer_package_contracts as c\n  (customer_id, customer_label, package_label, purchased_on, total_units, status, source_key, notes, service_units)\n" +
     /* Every contract goes in as active, whatever its colour: the database
        refuses a visit against a package that is not active, and the visits
        of a finished package are history that still has to be loaded. The
        finished ones are marked at the very end, once their visits are in. */
     `select ${c.phone ? `(select id from public.customers where phone = ${q(c.phone)} limit 1)` : "null"}, ${q(c.name)}, ${q(c.label)}, ${c.start ? q(c.start) + "::date" : "null"}, ${c.total ?? "null"}, 'active', ${q(c.key)}, ${q(c.notes)},\n  ${units}\n` +
-    `where not exists (select 1 from public.customer_package_contracts c where c.source_key = ${q(c.key)});`);
+    /* A row already loaded is brought up to date rather than skipped, so a
+       second run picks up what changed in the sheet — new sessions bought,
+       a corrected name. It goes back to active for the same reason as above. */
+    "on conflict (source_key) where source_key is not null do update set\n" +
+    "  customer_label = excluded.customer_label, package_label = excluded.package_label, purchased_on = excluded.purchased_on,\n" +
+    "  total_units = excluded.total_units, notes = excluded.notes, service_units = excluded.service_units, status = 'active'\n" +
+    `where not ${touched("c")};`);
 });
 
 chunks.push("-- ══════════ БАГЦ — sessions used ══════════");
@@ -343,13 +369,14 @@ batch(redemptions, 700, (rows) =>
   "\n) as v(contract, used_on, slug, label, note, cell)\njoin public.customer_package_contracts c on c.source_key = v.contract\nleft join public.services s on s.slug = v.slug\n" +
   "where not exists (select 1 from public.package_redemptions p where p.source_key = v.contract || ':' || v.cell)\n" +
   /* a visit the package's own list cannot account for would be refused and take the whole batch with it */
-  "  and (s.id is not null or jsonb_array_length(c.service_units) = 0);");
+  "  and (s.id is not null or jsonb_array_length(c.service_units) = 0)\n" +
+  `  and not ${touched("c")};`);
 
 {
   const done = contracts.filter((c) => c.status === "completed").map((c) => c.key);
   if (done.length) {
     chunks.push("-- ══════════ БАГЦ — the green rows are finished ══════════\n" +
-      "update public.customer_package_contracts set status = 'completed'\n where source_key in (" + done.map(q).join(",") + ");");
+      "update public.customer_package_contracts c set status = 'completed'\n where c.source_key in (" + done.map(q).join(",") + ")\n   and not " + touched("c") + ";");
   }
 }
 
