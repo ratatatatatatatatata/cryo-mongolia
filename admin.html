@@ -842,6 +842,20 @@
 
   </main>
   <button type="button" id="adminGuideOpen" class="guide-launcher" aria-haspopup="dialog" aria-controls="adminGuide" aria-expanded="false">? Гарын авлага</button>
+
+  <!-- ── STAFF ASSISTANT: typed commands, no AI, nothing leaves the browser ── -->
+  <button type="button" id="asstOpen" class="asst-launcher" aria-controls="asstPanel" aria-expanded="false">✦ Туслах</button>
+  <section id="asstPanel" class="asst-panel" aria-label="Ажилтны туслах" hidden>
+    <header class="asst-head">
+      <div><strong>Туслах</strong><small>Хүссэн зүйлээ бичнэ үү</small></div>
+      <button type="button" id="asstClose" class="btn-sm ghost" aria-label="Туслахыг хаах">✕</button>
+    </header>
+    <div id="asstLog" class="asst-log" role="log" aria-live="polite"></div>
+    <form id="asstForm" class="asst-form" autocomplete="off">
+      <input id="asstInput" class="ctl" maxlength="200" placeholder="Болд маргааш 14:00 cryo cabin" aria-label="Туслахад бичих"/>
+      <button class="btn-sm primary" type="submit">Илгээх</button>
+    </form>
+  </section>
 </div>
 <dialog id="adminGuide" class="admin-guide" aria-labelledby="adminGuideTitle">
   <div class="guide-head"><div><h2 id="adminGuideTitle">Ашиглалтын гарын авлага</h2><p>CRYO Mongolia · Админ ба ажилтан</p></div><button type="button" id="adminGuideClose" class="btn-sm ghost" aria-label="Гарын авлага хаах">✕ Хаах</button></div>
